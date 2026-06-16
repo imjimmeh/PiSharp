@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>PiSharp.Ai</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Abstractions\PiSharp.Abstractions.csproj" />
+    <ProjectReference Include="..\PiSharp.Agent.Core\PiSharp.Agent.Core.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Scripts\**\*.cs" />
+    <None Include="Scripts\**\*.cs" />
+  </ItemGroup>
+
+</Project>

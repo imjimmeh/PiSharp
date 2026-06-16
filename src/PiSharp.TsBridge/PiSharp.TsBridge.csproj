@@ -1,0 +1,104 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>PiSharp.TsBridge</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Tools\**\*.cs" />
+    <Compile Remove="Shims\ShimExports.Auto.g.cs" />
+    <Compile Remove="Shims\SdkShimRuntimeActions.Auto.g.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Shims\ShimExports.Auto.g.cs" Condition="Exists('Shims\ShimExports.Auto.g.cs')" />
+    <Compile Include="Shims\SdkShimRuntimeActions.Auto.g.cs" Condition="Exists('Shims\SdkShimRuntimeActions.Auto.g.cs')" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Abstractions\PiSharp.Abstractions.csproj" />
+    <ProjectReference Include="..\PiSharp.Agent.Core\PiSharp.Agent.Core.csproj" />
+    <ProjectReference Include="..\PiSharp.Agent\PiSharp.Agent.csproj" />
+    <ProjectReference Include="..\PiSharp.Ai\PiSharp.Ai.csproj" />
+    <ProjectReference Include="..\PiSharp.Extensions\PiSharp.Extensions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Node\**\*.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Node\dist\**\*.js" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Node\dist\**\*.d.ts" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Node\dist\**\*.map" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Node\package.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Node\tsconfig.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Node\src\**\*.ts" Pack="true" PackagePath="Node\src\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <Target Name="BuildTypeScriptBridge" BeforeTargets="AssignTargetPaths"
+          Condition="'$(NpmAvailable)' == ''">
+    <Exec Command="npm --version" ContinueOnError="true" StandardOutputImportance="low"
+          StandardErrorImportance="low" ConsoleToMSBuild="true">
+      <Output TaskParameter="ExitCode" PropertyName="NpmExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <NpmAvailable Condition="$(NpmExitCode) == 0">true</NpmAvailable>
+      <NpmAvailable Condition="$(NpmExitCode) != 0">false</NpmAvailable>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="BuildTypeScriptBridgeInstall"
+          AfterTargets="BuildTypeScriptBridge"
+          Condition="$(NpmAvailable) == true AND !Exists('Node\node_modules')">
+    <Exec Command="npm ci" WorkingDirectory="Node"
+          StandardOutputImportance="high" StandardErrorImportance="high" />
+  </Target>
+
+  <Target Name="BuildTypeScriptBridgeCompile"
+          AfterTargets="BuildTypeScriptBridgeInstall"
+          Condition="$(NpmAvailable) == true">
+    <Exec Command="npm run build" WorkingDirectory="Node"
+          StandardOutputImportance="high" StandardErrorImportance="high" />
+  </Target>
+
+  <Target Name="BuildTypeScriptBridgeUnavailable"
+          AfterTargets="BuildTypeScriptBridge"
+          Condition="$(NpmAvailable) == false">
+    <Warning Text="npm not found. TypeScript bridge JS must be pre-compiled (cd Node &amp;&amp; npm run build)." />
+  </Target>
+
+  <Target Name="GenerateShimExports" BeforeTargets="CoreCompile"
+          Inputs="Shims\shim-exports.fallback.json;Shims\SdkShimExportClassification.cs;TsBridgeManifestFactory.cs;Tools\ShimExportGenerator\Program.cs;Tools\analyze-shim-exports.mjs"
+          Outputs="Shims\ShimExports.Auto.g.cs;Shims\SdkShimRuntimeActions.Auto.g.cs">
+    <PropertyGroup>
+      <ShimsDir>Shims</ShimsDir>
+      <GeneratedJson>$(ShimsDir)\shim-exports.generated.json</GeneratedJson>
+      <ShimAutoCs>$(ShimsDir)\ShimExports.Auto.g.cs</ShimAutoCs>
+      <SdkShimRuntimeCs>$(ShimsDir)\SdkShimRuntimeActions.Auto.g.cs</SdkShimRuntimeCs>
+    </PropertyGroup>
+
+    <Copy SourceFiles="$(ShimsDir)\shim-exports.fallback.json"
+          DestinationFiles="$(GeneratedJson)"
+          SkipUnchangedFiles="true" />
+
+    <Exec Condition="'$(PiSdkSourcePath)' != '' AND Exists('$(PiSdkSourcePath)')"
+          Command="node &quot;Tools\analyze-shim-exports.mjs&quot; --entry &quot;$(PiSdkSourcePath)&quot; --out &quot;$(GeneratedJson)&quot;"
+          ContinueOnError="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low">
+      <Output TaskParameter="ExitCode" PropertyName="AnalyzerExitCode" />
+    </Exec>
+
+    <Warning Condition="'$(AnalyzerExitCode)' != '' AND '$(AnalyzerExitCode)' != '0'"
+             Text="TypeScript shim export analyzer failed (exit code $(AnalyzerExitCode)). Using fallback data from shim-exports.fallback.json." />
+
+    <Exec Command="dotnet run --project &quot;Tools\ShimExportGenerator\ShimExportGenerator.csproj&quot; -- --input &quot;$(GeneratedJson)&quot; --out-dir &quot;$(ShimsDir)&quot;"
+          StandardOutputImportance="high"
+          StandardErrorImportance="high" />
+
+    <ItemGroup>
+      <Compile Remove="$(ShimAutoCs)" />
+      <Compile Remove="$(SdkShimRuntimeCs)" />
+      <Compile Include="$(ShimAutoCs)" />
+      <Compile Include="$(SdkShimRuntimeCs)" />
+    </ItemGroup>
+  </Target>
+</Project>

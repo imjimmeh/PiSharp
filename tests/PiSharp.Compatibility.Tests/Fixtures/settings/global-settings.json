@@ -1,0 +1,7 @@
+{
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-4-5",
+  "extensions": ["./extensions/sample"],
+  "packages": ["./resources/package-with-extension"],
+  "external": { "preserve": true }
+}

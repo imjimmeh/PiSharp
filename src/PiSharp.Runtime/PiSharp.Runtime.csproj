@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>PiSharp.Runtime</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Abstractions\PiSharp.Abstractions.csproj" />
+    <ProjectReference Include="..\PiSharp.Agent.Core\PiSharp.Agent.Core.csproj" />
+    <ProjectReference Include="..\PiSharp.Agent\PiSharp.Agent.csproj" />
+    <ProjectReference Include="..\PiSharp.Ai\PiSharp.Ai.csproj" />
+    <ProjectReference Include="..\PiSharp.Tools\PiSharp.Tools.csproj" />
+    <ProjectReference Include="..\PiSharp.Extensions\PiSharp.Extensions.csproj" />
+    <ProjectReference Include="..\PiSharp.PluginHost\PiSharp.PluginHost.csproj" />
+    <ProjectReference Include="..\PiSharp.TsBridge\PiSharp.TsBridge.csproj" />
+    <ProjectReference Include="..\PiSharp.Compatibility\PiSharp.Compatibility.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+
+</Project>

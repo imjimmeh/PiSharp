@@ -1,0 +1,196 @@
+using Microsoft.Extensions.Logging;
+using PiSharp.Tui.Interactive;
+using Terminal.Gui;
+
+using PiSharp.Tui.Interactive.Components;
+using PiSharp.Tui.Interactive.Theme;
+
+namespace PiSharp.Tui.Interactive.Shell;
+
+internal sealed class TuiShellView
+{
+    public const int InlineSuggestionHeight = 10;
+    public const int MenuBarHeight = 1;
+    public const int SidebarWidthPercent = 25;
+
+    public Window Window { get; }
+    public MenuBar MenuBar { get; }
+    public TuiSidebarView LeftSidebar { get; }
+    public TuiSidebarView RightSidebar { get; }
+    public HeaderView Header { get; }
+    public ChatView Chat { get; }
+    public WorkingIndicatorView WorkingIndicator { get; }
+    public TextView PromptTitle { get; }
+    public PromptEditor Prompt { get; }
+    public LineView PromptBottomBorder { get; }
+    public InlineSuggestionListView Suggestions { get; }
+    public FooterView Footer { get; }
+    public ScrollBar ChatScrollBar { get; }
+    internal TuiProfilingCounters? ProfilingCounters { get; set; }
+
+    public TuiShellView(ILoggerFactory? loggerFactory = null)
+    {
+        Window = new Window
+        {
+            Title = string.Empty,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            CanFocus = true,
+            BorderStyle = LineStyle.None,
+            ColorScheme = TuiTheme.DefaultColorScheme
+        };
+        MenuBar = new MenuBar
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Menus = []
+        };
+        Header = new HeaderView
+        {
+            X = 0,
+            Y = MenuBarHeight,
+            Width = Dim.Fill(),
+            Height = 3
+        };
+        Chat = new ChatView
+        {
+            X = 0,
+            Y = 3 + MenuBarHeight,
+            Width = Dim.Fill(1),
+            Height = Dim.Fill(7)
+        };
+        WorkingIndicator = new WorkingIndicatorView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(8),
+            Width = Dim.Fill(),
+            Height = 1
+        };
+        PromptTitle = new TextView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(7),
+            Width = Dim.Fill(),
+            Height = 1,
+            ReadOnly = true,
+            WordWrap = false,
+            CanFocus = false
+        };
+        Prompt = new PromptEditor(loggerFactory: loggerFactory)
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(6),
+            Width = Dim.Fill(),
+            Height = 3
+        };
+        PromptBottomBorder = new LineView(Orientation.Horizontal)
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(3),
+            Width = Dim.Fill(),
+            Height = 1
+        };
+        Footer = new FooterView(loggerFactory)
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(2),
+            Width = Dim.Fill(),
+            Height = 2
+        };
+        Suggestions = new InlineSuggestionListView
+        {
+            X = 1,
+            Y = Pos.AnchorEnd(2 + InlineSuggestionHeight),
+            Width = Dim.Fill(2),
+            Height = InlineSuggestionHeight,
+            ColorScheme = TuiTheme.PopupColorScheme,
+            Visible = false
+        };
+        ChatScrollBar = new ScrollBar
+        {
+            X = Pos.AnchorEnd(1),
+            Y = 3 + MenuBarHeight,
+            Width = 1,
+            Height = Dim.Fill(7),
+            AutoShow = true,
+            CanFocus = false
+        };
+        LeftSidebar = new TuiSidebarView(TuiSidebarSide.Left, path => Prompt.InsertText(path + " "))
+        {
+            X = 0,
+            Y = MenuBarHeight,
+            Width = Dim.Percent(SidebarWidthPercent),
+            Height = Dim.Fill(7)
+        };
+        RightSidebar = new TuiSidebarView(TuiSidebarSide.Right)
+        {
+            X = Pos.Percent(100 - SidebarWidthPercent),
+            Y = MenuBarHeight,
+            Width = Dim.Percent(SidebarWidthPercent),
+            Height = Dim.Fill(7)
+        };
+
+        Header.ColorScheme = TuiTheme.DefaultColorScheme;
+        Chat.ColorScheme = TuiTheme.DefaultColorScheme;
+        WorkingIndicator.ColorScheme = TuiTheme.DefaultColorScheme;
+        PromptTitle.ColorScheme = TuiTheme.PromptBorderColorScheme;
+        Prompt.ColorScheme = TuiTheme.DefaultColorScheme;
+        PromptBottomBorder.ColorScheme = TuiTheme.PromptBorderColorScheme;
+        Footer.ColorScheme = TuiTheme.DefaultColorScheme;
+
+        Window.Add(LeftSidebar);
+        Window.Add(RightSidebar);
+        Window.Add(Header);
+        Window.Add(Chat);
+        Window.Add(ChatScrollBar);
+        Window.Add(WorkingIndicator);
+        Window.Add(PromptTitle);
+        Window.Add(Prompt);
+        Window.Add(PromptBottomBorder);
+        Window.Add(Suggestions);
+        Window.Add(Footer);
+        Window.Add(MenuBar);
+
+        ChatScrollBar.PositionChanged += (_, e) => Chat.ScrollTo(e.CurrentValue);
+    }
+
+    public void SetSidebarVisibility(bool leftVisible, bool rightVisible)
+    {
+        LeftSidebar.Visible = leftVisible;
+        RightSidebar.Visible = rightVisible;
+    }
+
+    public void ApplyLayout(TuiShellLayoutMetrics metrics)
+    {
+        ProfilingCounters?.Increment(TuiProfilingCounterNames.LayoutApply);
+
+        var promptHeight = metrics.PromptHeight;
+        var footerHeight = metrics.FooterHeight;
+        var bottomReserved = metrics.BottomReserved;
+        var suggestionsVisible = metrics.SuggestionsVisible;
+        var suggestionsHeight = metrics.SuggestionsHeight;
+
+        Header.Y = MenuBarHeight;
+        Chat.Y = metrics.HeaderHeight + MenuBarHeight;
+        Chat.Height = Dim.Fill(bottomReserved);
+        ChatScrollBar.Y = metrics.HeaderHeight + MenuBarHeight;
+        ChatScrollBar.Height = Dim.Fill(bottomReserved);
+
+        LeftSidebar.Height = Dim.Fill(bottomReserved);
+        RightSidebar.Height = Dim.Fill(bottomReserved);
+
+        Chat.X = LeftSidebar.Visible ? Pos.Right(LeftSidebar) : Pos.Absolute(0);
+        Chat.Width = Dim.Fill(1 + (RightSidebar.Visible ? (int)(Window.Frame.Width * SidebarWidthPercent / 100.0) : 0));
+        ChatScrollBar.X = RightSidebar.Visible ? Pos.Left(RightSidebar) - 1 : Pos.AnchorEnd(1);
+
+        Footer.Y = Pos.AnchorEnd(footerHeight);
+        PromptBottomBorder.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight);
+        Prompt.Height = promptHeight;
+        Prompt.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight + promptHeight);
+        PromptTitle.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight + promptHeight + TuiLayoutMetrics.PromptTitleHeight);
+        Suggestions.Height = suggestionsHeight;
+        Suggestions.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight + promptHeight + TuiLayoutMetrics.PromptTitleHeight + suggestionsHeight);
+        WorkingIndicator.Y = Pos.AnchorEnd(bottomReserved);
+    }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@pisharp/ts-bridge-node",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "clean": "node -e \"import('node:fs/promises').then(fs=>fs.rm('dist',{recursive:true,force:true}))\"",
+    "self-test": "node ./TsBridgeRunner.mjs --self-test",
+    "test": "node --test test/sigint-survival.mjs test/ui-request-timeout.mjs test/agent-session-live-messages.mjs test/shim-pin.test.mjs test/shim-runtime.test.mjs test/shim-manifest.test.mjs test/shim-codegen.test.mjs test/shim-materialize.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "^6.0.3"
+  }
+}
