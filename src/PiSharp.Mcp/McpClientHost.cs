@@ -17,6 +17,7 @@ public sealed class McpClientHost : IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<string, McpServerSession> _sessions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _configErrors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, McpServerConfig> _knownServers = new(StringComparer.Ordinal);
     private readonly HashSet<string> _explicitlyConnected = new(StringComparer.Ordinal);
     private readonly Func<McpTransportKind, IMcpTransportFactory?> _factoryResolver;
     private readonly TimeSpan _settingsDebounce;
@@ -139,9 +140,13 @@ public sealed class McpClientHost : IDisposable
             if (_configErrors.TryGetValue(name, out var error))
                 return new McpServerStatus(name, "settings", "error", LastError: error);
             var desired = BuildDesiredServers();
-            return desired.TryGetValue(name, out var config)
-                ? new McpServerStatus(config.Name, config.Source, "disconnected")
-                : new McpServerStatus(name, "settings", "error", LastError: $"Unknown MCP server '{name}'.");
+            if (desired.TryGetValue(name, out var config))
+                return new McpServerStatus(config.Name, config.Source, "disconnected");
+            // A server that was configured before but has since been removed (or disabled)
+            // stays queryable as disconnected rather than being reported as unknown.
+            if (_knownServers.TryGetValue(name, out var known))
+                return new McpServerStatus(known.Name, known.Source, "disconnected");
+            return new McpServerStatus(name, "settings", "error", LastError: $"Unknown MCP server '{name}'.");
         }
         finally
         {
@@ -256,10 +261,10 @@ public sealed class McpClientHost : IDisposable
     {
         var desired = new Dictionary<string, McpServerConfig>(StringComparer.Ordinal);
         if (!_options.Enabled) return desired;
-
         foreach (var (name, config) in _options.Servers ?? new Dictionary<string, McpServerConfig>())
         {
             if (!config.Enabled) continue;
+            _knownServers[name] = config;
             if (config.Validate(out var error))
             {
                 desired[name] = config;
@@ -280,6 +285,7 @@ public sealed class McpClientHost : IDisposable
                 continue;
             }
             var withSource = contributed with { Name = name, Source = $"extension:{contributed.Source}" };
+            _knownServers[name] = withSource;
             if (withSource.Validate(out var error))
             {
                 desired[name] = withSource;
@@ -317,6 +323,12 @@ public sealed class McpClientHost : IDisposable
     {
         StatusChanged?.Invoke(status);
         _ = _api.Events.EmitAsync(McpEventNames.McpServerStatus, status, CancellationToken.None);
+        if (status.State == "connected")
+        {
+            _ = _api.SendMessageAsync(
+                AgentMessages.User($"Connected MCP server '{status.Name}' ({status.ToolCount} tools)."),
+                cancellationToken: CancellationToken.None);
+        }
     }
 
     private McpServerConfig? FindConfig(string name)

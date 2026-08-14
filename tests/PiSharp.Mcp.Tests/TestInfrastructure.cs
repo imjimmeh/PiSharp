@@ -50,7 +50,7 @@ internal sealed class DuplexStream : Stream
                 if (_buffer.Length > 0)
                 {
                     var read = _buffer.Read(buffer, offset, count);
-                    if (_buffer.Length == 0) _buffer.SetLength(0);
+                    ResetWhenDrained();
                     return read;
                 }
                 if (_complete) return 0;
@@ -68,7 +68,7 @@ internal sealed class DuplexStream : Stream
                 if (_buffer.Length > 0)
                 {
                     var read = _buffer.Read(buffer.Span);
-                    if (_buffer.Length == 0) _buffer.SetLength(0);
+                    ResetWhenDrained();
                     return read;
                 }
                 if (_complete) return 0;
@@ -79,22 +79,50 @@ internal sealed class DuplexStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        lock (_gate) _buffer.Write(buffer, offset, count);
+        lock (_gate)
+        {
+            if (_complete) return;
+            Append(buffer.AsSpan(offset, count));
+        }
         _signal.Release();
     }
 
     public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
-        lock (_gate) _buffer.Write(buffer, offset, count);
-        _signal.Release();
+        Write(buffer, offset, count);
         return Task.CompletedTask;
     }
 
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        lock (_gate) _buffer.Write(buffer.Span);
+        lock (_gate)
+        {
+            if (_complete) return;
+            Append(buffer.Span);
+        }
         _signal.Release();
         await Task.CompletedTask;
+    }
+
+    // MemoryStream.Write appends at the current Position and advances it; appending must
+    // preserve the reader's cursor, and reads must not surface EOF once the buffered data
+    // is fully consumed. Otherwise a StreamReader on either end sees Position == Length and
+    // treats the pipe as closed after the first frame.
+    private void Append(ReadOnlySpan<byte> bytes)
+    {
+        var readerPosition = _buffer.Position;
+        _buffer.Position = _buffer.Length;
+        _buffer.Write(bytes);
+        _buffer.Position = readerPosition;
+    }
+
+    private void ResetWhenDrained()
+    {
+        if (_buffer.Position == _buffer.Length)
+        {
+            _buffer.SetLength(0);
+            _buffer.Position = 0;
+        }
     }
 
     public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
@@ -151,7 +179,7 @@ internal sealed class MockMcpServer : IAsyncDisposable
     }
 
     public IClientTransport CreateClientTransport()
-        => new StreamClientTransport(_serverToClient, _clientToServer, loggerFactory: null);
+        => new StreamClientTransport(_clientToServer, _serverToClient, loggerFactory: null);
 
     public async ValueTask DisposeAsync()
     {
