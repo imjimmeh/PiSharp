@@ -77,6 +77,16 @@ public sealed class ExampleExtension : IExtension
 | `Model` | Select model and thinking level. |
 | `Events` | Subscribe to and emit extension events. |
 | `Prompt` | Register prompt contributors, sections, and transforms. |
+| `Settings` | Namespaced settings (`extensions.<ns>.<key>`), `settings_changed` event. |
+| `State` | Per-extension versioned key-value state store. |
+| `Urls` | Register/unregister `IInternalUrlResolver`s (`skill://`, `agent://`, `diff://`, …). |
+| `Completion` | Completion/autocomplete suggestions API (used by the advisor plugin). |
+| `ExecutionEnv` | Declarative tool execution environment contracts (shell, env, cwd). |
+| `Files` | File/directory access abstractions (used by research + memory plugins). |
+| `Search` | Search/retrieval surface. |
+| `Packages` | Package lifecycle (`install`/`update`/`remove`/`list` backed by `IPackageCommandRunner`). |
+| `Rules` | Rule engine: register `IRuleProvider`s, apply rules with `RuleApplyMode`, list providers. |
+| `Telemetry` | Telemetry export surface (OTLP). |
 
 Top-level convenience methods mirror the grouped APIs:
 
@@ -91,6 +101,8 @@ Top-level convenience methods mirror the grouped APIs:
 - `RegisterProvider(provider)` / `RemoveProvider(api)`
 - `GetFlag(name)` / `GetFlags()`
 - `SendMessageAsync(message, delivery, triggerTurn)`
+- `RegisterSkill(ExtensionSkillDefinition)` / `RegisterRuleProvider(provider)` / `RemoveProvider(api)`
+- `EmitClientEventAsync(name, payload, ct)` — publish a custom client event (reserved names map to their dedicated flat event types, e.g. `advisor_note` → `FromAdvisor`)
 
 ## Registrations
 

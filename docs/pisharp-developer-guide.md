@@ -16,6 +16,8 @@ PiSharp is the C#/.NET port of the Pi coding agent. This guide is the high-level
 | [Model providers](pisharp-providers.md) | `IModelProvider`, built-in providers, model catalog/selection, credentials, extension providers, and provider events. |
 | [Agent coordination](pisharp-agent-coordination.md) | Multi-agent coordination: daemon, tools (`coordination_roster`, `coordination_send`, `coordination_inbox`), soft conflict warnings, subagent event observation, and agent definition frontmatter. |
 | [PiSharp vs TypeScript Pi](pisharp-vs-pi.md) | Compatibility points, architectural differences, settings/session differences, extension model differences, and migration guidance. |
+| [Plugin portfolio](pisharp-plugins.md) | Every shipped plugin (P07–P31): memory, plan mode, permissions, agent messaging, research, MCP, LSP/DAP, eval, observability, SDK, and the daemon-side command surfaces. |
+| [Implementation status](pisharp-implementation-status.md) | P01–P31 status matrix with per-plan test evidence. |
 
 ## What PiSharp does
 

@@ -196,6 +196,22 @@ Located under the `extensions/` directory and executed in an out-of-process Node
 
 - See [TypeScript Extension Compatibility Guide](docs/pisharp-typescript-extensions.md) for details.
 
+## 🧩 Plugin Portfolio
+
+PiSharp ships a portfolio of native plugins covering memory, plan mode, permissions, agent
+messaging, web research, IDE protocol clients (LSP/DAP), MCP, eval/bench, observability, model
+roles, internal URLs, continuity, and more — plus daemon-side command surfaces (theme registry,
+mcp_status, plan-mode RPC, metrics, package/skill commands, advisor event lane).
+
+Each plugin is a `net10.0` class library with `[ExtensionMetadata("id")]`, loaded in-process
+through the same `IExtensionApi` surface used by any native extension.
+
+- [Plugin portfolio guide](docs/pisharp-plugins.md) — every plugin, its plan, and its surface.
+- [Implementation status](docs/pisharp-implementation-status.md) — P01–P31 status + test evidence.
+
+The full portfolio design lives in [docs/plans](docs/plans/2026-08-14-plugin-index.md).
+
+
 ---
 
 ## 📖 Additional Documentation
@@ -210,3 +226,5 @@ For detailed architectural specifications, reference guides, and API contracts, 
 - [Terminal.GUI Architecture Reference](docs/terminal-gui-architecture-reference.md)
 - [Multi-agent Coordination Guide](docs/pisharp-agent-coordination.md)
 - [PiSharp vs TypeScript Pi comparison](docs/pisharp-vs-pi.md)
+- [Plugin portfolio guide](docs/pisharp-plugins.md)
+- [Implementation status](docs/pisharp-implementation-status.md)
