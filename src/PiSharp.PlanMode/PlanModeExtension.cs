@@ -18,12 +18,12 @@ namespace PiSharp.PlanMode;
 /// contributor, and the capture/input-gate subscriptions, and owns the
 /// <see cref="PlanModeService"/> state machine.
 /// </summary>
-public sealed class PlanModeExtension : IExtension, IAsyncDisposable
+public sealed class PlanModeExtension : IExtension, IPlanModeDaemonSurface, IAsyncDisposable
 {
     internal const string SettingsNamespace = "pisharp-plan-mode";
     internal const string PlanFlag = "plan";
     internal const string PlanModelFlag = "plan-model";
-    private const string DefaultRestrictedTools = "read,grep,find,ls";
+    private static readonly IReadOnlyList<string> DefaultRestrictedToolNames = ["read", "grep", "find", "ls"];
 
     private readonly object _gate = new();
     private readonly List<IDisposable> _subscriptions = [];
@@ -33,13 +33,42 @@ public sealed class PlanModeExtension : IExtension, IAsyncDisposable
 
     private bool _planModeEnabled;
     private string? _planningModel;
-    private IReadOnlyList<string> _restrictedTools = [DefaultRestrictedTools];
+    private IReadOnlyList<string> _restrictedTools = DefaultRestrictedToolNames;
     private string _planFilesDir = ".pi/plans";
 
     internal PlanModeService? Service
     {
         get { lock (_gate) return _service; }
     }
+
+    /// <summary>Current machine snapshot for daemon <c>get_plan_mode</c> (never throws).</summary>
+    public ExtensionPlanModeState Current => ToDaemonState(Service?.State ?? new PlanModeState(PlanModePhase.Inactive, [], null, null));
+
+    /// <summary>
+    /// Drives the plan-mode machine from the daemon (<c>set_plan_mode</c>): <c>planning</c> enters,
+    /// <c>executing</c> approves, <c>aborted</c> aborts, <c>inactive</c> ends. Entering a phase the
+    /// machine is already in is a no-op; illegal transitions throw so the daemon can surface them.
+    /// </summary>
+    public async Task<ExtensionPlanModeState> ApplyPhaseAsync(string phase, CancellationToken cancellationToken = default)
+    {
+        var service = Service ?? throw new InvalidOperationException("The plan-mode service is not initialized.");
+        PlanModeState state = phase switch
+        {
+            "planning" => service.Phase is PlanModePhase.Planning or PlanModePhase.Executing
+                ? service.State
+                : await EnterCoreAsync(service, null, cancellationToken),
+            "executing" => await service.ApproveAsync(cancellationToken),
+            "aborted" => await service.AbortAsync(cancellationToken),
+            "inactive" => service.Phase is PlanModePhase.Inactive or PlanModePhase.Aborted
+                ? service.State
+                : await service.EndAsync(cancellationToken),
+            _ => throw new ArgumentException($"Unknown plan-mode phase '{phase}'. Expected 'planning', 'executing', 'aborted', or 'inactive'.", nameof(phase))
+        };
+        return ToDaemonState(state);
+    }
+
+    private static ExtensionPlanModeState ToDaemonState(PlanModeState state)
+        => new(PlanModeService.PhaseToString(state.Phase), state.RestrictedToolNames, state.PlanningModel, state.PlanFile);
 
     public async Task InitializeAsync(IExtensionApi api, CancellationToken cancellationToken = default)
     {
@@ -99,12 +128,18 @@ public sealed class PlanModeExtension : IExtension, IAsyncDisposable
         if (api is null) return;
         try
         {
-            await service.EnterAsync(new PlanModeOptions(_restrictedTools, planningModelOverride ?? _planningModel, _planFilesDir, await ResolveSessionIdAsync(api, cancellationToken)), cancellationToken);
+            await EnterCoreAsync(service, planningModelOverride, cancellationToken);
         }
         catch (Exception ex)
         {
             await api.SendMessageAsync(AgentMessages.User($"[plan mode] Failed to enter plan mode: {ex.Message}"), cancellationToken);
         }
+    }
+
+    private async Task<PlanModeState> EnterCoreAsync(PlanModeService service, string? planningModelOverride, CancellationToken cancellationToken)
+    {
+        var api = _api ?? throw new InvalidOperationException("The plan-mode extension is not initialized.");
+        return await service.EnterAsync(new PlanModeOptions(_restrictedTools, planningModelOverride ?? _planningModel, _planFilesDir, await ResolveSessionIdAsync(api, cancellationToken)), cancellationToken);
     }
 
     private async Task OnPlanCommandAsync(string args, CancellationToken cancellationToken)
@@ -168,7 +203,7 @@ public sealed class PlanModeExtension : IExtension, IAsyncDisposable
     {
         _planModeEnabled = api.Settings.Get<bool?>("planModeEnabled") ?? false;
         _planningModel = api.Settings.Get<string>("planningModel");
-        _restrictedTools = api.Settings.Get<List<string>>("restrictedTools") ?? [DefaultRestrictedTools];
+        _restrictedTools = api.Settings.Get<List<string>>("restrictedTools") ?? DefaultRestrictedToolNames;
         _planFilesDir = api.Settings.Get<string>("planFilesDir") ?? ".pi/plans";
     }
 
