@@ -21,6 +21,7 @@ public sealed class DaemonLeaseStoreTests
         Assert.Equal(lease.ApiKey, read.ApiKey);
         Assert.Equal(lease.StartedAt, read.StartedAt);
         Assert.Equal(lease.Version, read.Version);
+        Assert.False(File.Exists(Path.Combine(tempDir.Path, "daemon.json.tmp")));
     }
 
     [Fact]

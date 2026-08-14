@@ -30,13 +30,32 @@ public sealed class DaemonLeaseStore(string directory)
     {
         Directory.CreateDirectory(directory);
         var tempPath = LeasePath + ".tmp";
-        await using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, lease, ServerJsonSerializer.Options, ct);
-        }
+            await using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(tempPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                await JsonSerializer.SerializeAsync(stream, lease, ServerJsonSerializer.Options, ct);
+            }
 
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(tempPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        File.Move(tempPath, LeasePath, overwrite: true);
+            File.Move(tempPath, LeasePath, overwrite: true);
+        }
+        finally
+        {
+            DeleteTempFileIfPresent(tempPath);
+        }
+    }
+
+    private static void DeleteTempFileIfPresent(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Best-effort cleanup; never mask the original write failure.
+        }
     }
 
     internal static bool ProcessAlive(int pid)
