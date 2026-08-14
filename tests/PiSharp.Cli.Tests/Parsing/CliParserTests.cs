@@ -83,6 +83,14 @@ public sealed class CliParserTests
         Assert.True(args.NoResources);
         Assert.False(args.NoTools);
     }
+    [Fact]
+    public void ParsesNoTsExtensionsFlag()
+    {
+        var args = CliParser.Parse(["--no-ts-extensions"]);
+
+        Assert.True(args.NoTsExtensions);
+        Assert.False(args.NoExtensions);
+    }
 
     [Fact]
     public void Config_command_is_parsed_as_package_command()

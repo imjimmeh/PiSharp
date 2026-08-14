@@ -63,6 +63,7 @@ public sealed record CliArgs(
     bool NoBuiltinTools = false,
     IReadOnlyList<string>? Extensions = null,
     bool NoExtensions = false,
+    bool NoTsExtensions = false,
     bool Print = false,
     string? Export = null,
     string? Import = null,
