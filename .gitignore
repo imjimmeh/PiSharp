@@ -215,6 +215,9 @@ PublishScripts/
 # except PiSharp.Cli.Tests/Packages/ test directory
 !tests/PiSharp.Cli.Tests/Packages/
 !tests/PiSharp.Cli.Tests/Packages/*
+# except PiSharp.Runtime.Tests/Packages/ test directory
+!tests/PiSharp.Runtime.Tests/Packages/
+!tests/PiSharp.Runtime.Tests/Packages/*
 # Uncomment if necessary however generally it will be regenerated when needed
 #!**/[Pp]ackages/repositories.config
 # NuGet v3's project.json files produces more ignorable files
