@@ -132,6 +132,79 @@ public sealed class ServerSessionRegistryTests
         Assert.DoesNotContain("\"event\":{\"event\":", json);
     }
 
+    [Fact]
+    public async Task CreateAsync_RegistersSession()
+    {
+        await using var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+
+        var created = await registry.CreateAsync(new CreateServerSessionRequest(TempRoot()));
+
+        Assert.True(registry.TryGet(created.ServerSessionId, out _));
+    }
+
+    [Fact]
+    public async Task DisposesIdleSessionAfterTimeout()
+    {
+        await using var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd), idleTimeout: TimeSpan.FromMilliseconds(100));
+        var created = await registry.CreateAsync(new CreateServerSessionRequest(TempRoot()));
+
+        await WaitUntilAsync(() => !registry.TryGet(created.ServerSessionId, out _));
+
+        Assert.False(registry.TryGet(created.ServerSessionId, out _));
+    }
+
+    [Fact]
+    public async Task KeepsSessionWithAttachedClient()
+    {
+        await using var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd), idleTimeout: TimeSpan.FromMilliseconds(100));
+        var created = await registry.CreateAsync(new CreateServerSessionRequest(TempRoot()));
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+
+        using var cts = new CancellationTokenSource();
+        var enumerator = live.ReadEventsAsync(0, cts.Token).GetAsyncEnumerator();
+        var reader = enumerator.MoveNextAsync().AsTask();
+        await Task.Delay(400);
+
+        Assert.True(registry.TryGet(created.ServerSessionId, out _));
+        Assert.Equal(1, live.AttachedClients);
+
+        cts.Cancel();
+        try { await reader; } catch (OperationCanceledException) { }
+        await enumerator.DisposeAsync();
+        await WaitUntilAsync(() => !registry.TryGet(created.ServerSessionId, out _));
+        Assert.False(registry.TryGet(created.ServerSessionId, out _));
+    }
+
+    [Fact]
+    public async Task KeepsSessionWithPendingWork()
+    {
+        await using var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd), idleTimeout: TimeSpan.FromMilliseconds(100));
+        var created = await registry.CreateAsync(new CreateServerSessionRequest(TempRoot()));
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = live.RunExclusiveAsync((_, _) => gate.Task);
+
+        await Task.Delay(400);
+
+        Assert.True(registry.TryGet(created.ServerSessionId, out _));
+        Assert.True(live.HasPendingWork);
+
+        gate.SetResult();
+        await run;
+        await WaitUntilAsync(() => !registry.TryGet(created.ServerSessionId, out _));
+        Assert.False(registry.TryGet(created.ServerSessionId, out _));
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan? timeout = null)
+    {
+        var deadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
+        while (!condition())
+        {
+            if (DateTimeOffset.UtcNow >= deadline) throw new TimeoutException("Condition was not met before the deadline.");
+            await Task.Delay(25);
+        }
+    }
+
     private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeAsync(string root, ExtensionManager? extensionManager = null)
     {
         var repo = new JsonlSessionRepo(new SystemExecutionEnv(root), "sessions");

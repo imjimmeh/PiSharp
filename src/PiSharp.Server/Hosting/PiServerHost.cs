@@ -1,3 +1,6 @@
+using PiSharp.Server.Contracts;
+using PiSharp.Server.UiBridge;
+
 using PiSharp.Server.Authentication;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.WebSockets;
@@ -16,7 +19,14 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
         builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
         builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
         builder.Services.AddSingleton(new ApiKeyValidator(new ApiKeyOptions { ApiKey = options.ApiKey }));
-        builder.Services.AddSingleton<ServerSessionRegistry>();
+        builder.Services.AddSingleton(new ServerSessionRegistry(idleTimeout: options.IdleTimeout));
+        builder.Services.AddSingleton(new PiServerCommandDelegates(
+            options.RunCommandAsync,
+            options.CompleteCommandAsync,
+            options.ProcessInputAsync,
+            options.GetStartupMessagesAsync,
+            options.PostStartupChecksAsync));
+        builder.Services.AddSingleton<IServerUiBridge, ServerUiBridge>();
         builder.Services.AddSingleton<PiServerWebSocketHandler>();
 
         _app = builder.Build();

@@ -81,6 +81,13 @@ public sealed class AgentSessionEvent
             _ => throw new NotSupportedException($"Unknown own event: {ownEvent.GetType().Name}")
         };
 
+    /// <summary>
+    /// Creates a flat session event with an arbitrary server-defined type (e.g. <c>ui_request</c>).
+    /// The client transport already handles unknown type strings.
+    /// </summary>
+    public static AgentSessionEvent FromServer(string type, object? data)
+        => new(type, data);
+
     private static string ToJsonValue(ThinkingLevel level) => level.ToString().ToLowerInvariant();
 }
 

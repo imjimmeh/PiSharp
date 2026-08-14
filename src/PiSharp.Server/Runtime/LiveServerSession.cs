@@ -16,6 +16,8 @@ public sealed class LiveServerSession : IAsyncDisposable
     private CancellationTokenSource _operationAbort = new();
     private string _runtimeSessionId;
     private int _scheduledOperations;
+    private int _attachedClients;
+    private long _lastActivityTicks = DateTimeOffset.UtcNow.UtcTicks;
     private long _sequence;
     private bool _disposed;
 
@@ -37,6 +39,9 @@ public sealed class LiveServerSession : IAsyncDisposable
     public SemaphoreSlim Gate { get; } = new(1, 1);
     public CancellationToken LifetimeToken => _lifetime.Token;
     public RetainedEventLog EventLog { get; }
+    public int AttachedClients => Volatile.Read(ref _attachedClients);
+    public DateTimeOffset LastActivityUtc => new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
+    public bool HasPendingWork => Volatile.Read(ref _scheduledOperations) > 0;
 
     /// <summary>
     /// Yields retained envelopes with <see cref="ServerEventEnvelope.Sequence"/> at or after
@@ -61,6 +66,8 @@ public sealed class LiveServerSession : IAsyncDisposable
             SingleReader = true,
             SingleWriter = false
         });
+        Interlocked.Increment(ref _attachedClients);
+        Touch();
         _subscribers[key] = channel;
         try
         {
@@ -69,12 +76,14 @@ public sealed class LiveServerSession : IAsyncDisposable
         finally
         {
             if (_subscribers.TryRemove(key, out var removed)) removed.Writer.TryComplete();
+            Interlocked.Decrement(ref _attachedClients);
         }
     }
 
     public async Task<T> RunExclusiveAsync<T>(Func<PiSharp.Runtime.SessionRuntime, CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _scheduledOperations);
+        Touch();
         var gateTaken = false;
         try
         {
@@ -93,6 +102,7 @@ public sealed class LiveServerSession : IAsyncDisposable
     public async Task RunExclusiveAsync(Func<PiSharp.Runtime.SessionRuntime, CancellationToken, Task> operation, CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _scheduledOperations);
+        Touch();
         var gateTaken = false;
         try
         {
@@ -111,6 +121,7 @@ public sealed class LiveServerSession : IAsyncDisposable
     /// <summary>Requests cancellation of the active or already-scheduled harness run without taking the operation gate, so abort can interrupt prompt/compaction.</summary>
     public void RequestAbort()
     {
+        Touch();
         if (Volatile.Read(ref _scheduledOperations) > 0) _operationAbort.Cancel();
         Runtime.Harness.Abort();
     }
@@ -141,6 +152,8 @@ public sealed class LiveServerSession : IAsyncDisposable
         _operationAbort = new CancellationTokenSource();
     }
 
+    private void Touch() => Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
+
     private async Task OnRuntimeReboundAsync(PiSharp.Runtime.SessionRuntime runtime, CancellationToken cancellationToken)
     {
         BindCurrentHarness();
@@ -164,6 +177,19 @@ public sealed class LiveServerSession : IAsyncDisposable
             foreach (var subscriber in _subscribers.Values) subscriber.Writer.TryWrite(envelope);
             return Task.CompletedTask;
         });
+    }
+
+    /// <summary>
+    /// Emits a server-generated flat event (e.g. a <c>ui_request</c>) into the retained event log
+    /// and broadcasts it to all attached subscribers, mirroring the harness subscription path.
+    /// </summary>
+    public ServerEventEnvelope EmitEvent(AgentSessionEvent flatEvent)
+    {
+        var sequence = Interlocked.Increment(ref _sequence);
+        var envelope = ServerEventEnvelope.FromFlat(Id, sequence, flatEvent);
+        EventLog.Append(envelope);
+        foreach (var subscriber in _subscribers.Values) subscriber.Writer.TryWrite(envelope);
+        return envelope;
     }
 
     public async ValueTask DisposeAsync()
