@@ -586,7 +586,6 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
     }
 
     private void ReplaceSubagentEventSubscription(string sessionId, IDisposable subscription)
-    private void ReplaceSubagentEventSubscription(string sessionId, IDisposable subscription)
     {
         lock (_subagentEventSubscriptions)
         {

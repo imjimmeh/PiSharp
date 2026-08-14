@@ -322,12 +322,13 @@ public static class PiRuntimeBootstrap
             loggerFactory);
 
         var runtime = startupContext.Measure("runtime.compose", () =>
-            new SessionRuntime(repo, createOptions, Factory, session, manager, pluginHost, tsHost, settingsStore, settings, selection, resources, promptOptionsWithSkills, loadedSkills, extensionBinding, flagDiagnostics, promptTemplateCatalog, themeDocument, benchmark?.Build(), extensionLoadCoordinator, loggerFactory, tools: registeredTools, authStorage: authStorage)
+            new SessionRuntime(repo, createOptions, Factory, session, manager, pluginHost, tsHost, settingsStore, settings, selection, resources, promptOptionsWithSkills, loadedSkills, extensionBinding, flagDiagnostics, promptTemplateCatalog, themeDocument, benchmark?.Build(), extensionLoadCoordinator, loggerFactory, tools: registeredTools, authStorage: authStorage, telemetry: options.Telemetry)
             {
                 CachedBackgroundExtensionPaths = backgroundExtensionPaths.ToArray()
             });
         runtime.BindExtensionRuntime();
         runtime.BindHarnessEventForwarding();
+        if (options.Telemetry is not null) runtime.BindTelemetryInstrumentation();
         await runtime.Harness.DispatchSessionStartAsync("startup", cancellationToken);
         if (options.Extensions?.DeferCachedActivationUntilUiReady != true)
         {

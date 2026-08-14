@@ -1,6 +1,7 @@
 using PiSharp.Abstractions.Environment;
 using PiSharp.Abstractions.Options;
 using PiSharp.Ai.Auth;
+using PiSharp.Runtime.Telemetry;
 
 namespace PiSharp.Runtime;
 
@@ -19,7 +20,8 @@ public sealed record PiRuntimeOptions(
     IProviderCredentialResolver? CredentialResolver = null,
     bool CompatibilityMode = true,
     bool BenchmarkStartup = false,
-    bool Verbose = false);
+    bool Verbose = false,
+    TelemetryService? Telemetry = null);
 
 public sealed record RuntimeModelOptions(
     string? Provider = null,
