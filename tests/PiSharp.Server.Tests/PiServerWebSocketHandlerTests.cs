@@ -114,6 +114,68 @@ public sealed class PiServerWebSocketHandlerTests
         Assert.Contains("cwd is required", response.Error?.Message);
     }
 
+    [Fact]
+    public async Task AttachCommand_ReplaysFromSinceSequence()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+
+        await EmitTurnAsync(live);
+        var head = live.EventLog.HeadSequence;
+
+        var attachResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "a", type = ServerCommandTypes.Attach, serverSessionId = created.ServerSessionId, sinceSequence = head - 1
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(attachResponse.Success);
+        var result = Assert.IsType<AttachResult>(attachResponse.Data);
+        Assert.Equal(head, result.HeadSequence);
+        Assert.False(result.Gap);
+    }
+
+    [Fact]
+    public async Task AttachCommand_WithOldSinceSequence_ReportsGap()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+
+        await EmitTurnAsync(live);
+        var head = live.EventLog.HeadSequence;
+        var sample = live.EventLog.ReplayFrom(1).Events[0];
+        live.EventLog.Append(sample with { Sequence = head + 1000 });
+
+        var attachResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "a", type = ServerCommandTypes.Attach, serverSessionId = created.ServerSessionId, sinceSequence = 1
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(attachResponse.Success);
+        var result = Assert.IsType<AttachResult>(attachResponse.Data);
+        Assert.True(result.Gap);
+        Assert.Equal(head + 1000, result.HeadSequence);
+    }
+
+    [Fact]
+    public async Task AttachCommand_UnknownSession_ReturnsFailure()
+    {
+        var handler = CreateHandler(new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd)));
+        var command = JsonSerializer.Serialize(new { id = "a", type = ServerCommandTypes.Attach, serverSessionId = "missing", sinceSequence = 0 }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+        Assert.Equal("command_failed", response.Error?.Code);
+    }
+
     private static PiServerWebSocketHandler CreateHandler(ServerSessionRegistry registry)
         => new(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance);
 
@@ -129,6 +191,9 @@ public sealed class PiServerWebSocketHandlerTests
 
     private static MessageEntry UserEntry(string id, string text)
         => new() { Id = id, ParentId = null, Timestamp = DateTimeOffset.UtcNow, Message = AgentMessages.User(text) };
+
+    private static Task EmitTurnAsync(LiveServerSession live)
+        => live.RunExclusiveAsync((runtime, _) => runtime.Harness.PromptAsync("hi", [], CancellationToken.None));
 
     private static async IAsyncEnumerable<AssistantMessageEvent> FakeStream(ModelDescriptor _, AgentContext __, AgentStreamOptions ___, [EnumeratorCancellation] CancellationToken ____ = default)
     {

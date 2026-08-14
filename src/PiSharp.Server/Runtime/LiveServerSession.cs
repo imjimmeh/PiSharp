@@ -38,8 +38,22 @@ public sealed class LiveServerSession : IAsyncDisposable
     public CancellationToken LifetimeToken => _lifetime.Token;
     public RetainedEventLog EventLog { get; }
 
-    public async IAsyncEnumerable<ServerEventEnvelope> ReadEventsAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Yields retained envelopes with <see cref="ServerEventEnvelope.Sequence"/> at or after
+    /// <paramref name="sinceSequence"/> from <see cref="EventLog"/> (skipped entirely when the log
+    /// reports a gap), then falls through to the live subscriber tail until cancelled.
+    /// </summary>
+    public async IAsyncEnumerable<ServerEventEnvelope> ReadEventsAsync(long sinceSequence = 0, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        var replay = EventLog.ReplayFrom(sinceSequence);
+        if (!replay.Gap)
+        {
+            foreach (var envelope in replay.Events)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return envelope;
+            }
+        }
         var key = Guid.NewGuid();
         var channel = Channel.CreateBounded<ServerEventEnvelope>(new BoundedChannelOptions(_eventCapacity)
         {
@@ -55,21 +69,6 @@ public sealed class LiveServerSession : IAsyncDisposable
         finally
         {
             if (_subscribers.TryRemove(key, out var removed)) removed.Writer.TryComplete();
-        }
-    }
-
-    /// <summary>
-    /// Replays retained envelopes with <see cref="ServerEventEnvelope.Sequence"/> at or after
-    /// <paramref name="sinceSequence"/> from <see cref="EventLog"/>. Task 1.2 wires the live channel
-    /// tail into this reader; here it only exposes the retained replay.
-    /// </summary>
-    public async IAsyncEnumerable<ServerEventEnvelope> ReplayEventsAsync(long sinceSequence, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var replay = EventLog.ReplayFrom(sinceSequence);
-        foreach (var envelope in replay.Events)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return envelope;
         }
     }
 

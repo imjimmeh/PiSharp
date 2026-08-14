@@ -48,14 +48,14 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
             finally { sendGate.Release(); }
         }
 
-        Task EnsureEventPumpAsync(LiveServerSession live)
+        Task EnsureEventPumpAsync(LiveServerSession live, long sinceSequence = 0)
         {
             if (eventPumps.ContainsKey(live.Id)) return Task.CompletedTask;
             eventPumps[live.Id] = Task.Run(async () =>
             {
                 try
                 {
-                    await foreach (var evt in live.ReadEventsAsync(linked.Token)) await SendAsync(evt, linked.Token);
+                    await foreach (var evt in live.ReadEventsAsync(sinceSequence, linked.Token)) await SendAsync(evt, linked.Token);
                 }
                 catch (OperationCanceledException) { }
                 catch (Exception ex) { logger.LogWarning(ex, "Event pump failed for {ServerSessionId}", live.Id); }
@@ -90,7 +90,7 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
         }
     }
 
-    public async Task<ServerResponse> DispatchTextCommandAsync(string json, Func<LiveServerSession, Task>? ensureEventPump = null, Func<object, CancellationToken, Task>? sendAsync = null, Task? responseSent = null, CancellationToken cancellationToken = default)
+    public async Task<ServerResponse> DispatchTextCommandAsync(string json, Func<LiveServerSession, long, Task>? ensureEventPump = null, Func<object, CancellationToken, Task>? sendAsync = null, Task? responseSent = null, CancellationToken cancellationToken = default)
     {
         ServerCommandEnvelope? envelope = null;
         try
@@ -101,6 +101,7 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
             return envelope.Type switch
             {
                 ServerCommandTypes.CreateSession => await CreateSessionAsync(json, envelope, ensureEventPump, cancellationToken),
+                ServerCommandTypes.Attach => await AttachAsync(json, envelope, ensureEventPump, cancellationToken),
                 ServerCommandTypes.DisposeSession => await DisposeSessionAsync(envelope, cancellationToken),
                 ServerCommandTypes.Prompt => await PromptAsync(json, envelope, sendAsync, responseSent ?? Task.CompletedTask, cancellationToken),
                 ServerCommandTypes.Steer => await TextQueueAsync(json, envelope, ServerCommandTypes.Steer, cancellationToken),
@@ -132,12 +133,21 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
         }
     }
 
-    private async Task<ServerResponse> CreateSessionAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, Task>? ensureEventPump, CancellationToken cancellationToken)
+    private async Task<ServerResponse> CreateSessionAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)
     {
         var request = JsonSerializer.Deserialize<CreateServerSessionRequest>(json, ServerJsonSerializer.Options)!;
         var created = await registry.CreateAsync(request, cancellationToken);
-        if (ensureEventPump is not null && registry.TryGet(created.ServerSessionId, out var live)) await ensureEventPump(live);
+        if (ensureEventPump is not null && registry.TryGet(created.ServerSessionId, out var live)) await ensureEventPump(live, 0);
         return ServerResponse.Ok(envelope.Id, envelope.Type, created);
+    }
+
+    private async Task<ServerResponse> AttachAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<AttachCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var replay = live.EventLog.ReplayFrom(command.SinceSequence);
+        if (ensureEventPump is not null) await ensureEventPump(live, command.SinceSequence);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, new AttachResult(live.Id, replay.FromSequence, replay.HeadSequence, replay.Gap, replay.Events.Count));
     }
 
     private async Task<ServerResponse> DisposeSessionAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
