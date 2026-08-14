@@ -18,8 +18,15 @@ public sealed record PackageCommandArgs(
     bool Extensions = false,
     string? ExtensionSource = null);
 
+public enum DaemonCommandKind { Start, Stop, Status, Foreground }
+public sealed record DaemonCommandArgs(
+    DaemonCommandKind Kind,
+    string? Port = null,
+    bool Foreground = false);
+
 public sealed record CliArgs(
     PackageCommandArgs? PackageCommand = null,
+    DaemonCommandArgs? DaemonCommand = null,
     string? Provider = null,
     string? Model = null,
     string? ApiKey = null,

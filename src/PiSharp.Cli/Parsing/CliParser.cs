@@ -78,6 +78,7 @@ public static class CliParser
                     else if (arg.StartsWith("-", StringComparison.Ordinal)) b.Error($"Unknown option: {arg}");
                     else if (arg.StartsWith("@", StringComparison.Ordinal)) b.FileArgs.Add(arg[1..]);
                     else if (TryParsePackageCommand(arg, args, ref i, b)) { /* consumed */ }
+                    else if (TryParseDaemonCommand(arg, args, ref i, b)) { /* consumed */ }
                     else b.Messages.Add(arg);
                     break;
             }
@@ -125,6 +126,59 @@ public static class CliParser
             return ParseUpdateArgs(args, ref i, b);
         }
 
+        return true;
+    }
+
+    private static bool TryParseDaemonCommand(string arg, IReadOnlyList<string> args, ref int i, Builder b)
+    {
+        if (!string.Equals(arg, "daemon", StringComparison.Ordinal)) return false;
+
+        if (i + 1 >= args.Count)
+        {
+            b.Error("Missing subcommand for daemon.");
+            return true;
+        }
+
+        DaemonCommandKind kind;
+        switch (args[++i])
+        {
+            case "start": kind = DaemonCommandKind.Start; break;
+            case "stop": kind = DaemonCommandKind.Stop; break;
+            case "status": kind = DaemonCommandKind.Status; break;
+            case "foreground": kind = DaemonCommandKind.Foreground; break;
+            default:
+                b.Error($"Unknown daemon subcommand: {args[i]}");
+                return true;
+        }
+
+        string? port = null;
+        var foreground = false;
+        while (i + 1 < args.Count)
+        {
+            var next = args[i + 1];
+            if (next.StartsWith("@", StringComparison.Ordinal) || !next.StartsWith("-", StringComparison.Ordinal)) break;
+
+            i++;
+            switch (next)
+            {
+                case "--foreground":
+                    foreground = true;
+                    break;
+                case "--port":
+                    if (i + 1 >= args.Count)
+                    {
+                        b.Error("Missing value for --port.");
+                        continue;
+                    }
+                    port = args[++i];
+                    break;
+                default:
+                    b.Error($"Unknown option for daemon: {next}");
+                    break;
+            }
+        }
+
+        b.DaemonCommand = new DaemonCommandArgs(kind, port, foreground);
         return true;
     }
 
@@ -327,6 +381,7 @@ public static class CliParser
     private sealed class Builder
     {
         public PackageCommandArgs? PackageCommand;
+        public DaemonCommandArgs? DaemonCommand;
         public string? Provider, Model, ApiKey, SystemPrompt, Session, Fork, SessionDir, Export, Import, Share, LoginProvider, ListModels;
         public ThinkingLevel? Thinking;
         public CliMode? Mode;
@@ -347,7 +402,7 @@ public static class CliParser
         public T WarningAndReturn<T>(string message) { Warning(message); return default!; }
         public T ErrorAndReturn<T>(string message) { Error(message); return default!; }
 
-        public CliArgs Build() => new(PackageCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
+        public CliArgs Build() => new(PackageCommand, DaemonCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
     }
 }
 

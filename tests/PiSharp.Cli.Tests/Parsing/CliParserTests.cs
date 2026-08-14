@@ -101,4 +101,23 @@ public sealed class CliParserTests
         Assert.Equal(PackageCommandKind.Config, result.PackageCommand!.Kind);
         Assert.True(result.Verbose);
     }
+
+    [Fact]
+    public void Parse_DaemonCommand_ProducesDaemonArgs()
+    {
+        var parsed = CliParser.Parse(["daemon", "start", "--port", "7878"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Start, parsed.DaemonCommand.Kind);
+        Assert.Equal("7878", parsed.DaemonCommand.Port);
+    }
+
+    [Fact]
+    public void Parse_DaemonStatusCommand_ProducesStatusArgs()
+    {
+        var parsed = CliParser.Parse(["daemon", "status"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Status, parsed.DaemonCommand.Kind);
+    }
 }

@@ -42,6 +42,11 @@ public static class Program
             return 0;
         }
 
+        if (parsed.DaemonCommand is not null)
+        {
+            return await DaemonMode.RunAsync(parsed.DaemonCommand, console, cancellationToken);
+        }
+
         CliFileLoggingRegistration? fileLogging = null;
         var cwd = Directory.GetCurrentDirectory();
         using var loggerFactory = LoggerFactory.Create(builder =>
