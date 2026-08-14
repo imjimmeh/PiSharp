@@ -14,14 +14,23 @@ public sealed partial class ServerSessionRegistry : IAsyncDisposable
     private readonly ConcurrentDictionary<string, LiveServerSession> _sessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _liveRuntimeSessionIds = new(StringComparer.Ordinal);
     private readonly Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> _runtimeFactory;
+    private readonly TimeSpan _idleTimeout;
+    private readonly CancellationTokenSource _sweepCts = new();
+    private readonly Task _sweepTask;
 
     public ServerSessionRegistry()
         : this(CreateRuntimeAsync)
     {
     }
 
-    public ServerSessionRegistry(Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> runtimeFactory)
-        => _runtimeFactory = runtimeFactory;
+    public ServerSessionRegistry(TimeSpan? idleTimeout) : this(CreateRuntimeAsync, idleTimeout) { }
+
+    public ServerSessionRegistry(Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> runtimeFactory, TimeSpan? idleTimeout = null)
+    {
+        _runtimeFactory = runtimeFactory;
+        _idleTimeout = idleTimeout ?? TimeSpan.FromMinutes(5);
+        _sweepTask = Task.Run(SweepLoopAsync);
+    }
 
     public IReadOnlyCollection<LiveServerSession> Sessions => _sessions.Values.ToArray();
 
@@ -76,7 +85,32 @@ public sealed partial class ServerSessionRegistry : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _sweepCts.Cancel();
+        try { await _sweepTask; }
+        catch (OperationCanceledException) when (_sweepCts.IsCancellationRequested) { }
         foreach (var id in _sessions.Keys.ToArray()) await DisposeAsync(id);
+    }
+
+    private async Task SweepLoopAsync()
+    {
+        var period = TimeSpan.FromMilliseconds(Math.Clamp(_idleTimeout.TotalMilliseconds / 2, 50, 1000));
+        using var timer = new PeriodicTimer(period);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_sweepCts.Token))
+            {
+                var cutoff = DateTimeOffset.UtcNow - _idleTimeout;
+                foreach (var session in _sessions.Values)
+                {
+                    if (session.AttachedClients == 0 && !session.HasPendingWork && session.LastActivityUtc < cutoff)
+                    {
+                        try { await DisposeAsync(session.Id); }
+                        catch { /* A failing session must not stall the sweep. */ }
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_sweepCts.IsCancellationRequested) { }
     }
 
     public async Task<T> RunWithReservedRuntimeSessionIdAsync<T>(LiveServerSession live, string? requestedRuntimeSessionId, Func<Task<T>> operation, CancellationToken cancellationToken = default)

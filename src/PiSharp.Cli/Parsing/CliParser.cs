@@ -27,6 +27,7 @@ public static class CliParser
                 case "--mode": b.Mode = ParseMode(NextValue(), b); break;
                 case "--continue" or "-c": b.Continue = true; break;
                 case "--resume" or "-r": b.Resume = true; break;
+                case "--attach": b.Attach = NextValue(); break;
                 case "--provider": b.Provider = NextValue(); break;
                 case "--model": b.Model = NextValue(); break;
                 case "--api-key": b.ApiKey = NextValue(); break;
@@ -77,11 +78,13 @@ public static class CliParser
                 case "--approval-mode": b.ApprovalMode = ParseApprovalMode(NextValue(), b); break;
                 case "--check-updates": b.CheckUpdates = true; break;
                 case "--no-check-updates": b.NoCheckUpdates = true; break;
+                case "--local": b.Local = true; break;
                 default:
                     if (arg.StartsWith("--", StringComparison.Ordinal)) CaptureUnknownLong(arg, args, ref i, b);
                     else if (arg.StartsWith("-", StringComparison.Ordinal)) b.Error($"Unknown option: {arg}");
                     else if (arg.StartsWith("@", StringComparison.Ordinal)) b.FileArgs.Add(arg[1..]);
                     else if (TryParsePackageCommand(arg, args, ref i, b)) { /* consumed */ }
+                    else if (TryParseDaemonCommand(arg, args, ref i, b)) { /* consumed */ }
                     else b.Messages.Add(arg);
                     break;
             }
@@ -129,6 +132,78 @@ public static class CliParser
             return ParseUpdateArgs(args, ref i, b);
         }
 
+        return true;
+    }
+
+    private static bool TryParseDaemonCommand(string arg, IReadOnlyList<string> args, ref int i, Builder b)
+    {
+        if (!string.Equals(arg, "daemon", StringComparison.Ordinal)) return false;
+
+        if (i + 1 >= args.Count)
+        {
+            b.Error("Missing subcommand for daemon.");
+            return true;
+        }
+
+        DaemonCommandKind kind;
+        var foreground = false;
+        switch (args[++i])
+        {
+            case "start": kind = DaemonCommandKind.Start; break;
+            case "stop": kind = DaemonCommandKind.Stop; break;
+            case "status": kind = DaemonCommandKind.Status; break;
+            case "foreground": kind = DaemonCommandKind.Start; foreground = true; break;
+            default:
+                b.Error($"Unknown daemon subcommand: {args[i]}");
+                return true;
+        }
+
+        string? port = null;
+        string? apiKey = null;
+        while (i + 1 < args.Count)
+        {
+            var next = args[i + 1];
+            if (next.StartsWith("@", StringComparison.Ordinal) || !next.StartsWith("-", StringComparison.Ordinal)) break;
+
+            i++;
+            switch (next)
+            {
+                case "--foreground":
+                    foreground = true;
+                    break;
+                case "--port":
+                    if (i + 1 >= args.Count)
+                    {
+                        b.Error("Missing value for --port.");
+                        continue;
+                    }
+                    if (args[i + 1].StartsWith("-", StringComparison.Ordinal))
+                    {
+                        b.Error("Missing value for --port.");
+                        continue;
+                    }
+                    port = args[++i];
+                    break;
+                case "--api-key":
+                    if (i + 1 >= args.Count)
+                    {
+                        b.Error("Missing value for --api-key.");
+                        continue;
+                    }
+                    if (args[i + 1].StartsWith("-", StringComparison.Ordinal))
+                    {
+                        b.Error("Missing value for --api-key.");
+                        continue;
+                    }
+                    apiKey = args[++i];
+                    break;
+                default:
+                    b.Error($"Unknown option for daemon: {next}");
+                    break;
+            }
+        }
+
+        b.DaemonCommand = new DaemonCommandArgs(kind, port, foreground, apiKey);
         return true;
     }
 
@@ -351,13 +426,14 @@ public static class CliParser
     private sealed class Builder
     {
         public PackageCommandArgs? PackageCommand;
-        public string? Provider, Model, ApiKey, SystemPrompt, Session, Fork, SessionDir, Export, Import, Share, LoginProvider, ListModels;
+        public DaemonCommandArgs? DaemonCommand;
+        public string? Provider, Model, ApiKey, SystemPrompt, Session, Fork, SessionDir, Export, Import, Share, LoginProvider, ListModels, Attach;
         public ThinkingLevel? Thinking;
         public CliMode? Mode;
         public string? Profile;
         public AcpApprovalMode? ApprovalMode;
         public bool CheckUpdates, NoCheckUpdates;
-        public bool Continue, Resume, Help, Version, NoSession, NoTools, NoBuiltinTools, NoExtensions, Print, Logout, Reload, CompatibilityMode = true, NoSkills, NoPromptTemplates, NoThemes, NoContextFiles, NoResources, ListAllModels, Offline, Verbose, BenchmarkStartup;
+        public bool Continue, Resume, Help, Version, NoSession, NoTools, NoBuiltinTools, NoExtensions, Print, Logout, Reload, CompatibilityMode = true, NoSkills, NoPromptTemplates, NoThemes, NoContextFiles, NoResources, ListAllModels, Offline, Verbose, BenchmarkStartup, Local;
         public List<string> AppendSystemPrompt { get; } = [];
         public List<string> Models { get; } = [];
         public List<string> Tools { get; } = [];
@@ -374,7 +450,7 @@ public static class CliParser
         public T WarningAndReturn<T>(string message) { Warning(message); return default!; }
         public T ErrorAndReturn<T>(string message) { Error(message); return default!; }
 
-        public CliArgs Build() => new(PackageCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Profile, ApprovalMode, CheckUpdates, NoCheckUpdates, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
+        public CliArgs Build() => new(PackageCommand, DaemonCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Attach, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Profile, ApprovalMode, CheckUpdates, NoCheckUpdates, Local, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
     }
 }
 

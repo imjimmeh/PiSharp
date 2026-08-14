@@ -14,7 +14,7 @@ PiSharp is the C#/.NET port of the Pi coding agent. It is an agent runtime, CLI,
 - **Flexible Extension Architecture**:
   - **Native .NET Extensions**: Direct DLL-based plugins running in-process via collectible assembly loading.
   - **TypeScript Extension Bridge**: Out-of-process Node.js bridge maintaining backward compatibility with the original JavaScript version of Pi.
-- **Live Sessions & Server Host**: A lightweight ASP.NET Core web server providing health check and WebSocket connection endpoints.
+- **Live Sessions & Daemon Host**: Interactive mode connects to a per-user background daemon over WebSocket (event-sourced, with sequence replay) for fast startup and multi-terminal attach; `pisharp daemon start|stop|status` manages it, `--local` forces in-process mode.
 
 ---
 
@@ -82,6 +82,25 @@ pisharp --resume <session-id>
 pisharp --help
 ```
 
+**Daemon mode (background server):**
+
+Interactive mode connects to a per-user daemon over WebSocket, so the TUI opens without paying full startup cost and live sessions survive client exit. The daemon is auto-started on first use; manage it explicitly with:
+
+```bash
+pisharp daemon start                 # start the daemon (auto-picks a free port)
+pisharp daemon start --port 7878     # start on a specific port
+pisharp daemon stop                  # shut down the daemon gracefully
+pisharp daemon status                # show port, pid, and liveness
+```
+
+**Force in-process mode (debugging / testing):**
+
+```bash
+pisharp --local
+```
+
+`--local` runs the TUI fully in-process, bypassing the daemon. If the daemon cannot be started or reached, interactive mode falls back to in-process with a warning.
+
 ---
 
 ## 🏛️ Project Structure
@@ -105,7 +124,8 @@ The codebase is organized into clean, decoupled components located under `src/`:
 | **[PiSharp.Runtime](src/PiSharp.Runtime)**             | Main bootstrap wiring settings, providers, and session contexts.                         |
 | **[PiSharp.Cli](src/PiSharp.Cli)**                     | CLI argument parser, print formatting, and execution controller.                         |
 | **[PiSharp.Tui](src/PiSharp.Tui)**                     | Terminal User Interface views, keyboard shortcuts, and rendering.                        |
-| **[PiSharp.Server](src/PiSharp.Server)**               | ASP.NET Core server containing `/health` and `/ws` endpoints.                            |
+| **[PiSharp.Server](src/PiSharp.Server)**               | Daemon host: ASP.NET Core `PiServerHost` with `/health` and `/ws` WebSocket endpoints, API-key auth, live session registry, retained event log, and command dispatch. |
+| **[PiSharp.Client](src/PiSharp.Client)**               | Daemon client: lease store/discovery, WebSocket transport, `ClientSessionState` + event reducer, and `RemoteTuiBackend` for the remote TUI. |
 
 Tests are located in corresponding projects under `tests/`.
 

@@ -1,19 +1,38 @@
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
+using PiSharp.Ai;
+using PiSharp.Agent.Core.Events;
 using PiSharp.Runtime;
 using PiSharp.Server.Authentication;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.Serialization;
+using PiSharp.Server.UiBridge;
 
 namespace PiSharp.Server.WebSockets;
 
-public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, ApiKeyValidator apiKeys, ILogger<PiServerWebSocketHandler> logger)
+public sealed class PiServerWebSocketHandler(
+    ServerSessionRegistry registry,
+    ApiKeyValidator apiKeys,
+    ILogger<PiServerWebSocketHandler> logger,
+    IServerUiBridge? uiBridge = null,
+    PiServerCommandDelegates? delegates = null)
 {
+    private IServerUiBridge Bridge => uiBridge ?? NoOpServerUiBridge.Instance;
+
+    private sealed class NoOpServerUiBridge : IServerUiBridge
+    {
+        public static NoOpServerUiBridge Instance { get; } = new();
+        public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
+        public void ResolveUiAsync(string requestId, string? value, bool cancelled) { }
+    }
+
     public async Task HandleHttpAsync(HttpContext context)
     {
         if (!apiKeys.Validate(context))
@@ -38,7 +57,7 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
     {
         using var sendGate = new SemaphoreSlim(1, 1);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var eventPumps = new Dictionary<string, Task>(StringComparer.Ordinal);
+        var eventPumps = new ConcurrentDictionary<string, Task>(StringComparer.Ordinal);
 
         async Task SendAsync(object payload, CancellationToken token)
         {
@@ -48,14 +67,14 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
             finally { sendGate.Release(); }
         }
 
-        Task EnsureEventPumpAsync(LiveServerSession live)
+        Task EnsureEventPumpAsync(LiveServerSession live, long sinceSequence = 0)
         {
             if (eventPumps.ContainsKey(live.Id)) return Task.CompletedTask;
             eventPumps[live.Id] = Task.Run(async () =>
             {
                 try
                 {
-                    await foreach (var evt in live.ReadEventsAsync(linked.Token)) await SendAsync(evt, linked.Token);
+                    await foreach (var evt in live.ReadEventsAsync(sinceSequence, linked.Token)) await SendAsync(evt, linked.Token);
                 }
                 catch (OperationCanceledException) { }
                 catch (Exception ex) { logger.LogWarning(ex, "Event pump failed for {ServerSessionId}", live.Id); }
@@ -69,16 +88,24 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
             {
                 var message = await ReceiveTextAsync(socket, cancellationToken);
                 if (message is null) break;
-                var responseSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                var response = await DispatchTextCommandAsync(message, EnsureEventPumpAsync, SendAsync, responseSent.Task, cancellationToken);
-                try
+                _ = Task.Run(async () =>
                 {
-                    await SendAsync(response, cancellationToken);
-                }
-                finally
-                {
-                    responseSent.TrySetResult();
-                }
+                    var responseSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    try
+                    {
+                        var response = await DispatchTextCommandAsync(message, EnsureEventPumpAsync, SendAsync, responseSent.Task, linked.Token);
+                        try
+                        {
+                            await SendAsync(response, linked.Token);
+                        }
+                        finally
+                        {
+                            responseSent.TrySetResult();
+                        }
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (Exception ex) { logger.LogWarning(ex, "Command dispatch failed"); }
+                }, CancellationToken.None);
             }
         }
         finally
@@ -90,7 +117,7 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
         }
     }
 
-    public async Task<ServerResponse> DispatchTextCommandAsync(string json, Func<LiveServerSession, Task>? ensureEventPump = null, Func<object, CancellationToken, Task>? sendAsync = null, Task? responseSent = null, CancellationToken cancellationToken = default)
+    public async Task<ServerResponse> DispatchTextCommandAsync(string json, Func<LiveServerSession, long, Task>? ensureEventPump = null, Func<object, CancellationToken, Task>? sendAsync = null, Task? responseSent = null, CancellationToken cancellationToken = default)
     {
         ServerCommandEnvelope? envelope = null;
         try
@@ -101,6 +128,7 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
             return envelope.Type switch
             {
                 ServerCommandTypes.CreateSession => await CreateSessionAsync(json, envelope, ensureEventPump, cancellationToken),
+                ServerCommandTypes.Attach => await AttachAsync(json, envelope, ensureEventPump, cancellationToken),
                 ServerCommandTypes.DisposeSession => await DisposeSessionAsync(envelope, cancellationToken),
                 ServerCommandTypes.Prompt => await PromptAsync(json, envelope, sendAsync, responseSent ?? Task.CompletedTask, cancellationToken),
                 ServerCommandTypes.Steer => await TextQueueAsync(json, envelope, ServerCommandTypes.Steer, cancellationToken),
@@ -117,6 +145,24 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
                 ServerCommandTypes.SwitchSession => await SwitchSessionAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.Fork => await ForkAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.SetSessionName => await SetSessionNameAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.RunCommand => await RunCommandAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.CompleteCommand => await CompleteCommandAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.ProcessInput => await ProcessInputAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.UiResponse => await UiResponseAsync(json, envelope),
+                ServerCommandTypes.GetTheme => await GetThemeAsync(envelope),
+                ServerCommandTypes.GetSessionSnapshot => await GetSessionSnapshotAsync(envelope, cancellationToken),
+                ServerCommandTypes.GetForkMessages => await GetForkMessagesAsync(envelope, cancellationToken),
+                ServerCommandTypes.GetExtensionLoadStatus => await GetExtensionLoadStatusAsync(envelope),
+                ServerCommandTypes.GetExtensionShortcuts => await GetExtensionShortcutsAsync(envelope),
+                ServerCommandTypes.GetExtensionRegistry => await GetExtensionRegistryAsync(envelope),
+                ServerCommandTypes.ResolveTool => await ResolveToolAsync(json, envelope),
+                ServerCommandTypes.CycleThinkingLevel => await CycleThinkingLevelAsync(envelope, cancellationToken),
+                ServerCommandTypes.GetAvailableModels => GetAvailableModels(envelope),
+                ServerCommandTypes.GetCommands => GetCommandsNotAvailable(envelope),
+                ServerCommandTypes.GetLastAssistantText => await GetLastAssistantTextAsync(envelope, cancellationToken),
+                ServerCommandTypes.GetStartupMessages => await GetStartupMessagesAsync(envelope, cancellationToken),
+                ServerCommandTypes.PostStartupChecks => await PostStartupChecksAsync(envelope, cancellationToken),
+                ServerCommandTypes.Shutdown => await ShutdownAsync(json, envelope, responseSent ?? Task.CompletedTask),
                 _ => ServerResponse.Fail(envelope.Id, envelope.Type, "unknown_command", $"Unknown command '{envelope.Type}'.")
             };
         }
@@ -132,12 +178,21 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
         }
     }
 
-    private async Task<ServerResponse> CreateSessionAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, Task>? ensureEventPump, CancellationToken cancellationToken)
+    private async Task<ServerResponse> CreateSessionAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)
     {
         var request = JsonSerializer.Deserialize<CreateServerSessionRequest>(json, ServerJsonSerializer.Options)!;
         var created = await registry.CreateAsync(request, cancellationToken);
-        if (ensureEventPump is not null && registry.TryGet(created.ServerSessionId, out var live)) await ensureEventPump(live);
+        if (ensureEventPump is not null && registry.TryGet(created.ServerSessionId, out var live)) await ensureEventPump(live, 0);
         return ServerResponse.Ok(envelope.Id, envelope.Type, created);
+    }
+
+    private async Task<ServerResponse> AttachAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<AttachCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var replay = live.EventLog.ReplayFrom(command.SinceSequence);
+        if (ensureEventPump is not null) await ensureEventPump(live, command.SinceSequence);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, new AttachResult(live.Id, replay.FromSequence, replay.HeadSequence, replay.Gap, replay.Events.Count));
     }
 
     private async Task<ServerResponse> DisposeSessionAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
@@ -191,7 +246,8 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
 
     private async Task<ServerResponse> GetStateAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var live = RequireSession(RequiredSessionId(envelope));
+        if (!registry.TryGet(RequiredSessionId(envelope), out var live))
+            return ServerResponse.Fail(envelope.Id, envelope.Type, "session_disposed", "Session was disposed.");
         return ServerResponse.Ok(envelope.Id, envelope.Type, await live.SnapshotAsync(cancellationToken));
     }
 
@@ -291,6 +347,170 @@ public sealed class PiServerWebSocketHandler(ServerSessionRegistry registry, Api
         var live = RequireSession(command.ServerSessionId);
         await live.RunExclusiveAsync((runtime, token) => runtime.Harness.SetSessionNameAsync(command.Name, token), cancellationToken);
         return ServerResponse.Ok(command.Id, command.Type, await live.SnapshotAsync(cancellationToken));
+    }
+
+    private async Task<ServerResponse> RunCommandAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<RunCommandRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (delegates?.RunCommandAsync is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Command '{command.Type}' is not available on this daemon.");
+        var result = await live.RunExclusiveAsync((runtime, token) => delegates.RunCommandAsync(new PiServerHostContext(live, Bridge), command.Text, command.Options, token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    private async Task<ServerResponse> CompleteCommandAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<CompleteCommandRequest>(json, ServerJsonSerializer.Options)!;
+        RequireSession(command.ServerSessionId);
+        if (delegates?.CompleteCommandAsync is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Command '{command.Type}' is not available on this daemon.");
+        var completions = await delegates.CompleteCommandAsync(command.Text, cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, completions);
+    }
+
+    private async Task<ServerResponse> ProcessInputAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<ProcessInputRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(RequiredSessionId(envelope));
+        if (delegates?.ProcessInputAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
+        var result = await live.RunExclusiveAsync((runtime, token) => delegates.ProcessInputAsync(command, token), cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, result);
+    }
+
+    private Task<ServerResponse> UiResponseAsync(string json, ServerCommandEnvelope envelope)
+    {
+        var command = JsonSerializer.Deserialize<UiResponseCommand>(json, ServerJsonSerializer.Options)!;
+        RequireSession(command.ServerSessionId);
+        Bridge.ResolveUiAsync(command.RequestId, command.Value, command.Cancelled);
+        return Task.FromResult(ServerResponse.Ok(command.Id, command.Type));
+    }
+
+    private Task<ServerResponse> GetThemeAsync(ServerCommandEnvelope envelope)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var theme = live.Runtime.Theme;
+        return Task.FromResult(theme is null
+            ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No theme is configured for this session.")
+            : ServerResponse.Ok(envelope.Id, envelope.Type, theme));
+    }
+
+    private async Task<ServerResponse> GetSessionSnapshotAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var snapshot = await live.RunExclusiveAsync(async (runtime, token) => new ServerSessionSnapshot(
+            runtime.Session.Metadata.Id,
+            runtime.Session.Metadata.Path,
+            await runtime.Session.GetSessionNameAsync(token),
+            await runtime.GetForkableEntriesAsync(token)), cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, snapshot);
+    }
+
+    private async Task<ServerResponse> GetForkMessagesAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var entries = await live.RunExclusiveAsync((runtime, token) => runtime.GetForkableEntriesAsync(token), cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, new { entries });
+    }
+
+    private Task<ServerResponse> GetExtensionLoadStatusAsync(ServerCommandEnvelope envelope)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type, live.Runtime.GetExtensionLoadSummary()));
+    }
+
+    private Task<ServerResponse> GetExtensionShortcutsAsync(ServerCommandEnvelope envelope)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var manager = live.Runtime.ExtensionManager;
+        return Task.FromResult(manager is null
+            ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session.")
+            : ServerResponse.Ok(envelope.Id, envelope.Type, manager.Registry.Shortcuts));
+    }
+
+    private Task<ServerResponse> GetExtensionRegistryAsync(ServerCommandEnvelope envelope)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var manager = live.Runtime.ExtensionManager;
+        return Task.FromResult(manager is null
+            ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session.")
+            : ServerResponse.Ok(envelope.Id, envelope.Type, manager.Registry));
+    }
+
+    private Task<ServerResponse> ResolveToolAsync(string json, ServerCommandEnvelope envelope)
+    {
+        var command = JsonSerializer.Deserialize<ResolveToolRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var manager = live.Runtime.ExtensionManager;
+        if (manager is null) return Task.FromResult(ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session."));
+        var tool = manager.Registry.Tools.FirstOrDefault(t => string.Equals(t.Value.Name, command.Name, StringComparison.Ordinal))?.Value;
+        return Task.FromResult(tool is null
+            ? ServerResponse.Fail(command.Id, command.Type, "not_available", $"Tool '{command.Name}' is not registered.")
+            : ServerResponse.Ok(command.Id, command.Type, tool));
+    }
+
+    private async Task<ServerResponse> CycleThinkingLevelAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var next = await live.RunExclusiveAsync(async (runtime, token) =>
+        {
+            var level = RuntimeModelSelector.CycleThinking(runtime.Harness.Model, runtime.Harness.ThinkingLevel, +1);
+            await runtime.SetThinkingLevelAsync(level, token);
+            return level;
+        }, cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, new { level = next.ToString().ToLowerInvariant() });
+    }
+
+    private static ServerResponse GetAvailableModels(ServerCommandEnvelope envelope)
+        => ServerResponse.Ok(envelope.Id, envelope.Type, PublicApi.Models.Select(m => m.Descriptor).ToArray());
+
+    private static ServerResponse GetCommandsNotAvailable(ServerCommandEnvelope envelope)
+        => ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "Command discovery is not available on this daemon.");
+
+    private async Task<ServerResponse> GetLastAssistantTextAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var messages = await live.RunExclusiveAsync(async (runtime, token) => (await runtime.Session.BuildContextAsync(token)).Messages, cancellationToken);
+        var text = string.Concat(messages.OfType<AssistantMessage>().LastOrDefault()?.Content.OfType<TextContent>().Select(c => c.Text) ?? []);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, new { text });
+    }
+
+    private async Task<ServerResponse> GetStartupMessagesAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        RequireSession(RequiredSessionId(envelope));
+        if (delegates?.GetStartupMessagesAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
+        var messages = await delegates.GetStartupMessagesAsync(cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, messages);
+    }
+
+    private async Task<ServerResponse> PostStartupChecksAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        if (delegates?.PostStartupChecksAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
+        await delegates.PostStartupChecksAsync(message => live.EmitEvent(AgentSessionEvent.FromServer("system_message", new { text = message })), cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type);
+    }
+
+    private Task<ServerResponse> ShutdownAsync(string json, ServerCommandEnvelope envelope, Task responseSent)
+    {
+        _ = JsonSerializer.Deserialize<ShutdownRequest>(json, ServerJsonSerializer.Options); // validate request shape; confirmation token is optional
+        var onShutdown = delegates?.OnShutdown;
+        if (onShutdown is null)
+            return Task.FromResult(ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "Shutdown is not available on this server."));
+
+        // Respond first, then stop the host once the response has been flushed to the client.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await responseSent;
+                await onShutdown(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Graceful shutdown failed");
+            }
+        }, CancellationToken.None);
+
+        return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type, new ShutdownResult(true)));
     }
 
     private LiveServerSession RequireSession(string serverSessionId)

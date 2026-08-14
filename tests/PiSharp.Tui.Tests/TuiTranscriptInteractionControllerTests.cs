@@ -31,7 +31,7 @@ public sealed class TuiTranscriptInteractionControllerTests
         var renderCoordinator = new TuiRenderCoordinator(
             shell, () => state, s => state = s, appContext, EmptyFooterSnapshot);
 
-        var sessionContext = new TuiSessionContext { CurrentHarness = TuiIntegrationTestHost.CreateHarness() };
+        var sessionContext = new TuiSessionContext { CurrentRuntime = TuiIntegrationTestHost.CreateRuntimeFacade() };
         var stateGateway = new TuiStateGateway(() => state, next => state = next, renderCoordinator, appContext, CancellationToken.None);
 
         var controller = new TuiTranscriptInteractionController(
@@ -49,7 +49,7 @@ public sealed class TuiTranscriptInteractionControllerTests
     public async Task ForkFromMessageAsync_WhenForkFromEntryAsyncIsNull_AppendsForkUnavailableErrorToTranscript()
     {
         var options = new TuiHostOptions(
-            TuiIntegrationTestHost.CreateHarness(), "sid", null,
+            TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null,
             _ => Task.FromResult<string?>(null));
         // ForkFromEntryAsync defaults to null — not supplied
 
@@ -76,7 +76,7 @@ public sealed class TuiTranscriptInteractionControllerTests
         TuiSessionSnapshot? capturedSnapshot = null;
 
         var options = new TuiHostOptions(
-            TuiIntegrationTestHost.CreateHarness(), "sid", null,
+            TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null,
             _ => Task.FromResult<string?>(null),
             ForkFromEntryAsync: (_, _) => Task.CompletedTask);
 
@@ -105,7 +105,7 @@ public sealed class TuiTranscriptInteractionControllerTests
         var snapshotApplied = false;
 
         var options = new TuiHostOptions(
-            TuiIntegrationTestHost.CreateHarness(), "sid", null,
+            TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null,
             _ => Task.FromResult<string?>(null),
             ForkFromEntryAsync: (_, _) => Task.CompletedTask);
 
@@ -133,7 +133,7 @@ public sealed class TuiTranscriptInteractionControllerTests
     public async Task ForkFromMessageAsync_WhenForkThrows_AppendsErrorMessageContainingExceptionText()
     {
         var options = new TuiHostOptions(
-            TuiIntegrationTestHost.CreateHarness(), "sid", null,
+            TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null,
             _ => Task.FromResult<string?>(null),
             ForkFromEntryAsync: (_, _) =>
                 Task.FromException(new InvalidOperationException("session is locked")));
@@ -161,7 +161,7 @@ public sealed class TuiTranscriptInteractionControllerTests
         var snapshotLoadCalled = false;
 
         var options = new TuiHostOptions(
-            TuiIntegrationTestHost.CreateHarness(), "sid", null,
+            TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null,
             _ => Task.FromResult<string?>(null),
             ForkFromEntryAsync: (_, _) =>
                 Task.FromException(new InvalidOperationException("network error")));

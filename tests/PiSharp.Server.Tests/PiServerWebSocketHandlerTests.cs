@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Sessions;
@@ -14,6 +13,7 @@ using PiSharp.Runtime.IO;
 using PiSharp.Server.Authentication;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Runtime;
+using PiSharp.Server.UiBridge;
 using PiSharp.Server.Serialization;
 using PiSharp.Server.WebSockets;
 using Xunit;
@@ -115,11 +115,180 @@ public sealed class PiServerWebSocketHandlerTests
         Assert.Contains("cwd is required", response.Error?.Message);
     }
 
-    private static PiServerWebSocketHandler CreateHandler(ServerSessionRegistry registry)
+    [Fact]
+    public async Task AttachCommand_ReplaysFromSinceSequence()
     {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["PiSharp:Server:ApiKey"] = "secret" }).Build();
-        return new PiServerWebSocketHandler(registry, new ApiKeyValidator(config), NullLogger<PiServerWebSocketHandler>.Instance);
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+
+        await EmitTurnAsync(live);
+        var head = live.EventLog.HeadSequence;
+
+        var attachResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "a", type = ServerCommandTypes.Attach, serverSessionId = created.ServerSessionId, sinceSequence = head - 1
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(attachResponse.Success);
+        var result = Assert.IsType<AttachResult>(attachResponse.Data);
+        Assert.Equal(head, result.HeadSequence);
+        Assert.False(result.Gap);
     }
+
+    [Fact]
+    public async Task AttachCommand_WithOldSinceSequence_ReportsGap()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+
+        await EmitTurnAsync(live);
+        var head = live.EventLog.HeadSequence;
+        var sample = live.EventLog.ReplayFrom(1).Events[0];
+        live.EventLog.Append(sample with { Sequence = head + 1000 });
+
+        var attachResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "a", type = ServerCommandTypes.Attach, serverSessionId = created.ServerSessionId, sinceSequence = 1
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(attachResponse.Success);
+        var result = Assert.IsType<AttachResult>(attachResponse.Data);
+        Assert.True(result.Gap);
+        Assert.Equal(head + 1000, result.HeadSequence);
+    }
+
+    [Fact]
+    public async Task AttachCommand_UnknownSession_ReturnsFailure()
+    {
+        var handler = CreateHandler(new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd)));
+        var command = JsonSerializer.Serialize(new { id = "a", type = ServerCommandTypes.Attach, serverSessionId = "missing", sinceSequence = 0 }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+        Assert.Equal("command_failed", response.Error?.Code);
+    }
+
+    [Fact]
+    public async Task GetStateCommand_ReturnsHeadSequence()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+
+        await EmitTurnAsync(live);
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "s", type = ServerCommandTypes.GetState, serverSessionId = created.ServerSessionId
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(response.Success);
+        var state = Assert.IsType<ServerSessionState>(response.Data);
+        Assert.Equal(live.EventLog.HeadSequence, state.HighWatermark);
+    }
+
+    [Fact]
+    public async Task GetStateCommand_WithoutSession_Fails()
+    {
+        var handler = CreateHandler(new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd)));
+        var command = JsonSerializer.Serialize(new { id = "s", type = ServerCommandTypes.GetState, serverSessionId = "missing" }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+    }
+
+    [Fact]
+    public async Task RunCommand_InvokesRegisteredDelegate()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var bridge = new ServerUiBridge(registry);
+        var invoked = false;
+        var delegates = new PiServerCommandDelegates(
+            RunCommandAsync: (context, text, options, ct) =>
+            {
+                invoked = true;
+                Assert.Equal("/help", text);
+                Assert.Same(registry.Sessions.Single(), context.Session);
+                Assert.Same(bridge, context.UiBridge);
+                return Task.FromResult(new ServerCommandResult(true, "done"));
+            });
+        var handler = CreateHandler(registry, bridge, delegates);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.RunCommand, serverSessionId = created.ServerSessionId, text = "/help"
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(invoked);
+        Assert.True(response.Success);
+        var result = Assert.IsType<ServerCommandResult>(response.Data);
+        Assert.Equal("done", result.Message);
+    }
+
+    [Fact]
+    public async Task UiResponse_CompletesPendingUiRequest()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var bridge = new ServerUiBridge(registry);
+        var handler = CreateHandler(registry, bridge);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var intent = new ServerUiIntent("req-1", "select", "Pick", "Choose one", ["a", "b"], null);
+        var requestTask = bridge.RequestUiAsync(intent);
+
+        await Task.Yield();
+        Assert.False(requestTask.IsCompleted);
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "u", type = ServerCommandTypes.UiResponse, serverSessionId = created.ServerSessionId,
+            requestId = "req-1", value = "a", cancelled = false
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(response.Success);
+        var uiResponse = await requestTask;
+        Assert.False(uiResponse.Cancelled);
+        Assert.Equal("a", uiResponse.Value);
+    }
+
+    [Fact]
+    public async Task CommandWithAbsentDelegate_ReturnsNotAvailable()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "x", type = ServerCommandTypes.CompleteCommand, serverSessionId = created.ServerSessionId, text = "/he"
+        }, ServerJsonSerializer.Options));
+
+        Assert.False(response.Success);
+        Assert.Equal("not_available", response.Error?.Code);
+    }
+
+    private static PiServerWebSocketHandler CreateHandler(ServerSessionRegistry registry, IServerUiBridge? uiBridge = null, PiServerCommandDelegates? delegates = null)
+        => new(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance, uiBridge, delegates);
 
     private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeAsync(string root)
     {
@@ -133,6 +302,9 @@ public sealed class PiServerWebSocketHandlerTests
 
     private static MessageEntry UserEntry(string id, string text)
         => new() { Id = id, ParentId = null, Timestamp = DateTimeOffset.UtcNow, Message = AgentMessages.User(text) };
+
+    private static Task EmitTurnAsync(LiveServerSession live)
+        => live.RunExclusiveAsync((runtime, _) => runtime.Harness.PromptAsync("hi", [], CancellationToken.None));
 
     private static async IAsyncEnumerable<AssistantMessageEvent> FakeStream(ModelDescriptor _, AgentContext __, AgentStreamOptions ___, [EnumeratorCancellation] CancellationToken ____ = default)
     {

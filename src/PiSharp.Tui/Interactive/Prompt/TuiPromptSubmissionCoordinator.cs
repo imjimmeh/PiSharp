@@ -105,7 +105,7 @@ internal sealed class TuiPromptSubmissionCoordinator
                 : await _options.ProcessFileReferencesAsync(text, _options.WorkingDirectory ?? Environment.CurrentDirectory, token);
             var images = input.Images is { Count: > 0 } ? input.Images.Concat(processed.Images).ToArray() : processed.Images;
 
-            if (_session.CurrentHarness.Phase == AgentHarnessPhase.Idle)
+            if (_session.CurrentRuntime.Phase == AgentHarnessPhase.Idle)
             {
                 _ = RunAgentTurnAsync(processed.Text, images, token);
             }
@@ -113,7 +113,7 @@ internal sealed class TuiPromptSubmissionCoordinator
             {
                 var content = new List<MessageContent> { new TextContent(processed.Text) };
                 if (images is { Count: > 0 }) content.AddRange(images);
-                _session.CurrentHarness.Steer(AgentMessages.User(content));
+                _session.CurrentRuntime.Steer(AgentMessages.User(content));
                 await _gateway.RunOnTuiAsync(() =>
                 {
                     var pendingCount = _gateway.State.PendingMessageCount + 1;
@@ -150,7 +150,7 @@ internal sealed class TuiPromptSubmissionCoordinator
     {
         try
         {
-            await Task.Run(() => _session.CurrentHarness.PromptAsync(text, images, token), token).ConfigureAwait(false);
+            await Task.Run(() => _session.CurrentRuntime.PromptAsync(text, images, token), token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

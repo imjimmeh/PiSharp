@@ -4,14 +4,13 @@ using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Core.Tools;
-using PiSharp.Agent.Harness;
 using PiSharp.Tui.Interactive;
 using System.Runtime.CompilerServices;
 
 namespace PiSharp.Tui.Interactive.Harness;
 
 internal sealed class TuiHarnessSubscription(
-    Func<AgentHarness<JsonlSessionMetadata>> getCurrentHarness,
+    Func<ITuiRuntimeFacade> getCurrentRuntime,
     Func<TuiRenderState> getState,
     Action<TuiRenderState> setState,
     Action<CancellationToken> scheduleRender,
@@ -36,9 +35,9 @@ internal sealed class TuiHarnessSubscription(
         _subscription?.Dispose();
         StopEventBatching();
         StartEventBatching();
-        var harness = getCurrentHarness();
-        _logger.LogDebug("TUI harness subscription binding harnessId={HarnessId}", RuntimeHelpers.GetHashCode(harness));
-        _subscription = harness.Subscribe(HandleHarnessEvent);
+        var runtime = getCurrentRuntime();
+        _logger.LogDebug("TUI harness subscription binding harnessId={HarnessId}", RuntimeHelpers.GetHashCode(runtime));
+        _subscription = runtime.Subscribe(HandleHarnessEvent);
     }
 
     public void Dispose()
@@ -54,7 +53,7 @@ internal sealed class TuiHarnessSubscription(
         {
             _logger.LogDebug(
                 "TUI harness event received harnessId={HarnessId} event={EventName} enqueueResult={EnqueueResult} cancellationRequested={CancellationRequested}",
-                RuntimeHelpers.GetHashCode(getCurrentHarness()),
+                RuntimeHelpers.GetHashCode(getCurrentRuntime()),
                 thinkingEvent,
                 enqueueResult,
                 token.IsCancellationRequested);
@@ -87,7 +86,7 @@ internal sealed class TuiHarnessSubscription(
         {
             _logger.LogDebug(
                 "TUI harness batch reducing thinking events harnessId={HarnessId} batchCount={BatchCount} events={ThinkingEvents} previousThinking={PreviousThinking} nextThinking={NextThinking}",
-                RuntimeHelpers.GetHashCode(getCurrentHarness()),
+                RuntimeHelpers.GetHashCode(getCurrentRuntime()),
                 batch.Count,
                 string.Join(",", thinkingEvents),
                 previousState.ThinkingLevel,

@@ -20,13 +20,9 @@ internal sealed class TuiHarnessLifecycleCoordinator(
 
     internal async Task RefreshAfterPossibleSessionChangeAsync(CancellationToken token)
     {
-        var nextHarness = options.GetCurrentHarness?.Invoke() ?? session.CurrentHarness;
-        if (ReferenceEquals(nextHarness, session.CurrentHarness)) return;
         var snapshot = await loadSessionSnapshotAsync(token);
         appContext.Post(() =>
         {
-            session.CurrentHarness = nextHarness;
-            RebindHarnessSubscription();
             if (snapshot is not null) applySessionSnapshot(snapshot, true);
             renderCoordinator.RequestRender(token);
         });
@@ -47,7 +43,7 @@ internal sealed class TuiHarnessLifecycleCoordinator(
 
     private TuiHarnessSubscription CreateHarnessSubscription()
         => new(
-            () => options.GetCurrentHarness?.Invoke() ?? session.CurrentHarness,
+            () => session.CurrentRuntime,
             getState,
             setState,
             token => renderCoordinator.RequestRender(token),

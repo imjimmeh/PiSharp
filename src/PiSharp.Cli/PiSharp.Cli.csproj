@@ -27,6 +27,8 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.8" />
     <ProjectReference Include="..\PiSharp.Runtime\PiSharp.Runtime.csproj" />
+    <ProjectReference Include="..\PiSharp.Client\PiSharp.Client.csproj" />
+    <ProjectReference Include="..\PiSharp.Server\PiSharp.Server.csproj" />
     <ProjectReference Include="..\PiSharp.Tui\PiSharp.Tui.csproj" />
     <ProjectReference Include="..\PiSharp.Packages\PiSharp.Packages.csproj" />
   </ItemGroup>

@@ -23,12 +23,9 @@ public sealed class TuiHarnessLifecycleCoordinatorTests
         var shell = new TuiShellView();
         var renderCoordinator = new TuiRenderCoordinator(
             shell, () => state, s => state = s, appContext, EmptyFooterSnapshot);
-        var harness = TuiIntegrationTestHost.CreateHarness();
-        var sessionContext = new TuiSessionContext { CurrentHarness = harness };
-        var options = new TuiHostOptions(harness, "sid", null, _ => Task.FromResult<string?>(null)) with
-        {
-            GetCurrentHarness = () => harness   // returns same instance
-        };
+        var runtime = TuiIntegrationTestHost.CreateRuntimeFacade();
+        var sessionContext = new TuiSessionContext { CurrentRuntime = runtime };
+        var options = new TuiHostOptions(runtime, "sid", null, _ => Task.FromResult<string?>(null));
         var coordinator = new TuiHarnessLifecycleCoordinator(
             sessionContext, options, appContext, renderCoordinator,
             () => state, s => state = s,
@@ -38,6 +35,6 @@ public sealed class TuiHarnessLifecycleCoordinatorTests
         await coordinator.RefreshAfterPossibleSessionChangeAsync(CancellationToken.None);
         appContext.Dispatcher.PumpPosted();
 
-        Assert.Same(harness, sessionContext.CurrentHarness); // unchanged
+        Assert.Same(runtime, sessionContext.CurrentRuntime); // unchanged
     }
 }

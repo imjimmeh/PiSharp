@@ -20,8 +20,16 @@ public sealed record PackageCommandArgs(
     string? ExtensionSource = null,
     string? AddSource = null);
 
+public enum DaemonCommandKind { Start, Stop, Status }
+public sealed record DaemonCommandArgs(
+    DaemonCommandKind Kind,
+    string? Port = null,
+    bool Foreground = false,
+    string? ApiKey = null);
+
 public sealed record CliArgs(
     PackageCommandArgs? PackageCommand = null,
+    DaemonCommandArgs? DaemonCommand = null,
     string? Provider = null,
     string? Model = null,
     string? ApiKey = null,
@@ -30,6 +38,7 @@ public sealed record CliArgs(
     ThinkingLevel? Thinking = null,
     bool Continue = false,
     bool Resume = false,
+    string? Attach = null,
     bool Help = false,
     bool Version = false,
     CliMode? Mode = null,
@@ -68,6 +77,7 @@ public sealed record CliArgs(
     AcpApprovalMode? ApprovalMode = null,
     bool CheckUpdates = false,
     bool NoCheckUpdates = false,
+    bool Local = false,
     IReadOnlyList<string>? Messages = null,
     IReadOnlyList<string>? FileArgs = null,
     IReadOnlyDictionary<string, object?>? UnknownFlags = null,

@@ -59,10 +59,10 @@ internal sealed class TuiShortcutActionHandler
             return;
         }
 
-        if (_session.CurrentHarness.Phase == AgentHarnessPhase.Idle) return;
+        if (_session.CurrentRuntime.Phase == AgentHarnessPhase.Idle) return;
 
         _session.AbortPending = true;
-        _session.CurrentHarness.Abort();
+        _session.CurrentRuntime.Abort();
         _gateway.Set(_gateway.State.AppendSystem("Abort requested.",
             systemMessageTag: "abort",
             removeDelayAfterEvent: TimeSpan.FromSeconds(2),

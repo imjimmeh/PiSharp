@@ -59,7 +59,7 @@ public sealed class RecordingExtensionApi : IExtensionApi
     public IExtensionStateApi State => throw new NotSupportedException();
 
     public IDisposable Use(ExtensionMiddleware middleware) => NullDisposable.Instance;
-    public IDisposable RegisterSkill(ExtensionSkillRegistration registration) => NullDisposable.Instance;
+    public IDisposable RegisterSkill(ExtensionSkillDefinition registration) => NullDisposable.Instance;
     public IDisposable RegisterShortcut(ExtensionShortcutRegistration registration) => NullDisposable.Instance;
     public IDisposable RegisterFlag(ExtensionFlagRegistration registration) => NullDisposable.Instance;
     public IDisposable RegisterMessageRenderer(ExtensionMessageRendererRegistration registration) => NullDisposable.Instance;
@@ -82,8 +82,8 @@ public sealed class RecordingExtensionApi : IExtensionApi
 
     private sealed class RecordingSkillApi : IExtensionSkillApi
     {
-        public IDisposable RegisterSkill(ExtensionSkillRegistration registration) => NullDisposable.Instance;
-        public Task<IReadOnlyList<ExtensionSkillRegistration>> GetAllSkillsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ExtensionSkillRegistration>>([]);
+        public IDisposable RegisterSkill(ExtensionSkillDefinition registration) => NullDisposable.Instance;
+        public Task<IReadOnlyList<ExtensionSkillDefinition>> GetAllSkillsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ExtensionSkillDefinition>>([]);
         public Task<IReadOnlyList<string>> GetSelectedSkillsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<string>>(["core"]);
         public Task SetSelectedSkillsAsync(IReadOnlyList<string> skillNames, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

@@ -987,9 +987,9 @@ public sealed class TuiDisposalTests
         var shell = new TuiShellView();
         var renderCoordinator = new TuiRenderCoordinator(shell, () => state, s => state = s, appContext, EmptyFooterSnapshot);
         using var inlineSelection = new TuiInlineSelectionCoordinator(shell.Prompt, () => { }, appContext.Post);
-        var sessionContext = new TuiSessionContext { CurrentHarness = TuiIntegrationTestHost.CreateHarness() };
+        var sessionContext = new TuiSessionContext { CurrentRuntime = TuiIntegrationTestHost.CreateRuntimeFacade() };
         var stateGateway = new TuiStateGateway(() => state, next => state = next, renderCoordinator, appContext, CancellationToken.None);
-        var options = new TuiHostOptions(TuiIntegrationTestHost.CreateHarness(), "sid", null, _ => Task.FromResult<string?>(null));
+        var options = new TuiHostOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null, _ => Task.FromResult<string?>(null));
         var shortcutActions = new TuiShortcutActionHandler(
             shell, inlineSelection, appContext, stateGateway, sessionContext, options, CancellationToken.None);
         shell.Prompt.SetPromptText("draft");
@@ -1010,9 +1010,9 @@ public sealed class TuiDisposalTests
         var shell = new TuiShellView();
         var renderCoordinator = new TuiRenderCoordinator(shell, () => state, s => state = s, appContext, EmptyFooterSnapshot);
         using var inlineSelection = new TuiInlineSelectionCoordinator(shell.Prompt, () => { }, appContext.Post);
-        var sessionContext = new TuiSessionContext { CurrentHarness = TuiIntegrationTestHost.CreateHarness() };
+        var sessionContext = new TuiSessionContext { CurrentRuntime = TuiIntegrationTestHost.CreateRuntimeFacade() };
         var stateGateway = new TuiStateGateway(() => state, next => state = next, renderCoordinator, appContext, CancellationToken.None);
-        var options = new TuiHostOptions(TuiIntegrationTestHost.CreateHarness(), "sid", null, _ => Task.FromResult<string?>(null));
+        var options = new TuiHostOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null, _ => Task.FromResult<string?>(null));
         var shortcutActions = new TuiShortcutActionHandler(
             shell, inlineSelection, appContext, stateGateway, sessionContext, options, CancellationToken.None);
 
@@ -1030,14 +1030,15 @@ public sealed class TuiDisposalTests
     public async Task HarnessSubscriptionLogsThinkingLevelBatchTransitions()
     {
         var harness = TuiIntegrationTestHost.CreateHarness();
-        var harnessId = RuntimeHelpers.GetHashCode(harness);
+        var runtime = TuiIntegrationTestHost.CreateRuntimeFacade(harness);
+        var harnessId = RuntimeHelpers.GetHashCode(runtime);
         var state = TuiRenderState.Empty("sid", "file",
             new PiSharp.Agent.Core.Models.ModelDescriptor("test", "m", "test"),
             ThinkingLevel.Off, null);
         using var provider = new RecordingLoggerProvider();
         using var loggerFactory = LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Debug).AddProvider(provider));
         using var subscription = new TuiHarnessSubscription(
-            () => harness,
+            () => runtime,
             () => state,
             next => state = next,
             _ => { },

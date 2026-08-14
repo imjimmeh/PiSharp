@@ -288,13 +288,18 @@ internal static class TuiIntegrationTestHost
             FakeCompletion,
             []));
     }
+    public static ITuiRuntimeFacade CreateRuntimeFacade()
+        => CreateRuntimeFacade(CreateHarness());
+
+    public static ITuiRuntimeFacade CreateRuntimeFacade(AgentHarness<JsonlSessionMetadata> harness)
+        => new TestRuntimeFacade(harness);
+
 
     public static TuiHostOptions CreateOptions(
-        AgentHarness<JsonlSessionMetadata> harness,
+        ITuiRuntimeFacade runtime,
         RecordingTerminalScreenSession? terminalScreenSession = null,
         Func<TuiCommandDispatchRequest, CancellationToken, Task<TuiCommandDispatchResult>>? dispatchCommandAsync = null,
         Func<string, IReadOnlyList<string>>? completeCommand = null,
-        Func<AgentHarness<JsonlSessionMetadata>>? getCurrentHarness = null,
         Func<CancellationToken, Task<TuiSessionSnapshot>>? getSessionSnapshotAsync = null,
         Func<IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>>>? getExtensionShortcuts = null,
         Func<CancellationToken, Task>? cycleThinkingLevelAsync = null,
@@ -305,7 +310,7 @@ internal static class TuiIntegrationTestHost
         IReadOnlySet<string>? commandWhitelist = null,
         TuiProfilingCounters? profilingCounters = null)
         => new(
-            harness,
+            runtime,
             SessionId: "test-session",
             SessionFile: null,
             GetSessionNameAsync: _ => Task.FromResult<string?>("Test session"),
@@ -313,7 +318,6 @@ internal static class TuiIntegrationTestHost
             TerminalScreenSession: terminalScreenSession ?? new RecordingTerminalScreenSession(),
             DispatchCommandAsync: dispatchCommandAsync,
             CompleteCommand: completeCommand,
-            GetCurrentHarness: getCurrentHarness,
             GetSessionSnapshotAsync: getSessionSnapshotAsync,
             GetExtensionShortcuts: getExtensionShortcuts,
             CycleThinkingLevelAsync: cycleThinkingLevelAsync,
@@ -329,13 +333,12 @@ internal static class TuiIntegrationTestHost
     public static async Task<RunningTuiHost> StartAsync(
         FakeDriver? driver = null,
         RecordingTerminalScreenSession? terminal = null,
-        AgentHarness<JsonlSessionMetadata>? harness = null,
+        ITuiRuntimeFacade? runtime = null,
         Func<TuiHostRunContext, CancellationToken, Task>? onBeforeRun = null,
         int width = 100,
         int height = 30,
         Func<TuiCommandDispatchRequest, CancellationToken, Task<TuiCommandDispatchResult>>? dispatchCommandAsync = null,
         Func<string, IReadOnlyList<string>>? completeCommand = null,
-        Func<AgentHarness<JsonlSessionMetadata>>? getCurrentHarness = null,
         Func<CancellationToken, Task<TuiSessionSnapshot>>? getSessionSnapshotAsync = null,
         IReadOnlyList<string>? startupMessages = null,
         TimeSpan? transientSystemMessageLifetime = null,
@@ -352,11 +355,11 @@ internal static class TuiIntegrationTestHost
         terminal ??= new RecordingTerminalScreenSession();
         var profilingCounters = new TuiProfilingCounters();
 
-        harness ??= CreateHarness();
+        runtime ??= CreateRuntimeFacade();
         var readyTcs = new TaskCompletionSource<TuiHostRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
         TuiHostRunContext? capturedContext = null;
 
-        var options = CreateOptions(harness, terminal, dispatchCommandAsync, completeCommand, getCurrentHarness, getSessionSnapshotAsync, getExtensionShortcuts,
+        var options = CreateOptions(runtime, terminal, dispatchCommandAsync, completeCommand, getSessionSnapshotAsync, getExtensionShortcuts,
             cycleThinkingLevelAsync, processFileReferencesAsync, processInputAsync, configureUiBridge, getExtensionLoadStatus, commandWhitelist, profilingCounters) with
         {
             ConsoleDriver = driver,

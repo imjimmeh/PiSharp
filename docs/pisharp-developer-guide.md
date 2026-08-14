@@ -30,7 +30,7 @@ PiSharp is an agent runtime and CLI for interactive and non-interactive coding-a
 - Two extension paths:
   - Native .NET extensions loaded from `.dll` assemblies.
   - TypeScript Pi extensions loaded through an out-of-process Node.js bridge.
-- A lightweight ASP.NET Core server project with health and WebSocket endpoints for live session use cases.
+- A daemon/server split: `pisharp daemon` runs a per-user background server hosting live sessions; interactive mode connects to it as an event-sourced WebSocket client (see [Daemon architecture and remote TUI](#daemon-architecture-and-remote-tui)).
 
 ## Repository layout
 
@@ -49,7 +49,8 @@ PiSharp is an agent runtime and CLI for interactive and non-interactive coding-a
 | `src/PiSharp.Runtime` | Runtime bootstrap that wires settings, providers, resources, sessions, tools, extensions, prompts, and the agent harness together. |
 | `src/PiSharp.Cli` | CLI parser, help text, runtime option mapping, interactive mode, print mode, and RPC mode. |
 | `src/PiSharp.Tui` | Terminal UI components: chat view, prompt editor, dialogs, footer/header, diff view, selector, session tree, and rendering helpers. |
-| `src/PiSharp.Server` | ASP.NET Core host with `/health` and `/ws` endpoints. |
+| `src/PiSharp.Server` | Daemon host: ASP.NET Core `PiServerHost` with `/health` and `/ws` WebSocket endpoints, API-key auth, live session registry, retained event log, and command dispatch. |
+| `src/PiSharp.Client` | Daemon client: lease store/discovery, WebSocket transport, `ClientSessionState` + event reducer, and `RemoteTuiBackend` for the remote TUI. |
 | `tests/*` | Project-specific test suites. |
 
 ## Runtime architecture overview
@@ -59,6 +60,78 @@ At startup, `PiRuntimeBootstrap.CreateRuntimeAsync()` builds a `SessionRuntime` 
 The main runtime object is `SessionRuntime`. It owns the session repo, current session, harness, extension manager, native plugin host, optional TypeScript host, settings snapshot, selected model, loaded resources, loaded skills, prompt template catalog, theme document, and startup diagnostics.
 
 See [Runtime, settings, resources, CLI, and sessions](pisharp-runtime.md) for details.
+
+## Daemon architecture and remote TUI
+
+Since the daemon-client work, `pisharp` in interactive mode is split into a per-user **daemon**
+(backend) and a **TUI client** (frontend) that talk over a localhost WebSocket using an
+**event-sourced** protocol: the client reconstructs all UI state by replaying a sequence-numbered
+event stream instead of polling.
+
+### Daemon mode
+
+The daemon is the same CLI binary hosting the ASP.NET Core server wiring (`PiServerHost`). It keeps
+`SessionRuntime`s warm, so a new TUI opens instantly without paying startup cost (extension
+loading, TypeScript bridge, resource discovery, session scan).
+
+- `pisharp daemon start` — spawns a detached daemon on a free port (or `--port <n>`), generates an
+  API key (or takes `--api-key <k>`), waits for `/health`, and writes the lease. Fails with
+  "daemon already running" if another daemon holds the start lock.
+- `pisharp daemon stop` — connects to the daemon over WebSocket, sends a `shutdown` command, and
+  clears the lease.
+- `pisharp daemon status` — prints the lease endpoint, pid, and whether the process is alive.
+- `pisharp daemon foreground --port <n> --api-key <k>` — runs the daemon in the foreground
+  (used internally by `daemon start` and by the client's auto-start).
+
+The lease lives at `~/.pi/PiSharp/daemon.json` (pid, port, api key, started-at, runtime version),
+guarded by an exclusive `daemon.lock`. Logs follow the existing convention under
+`~/.pi/PiSharp/logs`.
+
+### Client / daemon split
+
+`pisharp` in interactive mode acts as a client: it reads the lease, health-checks the daemon (pid
+alive, `/health` returns 200, runtime version major/minor matches), and auto-starts a daemon when
+none is live. It then connects over WebSocket (`ws://127.0.0.1:<port>/ws`,
+`Authorization: Bearer <key>`) and drives the TUI through `RemoteTuiBackend`.
+
+- `--local` forces the in-process TUI wiring (debugging escape hatch; also used by TUI integration
+  tests). If the daemon cannot be started or reached, the client falls back to in-process mode with
+  a warning.
+- Live sessions stay warm in the daemon and survive client exit; a detached session with zero
+  attached clients and no pending work is disposed after an idle timeout (default 5 minutes).
+
+### Event-sourced client
+
+`PiSharp.Client` holds `ClientSessionState`, the client's single source of truth for transcript
+items, busy/idle status, model/thinking level, pending tool calls, and session metadata. It is
+mutated only by a pure reducer (`ClientEventReducer`) folding flat `AgentSessionEvent`s, plus
+one-time command results on attach. `TuiRenderState` is derived from it per frame, so `TuiHost` and
+the Terminal.GUI views are unchanged.
+
+- **Sequences**: every event carries a per-session monotonic `Sequence`. The client tracks
+  `lastAppliedSequence` per session.
+- **Replay**: each daemon-side `LiveServerSession` keeps a retained in-memory ring buffer of the
+  most recent 100,000 envelopes. `attach { sessionId, sinceSequence }` replays the buffer from
+  `sinceSequence`, then streams live.
+- **Gap recovery**: when the client detects a sequence gap (including a replay whose `sinceSequence`
+  predates the retained window), it calls `get_state` (which carries the session `HighWatermark`),
+  folds the snapshot, and re-attaches from its watermark.
+
+### Wire protocol summary
+
+Transport is WebSocket at `ws://127.0.0.1:<port>/ws` with an API-key header; one JSON object per
+text frame. Requests are flat `ServerCommandEnvelope` frames (`type`, `id`, `serverSessionId` plus
+payload fields); responses are correlated `ServerResponse`s by envelope id; events are
+`ServerEventEnvelope`s (`{ Type, ServerSessionId, Sequence, Timestamp, Event }`). Commands include
+`create_session`, `attach`, `prompt`, `steer`, `follow_up`, `queue_next_turn`, `abort`, `fork`,
+`run_command`, `complete_command`, `process_input`, `shutdown`, `get_state`, `get_messages`,
+`list_sessions`, `set_model`, `set_thinking_level`, `compact`, `new_session`, `switch_session`,
+`set_session_name`, theme/snapshot/extension queries, and the `ui_request`/`ui_response` extension
+UI bridge lane. Async work (`prompt`, `compact`, `run_command`) returns `{ accepted = true }`
+immediately; the lifecycle flows over the event stream.
+
+Non-interactive modes (`print`, `json`, `subagent-json`, `rpc`) and subagent child processes stay
+in-process/stdio and are unchanged.
 
 ## Agent harness and event flow
 

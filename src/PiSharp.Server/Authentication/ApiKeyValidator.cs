@@ -1,20 +1,18 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
 
 namespace PiSharp.Server.Authentication;
 
 /// <summary>
 /// Validates the API key for HTTP/WebSocket handshakes. Query-string tokens are accepted only for browser WebSocket clients that cannot set Authorization headers; deployment logs must treat request URLs as sensitive.
 /// </summary>
-public sealed class ApiKeyValidator(IConfiguration configuration)
+public sealed class ApiKeyValidator(ApiKeyOptions options)
 {
     private const string BearerPrefix = "Bearer ";
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(ExpectedKey);
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(options.ApiKey);
 
-    private string? ExpectedKey
-        => configuration["PiSharp:Server:ApiKey"] ?? Environment.GetEnvironmentVariable("PISHARP_SERVER_API_KEY");
+    private string ExpectedKey => options.ApiKey;
 
     public bool Validate(HttpContext context)
     {

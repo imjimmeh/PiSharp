@@ -32,6 +32,250 @@ public sealed class TuiHostIntegrationTests
     }
 
     [Fact]
+    public async Task RunAsyncReachesRunContextBeforeBlockedSessionNameLoads()
+    {
+        var sessionNameCanComplete = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runContextReached = new TaskCompletionSource<TuiHostRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var driver = new FakeDriver();
+        driver.SetWindowSize(100, 30);
+        var terminal = new RecordingTerminalScreenSession();
+        using var runCancellation = new CancellationTokenSource();
+
+        var options = TuiIntegrationTestHost.CreateOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), terminal) with
+        {
+            ConsoleDriver = driver,
+            // Render-before-metadata is only guaranteed on the deferred-startup (remote) path, so opt
+            // into StartupAsync with a hook that completes without waiting on a real startup handshake.
+            StartupAsync = _ => Task.FromResult(new TuiHostStartupResult(Theme: null, StartupMessages: [])),
+            GetSessionNameAsync = cancellationToken => sessionNameCanComplete.Task.WaitAsync(cancellationToken),
+            BeforeRunAsync = (context, _) =>
+            {
+                runContextReached.TrySetResult(context);
+                return Task.CompletedTask;
+            }
+        };
+        var host = new TuiHost(options);
+        var runTask = Task.Run(() => host.RunAsync(runCancellation.Token), CancellationToken.None);
+
+        try
+        {
+            // The host must reach its app-running context while the session-name load is still blocked.
+            await runContextReached.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+            // The app loop must be live and rendering the shell while session metadata stays unresolved.
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            while (driver.Contents is null || driver.Contents.Length == 0)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not render while the session-name load was blocked.");
+                await Task.Delay(25);
+            }
+        }
+        finally
+        {
+            sessionNameCanComplete.TrySetResult(null);
+            var runContext = await runContextReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Application.Invoke(() => Application.RequestStop(runContext.Window));
+            runCancellation.Cancel();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Fact]
+    public async Task StartupHookDisablesPromptUntilStartupSucceedsThenEnablesIt()
+    {
+        var startupCanComplete = new TaskCompletionSource<TuiHostStartupResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readyTcs = new TaskCompletionSource<TuiHostRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var driver = new FakeDriver();
+        driver.SetWindowSize(100, 30);
+        var terminal = new RecordingTerminalScreenSession();
+        using var runCancellation = new CancellationTokenSource();
+
+        var options = TuiIntegrationTestHost.CreateOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), terminal) with
+        {
+            ConsoleDriver = driver,
+            StartupAsync = cancellationToken => startupCanComplete.Task.WaitAsync(cancellationToken),
+            BeforeRunAsync = (context, _) =>
+            {
+                readyTcs.TrySetResult(context);
+                return Task.CompletedTask;
+            }
+        };
+        var host = new TuiHost(options);
+        var runTask = Task.Run(() => host.RunAsync(runCancellation.Token), CancellationToken.None);
+
+        try
+        {
+            var runContext = await readyTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Once the app loop runs, the connecting status is pinned and the prompt is disabled
+            // while the startup hook is still pending.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not disable the prompt while the startup hook was pending.");
+                await Task.Delay(25);
+            }
+            Assert.Contains("Connecting to daemon…", runContext.GetState().Transcript.Select(item => item.Text));
+
+            startupCanComplete.TrySetResult(new TuiHostStartupResult(Theme: null, StartupMessages: ["daemon ready"]));
+
+            // Once startup and metadata hydration succeed, the prompt is re-enabled on the UI thread.
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not enable the prompt after startup succeeded.");
+                await Task.Delay(25);
+            }
+            Assert.Contains("daemon ready", runContext.GetState().Transcript.Select(item => item.Text));
+        }
+        finally
+        {
+            var runContext = await readyTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Application.Invoke(() => Application.RequestStop(runContext.Window));
+            runCancellation.Cancel();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+    [Fact]
+    public async Task DeferredStartupBeginsWhenOnlyConnectingPostIsDelivered()
+    {
+        var startupCanComplete = new TaskCompletionSource<TuiHostStartupResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readyTcs = new TaskCompletionSource<TuiHostRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var driver = new FakeDriver();
+        driver.SetWindowSize(100, 30);
+        var terminal = new RecordingTerminalScreenSession();
+        using var runCancellation = new CancellationTokenSource();
+
+        var options = TuiIntegrationTestHost.CreateOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), terminal) with
+        {
+            ConsoleDriver = driver,
+            // A long render-frame interval guarantees no deferred render can enqueue a
+            // Post before the host queues its connecting and hydration posts, so the
+            // second delivered Post is deterministically the hydration-launch post that
+            // DropSecondPostApplicationContext is meant to drop.
+            TimingOptions = new TuiTimingOptions(
+                RenderFrameInterval: TimeSpan.FromMinutes(1),
+                HarnessEventBatchInterval: TimeSpan.FromMinutes(1)),
+            // The connecting post must be enough to start startup hydration: the second
+            // posted callback (which currently launches hydration) is deliberately dropped.
+            ApplicationContext = new DropSecondPostApplicationContext(),
+            StartupAsync = cancellationToken => startupCanComplete.Task.WaitAsync(cancellationToken),
+            BeforeRunAsync = (context, _) =>
+            {
+                readyTcs.TrySetResult(context);
+                return Task.CompletedTask;
+            }
+        };
+        var host = new TuiHost(options);
+        var runTask = Task.Run(() => host.RunAsync(runCancellation.Token), CancellationToken.None);
+
+        try
+        {
+            var runContext = await readyTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // Only the connecting post is delivered: the prompt is disabled with the
+            // connecting status pinned while the startup gate is still pending.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not disable the prompt while the connecting post was pending.");
+                await Task.Delay(25);
+            }
+            Assert.Contains("Connecting to daemon…", runContext.GetState().Transcript.Select(item => item.Text));
+
+            startupCanComplete.TrySetResult(new TuiHostStartupResult(Theme: null, StartupMessages: ["daemon ready"]));
+
+            // Startup must begin even though only the connecting post was delivered, so
+            // the prompt is re-enabled shortly after the startup gate completes.
+            deadline = DateTime.UtcNow.AddSeconds(1);
+            while (!runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not begin startup hydration when only the connecting post was delivered.");
+                await Task.Delay(25);
+            }
+            Assert.Contains("daemon ready", runContext.GetState().Transcript.Select(item => item.Text));
+        }
+        finally
+        {
+            var runContext = await readyTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Application.Invoke(() => Application.RequestStop(runContext.Window));
+            runCancellation.Cancel();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Fact]
+    public async Task StartupAsyncFaultLeavesShellRenderedWithPersistentActionableErrorAndDisabledPrompt()
+    {
+        var runContextReached = new TaskCompletionSource<TuiHostRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var driver = new FakeDriver();
+        driver.SetWindowSize(100, 30);
+        var terminal = new RecordingTerminalScreenSession();
+        using var runCancellation = new CancellationTokenSource();
+
+        var options = TuiIntegrationTestHost.CreateOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), terminal) with
+        {
+            ConsoleDriver = driver,
+            StartupAsync = _ => Task.FromException<TuiHostStartupResult>(
+                new InvalidOperationException("daemon refused to start")),
+            BeforeRunAsync = (context, _) =>
+            {
+                runContextReached.TrySetResult(context);
+                return Task.CompletedTask;
+            }
+        };
+        var host = new TuiHost(options);
+        var runTask = Task.Run(() => host.RunAsync(runCancellation.Token), CancellationToken.None);
+
+        try
+        {
+            var runContext = await runContextReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // The app loop is live with the connecting status pinned and the prompt disabled
+            // while the faulted startup hook is still in flight.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not disable the prompt while the startup hook was pending.");
+                await Task.Delay(25);
+            }
+            Assert.Contains("Connecting to daemon…", runContext.GetState().Transcript.Select(item => item.Text));
+
+            // The startup fault must surface as a persistent, actionable daemon error row
+            // while the host stays rendered with input disabled.
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!runContext.GetState().Transcript.Any(item =>
+                item.IsError && item.Text.Contains("Failed to connect to the daemon", StringComparison.Ordinal)))
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not surface the daemon startup error.");
+                await Task.Delay(25);
+            }
+
+            var errorItem = Assert.Single(runContext.GetState().Transcript.Where(item =>
+                item.IsError && item.Text.Contains("Failed to connect to the daemon", StringComparison.Ordinal)));
+            Assert.Contains("daemon refused to start", errorItem.Text);
+            Assert.Contains("Verify the daemon is running and restart the interactive session.", errorItem.Text);
+            Assert.Null(errorItem.ExpiresAt);
+            Assert.False(runContext.Prompt.Enabled);
+            Assert.False(runTask.IsCompleted);
+        }
+        finally
+        {
+            var runContext = await runContextReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Application.Invoke(() => Application.RequestStop(runContext.Window));
+            runCancellation.Cancel();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Fact]
     public async Task SessionCommandLoadingShowsThenRemovesLoadingRow()
     {
         var dispatchTcs = new TaskCompletionSource<TuiCommandDispatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -134,7 +378,7 @@ public sealed class TuiHostIntegrationTests
         var promptText = "hello from integration";
         var assistantText = "assistant integration reply";
         var harness = TuiIntegrationTestHost.CreateHarness(assistantText);
-        await using var running = await TuiIntegrationTestHost.StartAsync(harness: harness);
+        await using var running = await TuiIntegrationTestHost.StartAsync(runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness));
 
         await running.SubmitPromptAsync(promptText);
 
@@ -181,7 +425,7 @@ public sealed class TuiHostIntegrationTests
             BlockingStream,
             TuiIntegrationTestHost.FakeCompletion,
             []));
-        await using var running = await TuiIntegrationTestHost.StartAsync(harness: harness);
+        await using var running = await TuiIntegrationTestHost.StartAsync(runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness));
 
         await running.SubmitPromptAsync("cancel this request");
         await streamStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -219,7 +463,7 @@ public sealed class TuiHostIntegrationTests
 
         var harness = TuiIntegrationTestHost.CreateHarness(assistantText);
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harness, processInputAsync: processInputAsync);
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness), processInputAsync: processInputAsync);
         var submitStarted = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         Application.Invoke(() =>
@@ -521,7 +765,7 @@ public sealed class TuiHostIntegrationTests
             []));
 
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harness,
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness),
             onBeforeRun: (context, _) =>
             {
                 context.Prompt.FocusAtEnd();
@@ -848,14 +1092,7 @@ public sealed class TuiHostIntegrationTests
         var dispatchTcs = new TaskCompletionSource<TuiCommandDispatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var dispatchStartedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var initialHarness = TuiIntegrationTestHost.CreateHarness("initial");
-        var newHarness = TuiIntegrationTestHost.CreateHarness("new");
-
-        var useNewHarness = 0;
         var snapshotCallCount = 0;
-
-        Func<AgentHarness<JsonlSessionMetadata>> getCurrentHarness = () =>
-            Volatile.Read(ref useNewHarness) == 1 ? newHarness : initialHarness;
 
         Func<CancellationToken, Task<TuiSessionSnapshot>> getSessionSnapshotAsync = _ =>
         {
@@ -868,13 +1105,11 @@ public sealed class TuiHostIntegrationTests
         Func<TuiCommandDispatchRequest, CancellationToken, Task<TuiCommandDispatchResult>> dispatchCommandAsync = async (request, ct) =>
         {
             dispatchStartedTcs.TrySetResult();
-            Interlocked.Exchange(ref useNewHarness, 1);
             return await dispatchTcs.Task.WaitAsync(ct);
         };
 
         await using var running = await TuiIntegrationTestHost.StartAsync(
             dispatchCommandAsync: dispatchCommandAsync,
-            getCurrentHarness: getCurrentHarness,
             getSessionSnapshotAsync: getSessionSnapshotAsync);
 
         Assert.Equal("test-session", running.Context.GetState().SessionId);
@@ -947,7 +1182,7 @@ public sealed class TuiHostIntegrationTests
 
         var harne = TuiIntegrationTestHost.CreateHarness("reply");
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harne, processFileReferencesAsync: processFileRefsAsync);
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harne), processFileReferencesAsync: processFileRefsAsync);
 
         await running.SubmitPromptAsync(filePath);
         await hookTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -984,7 +1219,7 @@ public sealed class TuiHostIntegrationTests
 
         var harne = TuiIntegrationTestHost.CreateHarness("ok");
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harne, processInputAsync: processInputAsync);
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harne), processInputAsync: processInputAsync);
 
         var originalText = "hello world";
         await running.SubmitPromptAsync(originalText);
@@ -1101,7 +1336,7 @@ public sealed class TuiHostIntegrationTests
             => new(Total: 3, Active: 3, BlockingActive: 0, Ready: 0, Failed: 0);
 
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harness,
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness),
             getExtensionLoadStatus: GetExtensionLoadStatus,
             commandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" });
 
@@ -1274,7 +1509,7 @@ public sealed class TuiHostIntegrationTests
             TuiIntegrationTestHost.FakeCompletion,
             []));
 
-        await using var running = await TuiIntegrationTestHost.StartAsync(harness: harness);
+        await using var running = await TuiIntegrationTestHost.StartAsync(runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness));
         await running.WaitUntilAsync(text => text.Length > 0);
 
         await running.SubmitPromptAsync("test prompt");
@@ -1516,5 +1751,37 @@ file sealed class NonPumpingSynchronizationContext : SynchronizationContext
 {
     public override void Post(SendOrPostCallback d, object? state)
     {
+    }
+}
+
+file sealed class DropSecondPostApplicationContext : ITuiApplicationContext
+{
+    private readonly ITuiApplicationContext _inner = new TerminalGuiApplicationContext();
+    private int _postCount;
+
+    public void Post(Action action)
+    {
+        // Drop exactly the second posted callback; the first (connecting) post and all
+        // later posts are forwarded unchanged.
+        if (Interlocked.Increment(ref _postCount) == 2)
+            return;
+        _inner.Post(action);
+    }
+
+    public object AddTimeout(TimeSpan interval, Func<bool> callback) => _inner.AddTimeout(interval, callback);
+    public void RemoveTimeout(object token) => _inner.RemoveTimeout(token);
+    public void RequestStop(Toplevel view) => _inner.RequestStop(view);
+    public void Run(Toplevel view) => _inner.Run(view);
+
+    public event EventHandler<Key>? KeyDown
+    {
+        add => _inner.KeyDown += value;
+        remove => _inner.KeyDown -= value;
+    }
+
+    public event EventHandler<SizeChangedEventArgs>? SizeChanging
+    {
+        add => _inner.SizeChanging += value;
+        remove => _inner.SizeChanging -= value;
     }
 }

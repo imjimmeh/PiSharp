@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core.Tools;
-using PiSharp.Agent.Harness;
 using PiSharp.Agent.Resources.Theme;
 using PiSharp.Extensions;
 using PiSharp.Tui.Interactive.Components;
@@ -26,6 +25,10 @@ public sealed record TuiSessionSnapshot(
     string? SessionName,
     IReadOnlyList<SessionTreeEntry> BranchEntries);
 
+public sealed record TuiHostStartupResult(
+    TuiThemeDocument? Theme,
+    IReadOnlyList<string> StartupMessages);
+
 public sealed record TuiInputHookResult(bool Handled, string Text, IReadOnlyList<ImageContent>? Images);
 
 internal sealed record TuiHostRunContext(
@@ -40,7 +43,7 @@ internal sealed record TuiHostRunContext(
     Action<string> InvokeCommand);
 
 public sealed record TuiHostOptions(
-    AgentHarness<JsonlSessionMetadata> Harness,
+    ITuiRuntimeFacade Runtime,
     string SessionId,
     string? SessionFile,
     Func<CancellationToken, Task<string?>> GetSessionNameAsync,
@@ -58,7 +61,6 @@ public sealed record TuiHostOptions(
     Func<ExtensionRegistry?>? GetExtensionRegistry = null,
     Func<string, IAgentTool?>? ResolveTool = null,
     Func<CancellationToken, Task>? CycleThinkingLevelAsync = null,
-    Func<AgentHarness<JsonlSessionMetadata>>? GetCurrentHarness = null,
     Func<string, string, CancellationToken, Task<(string Text, IReadOnlyList<ImageContent> Images)>>? ProcessFileReferencesAsync = null,
     Func<string, IReadOnlyList<ImageContent>?, string, CancellationToken, Task<TuiInputHookResult>>? ProcessInputAsync = null,
     Func<CancellationToken, Task<TuiSessionSnapshot>>? GetSessionSnapshotAsync = null,
@@ -69,9 +71,12 @@ public sealed record TuiHostOptions(
     TuiTimingOptions? TimingOptions = null,
     ILoggerFactory? LoggerFactory = null)
 {
+    public Func<CancellationToken, Task<TuiHostStartupResult>>? StartupAsync { get; init; }
     public Func<CancellationToken, Task>? OnHarnessReplaced { get; set; }
 
     internal IConsoleDriver? ConsoleDriver { get; init; }
+
+    internal ITuiApplicationContext? ApplicationContext { get; init; }
 
     internal TuiProfilingCounters? ProfilingCounters { get; init; }
 

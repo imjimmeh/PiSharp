@@ -104,11 +104,12 @@ public sealed class TuiPerformanceTests
     public async Task HarnessSubscriptionBatchesBurstEventsIntoOneStateUpdateAndRender()
     {
         var harness = TuiIntegrationTestHost.CreateHarness();
+        var runtime = TuiIntegrationTestHost.CreateRuntimeFacade(harness);
         var state = Empty();
         var setStateCalls = 0;
         var scheduledRenders = 0;
         using var subscription = new TuiHarnessSubscription(
-            () => harness,
+            () => runtime,
             () => state,
             next =>
             {

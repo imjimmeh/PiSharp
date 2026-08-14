@@ -114,6 +114,12 @@ public sealed class AgentSessionEvent
 
     public static AgentSessionEvent FromAdvisor(ExtensionAdvisorEvent e)
         => new AgentSessionEvent("advisor_note", new { sessionId = e.SessionId, turnId = e.TurnId, kind = e.Note.Kind, text = e.Note.Text, toolName = e.Note.ToolName, model = e.Note.Model });
+    /// <summary>
+    /// Creates a flat session event with an arbitrary server-defined type (e.g. <c>ui_request</c>).
+    /// The client transport already handles unknown type strings.
+    /// </summary>
+    public static AgentSessionEvent FromServer(string type, object? data)
+        => new(type, data);
 
     private static string ToJsonValue(ThinkingLevel level) => level.ToString().ToLowerInvariant();
 }

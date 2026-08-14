@@ -16,16 +16,19 @@ public sealed class LiveServerSession : IAsyncDisposable
     private CancellationTokenSource _operationAbort = new();
     private string _runtimeSessionId;
     private int _scheduledOperations;
+    private int _attachedClients;
+    private long _lastActivityTicks = DateTimeOffset.UtcNow.UtcTicks;
     private long _sequence;
     private bool _disposed;
 
-    public LiveServerSession(string id, PiSharp.Runtime.SessionRuntime runtime, Func<LiveServerSession, string, string, CancellationToken, Task>? runtimeSessionChanged = null, int eventCapacity = 1024)
+    public LiveServerSession(string id, PiSharp.Runtime.SessionRuntime runtime, Func<LiveServerSession, string, string, CancellationToken, Task>? runtimeSessionChanged = null, int eventCapacity = 100_000)
     {
         Id = id;
         Runtime = runtime;
         _runtimeSessionChanged = runtimeSessionChanged;
         _runtimeSessionId = runtime.Session.Metadata.Id;
         _eventCapacity = eventCapacity;
+        EventLog = new RetainedEventLog(eventCapacity);
         BindCurrentHarness();
         Runtime.SetRebindSession(OnRuntimeReboundAsync);
     }
@@ -35,9 +38,27 @@ public sealed class LiveServerSession : IAsyncDisposable
     public string RuntimeSessionId => _runtimeSessionId;
     public SemaphoreSlim Gate { get; } = new(1, 1);
     public CancellationToken LifetimeToken => _lifetime.Token;
+    public RetainedEventLog EventLog { get; }
+    public int AttachedClients => Volatile.Read(ref _attachedClients);
+    public DateTimeOffset LastActivityUtc => new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
+    public bool HasPendingWork => Volatile.Read(ref _scheduledOperations) > 0;
 
-    public async IAsyncEnumerable<ServerEventEnvelope> ReadEventsAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Yields retained envelopes with <see cref="ServerEventEnvelope.Sequence"/> at or after
+    /// <paramref name="sinceSequence"/> from <see cref="EventLog"/> (skipped entirely when the log
+    /// reports a gap), then falls through to the live subscriber tail until cancelled.
+    /// </summary>
+    public async IAsyncEnumerable<ServerEventEnvelope> ReadEventsAsync(long sinceSequence = 0, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        var replay = EventLog.ReplayFrom(sinceSequence);
+        if (!replay.Gap)
+        {
+            foreach (var envelope in replay.Events)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return envelope;
+            }
+        }
         var key = Guid.NewGuid();
         var channel = Channel.CreateBounded<ServerEventEnvelope>(new BoundedChannelOptions(_eventCapacity)
         {
@@ -45,6 +66,8 @@ public sealed class LiveServerSession : IAsyncDisposable
             SingleReader = true,
             SingleWriter = false
         });
+        Interlocked.Increment(ref _attachedClients);
+        Touch();
         _subscribers[key] = channel;
         try
         {
@@ -53,12 +76,14 @@ public sealed class LiveServerSession : IAsyncDisposable
         finally
         {
             if (_subscribers.TryRemove(key, out var removed)) removed.Writer.TryComplete();
+            Interlocked.Decrement(ref _attachedClients);
         }
     }
 
     public async Task<T> RunExclusiveAsync<T>(Func<PiSharp.Runtime.SessionRuntime, CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _scheduledOperations);
+        Touch();
         var gateTaken = false;
         try
         {
@@ -77,6 +102,7 @@ public sealed class LiveServerSession : IAsyncDisposable
     public async Task RunExclusiveAsync(Func<PiSharp.Runtime.SessionRuntime, CancellationToken, Task> operation, CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _scheduledOperations);
+        Touch();
         var gateTaken = false;
         try
         {
@@ -95,6 +121,7 @@ public sealed class LiveServerSession : IAsyncDisposable
     /// <summary>Requests cancellation of the active or already-scheduled harness run without taking the operation gate, so abort can interrupt prompt/compaction.</summary>
     public void RequestAbort()
     {
+        Touch();
         if (Volatile.Read(ref _scheduledOperations) > 0) _operationAbort.Cancel();
         Runtime.Harness.Abort();
     }
@@ -114,7 +141,8 @@ public sealed class LiveServerSession : IAsyncDisposable
             harness.ThinkingLevel,
             harness.Phase == AgentHarnessPhase.Turn,
             harness.Phase == AgentHarnessPhase.Compaction,
-            context.Messages.Count);
+            context.Messages.Count,
+            EventLog.HeadSequence);
     }
 
     private void ResetAbortIfNeeded()
@@ -123,6 +151,8 @@ public sealed class LiveServerSession : IAsyncDisposable
         _operationAbort.Dispose();
         _operationAbort = new CancellationTokenSource();
     }
+
+    private void Touch() => Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
 
     private async Task OnRuntimeReboundAsync(PiSharp.Runtime.SessionRuntime runtime, CancellationToken cancellationToken)
     {
@@ -143,9 +173,23 @@ public sealed class LiveServerSession : IAsyncDisposable
         {
             var sequence = Interlocked.Increment(ref _sequence);
             var envelope = ServerEventEnvelope.FromFlat(Id, sequence, evt.ToFlat());
+            EventLog.Append(envelope);
             foreach (var subscriber in _subscribers.Values) subscriber.Writer.TryWrite(envelope);
             return Task.CompletedTask;
         });
+    }
+
+    /// <summary>
+    /// Emits a server-generated flat event (e.g. a <c>ui_request</c>) into the retained event log
+    /// and broadcasts it to all attached subscribers, mirroring the harness subscription path.
+    /// </summary>
+    public ServerEventEnvelope EmitEvent(AgentSessionEvent flatEvent)
+    {
+        var sequence = Interlocked.Increment(ref _sequence);
+        var envelope = ServerEventEnvelope.FromFlat(Id, sequence, flatEvent);
+        EventLog.Append(envelope);
+        foreach (var subscriber in _subscribers.Values) subscriber.Writer.TryWrite(envelope);
+        return envelope;
     }
 
     public async ValueTask DisposeAsync()

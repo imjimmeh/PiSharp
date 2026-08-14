@@ -28,9 +28,9 @@ public sealed class TuiPromptSubmissionCoordinatorTests
         using var inlineSelection = new TuiInlineSelectionCoordinator(
             shell.Prompt, () => { }, appContext.Post);
         var gateway = new TuiStateGateway(() => state, s => state = s, renderCoordinator, appContext, CancellationToken.None);
-        var sessionContext = new TuiSessionContext { CurrentHarness = TuiIntegrationTestHost.CreateHarness() };
+        var sessionContext = new TuiSessionContext { CurrentRuntime = TuiIntegrationTestHost.CreateRuntimeFacade() };
         var options = new TuiHostOptions(
-            TuiIntegrationTestHost.CreateHarness(), "sid", null,
+            TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null,
             _ => Task.FromResult<string?>(null),
             CompleteCommand: text => ["/model", "/tree", "/help"]);
 
@@ -55,9 +55,9 @@ public sealed class TuiPromptSubmissionCoordinatorTests
         using var inlineSelection = new TuiInlineSelectionCoordinator(
             shell.Prompt, () => { }, appContext.Post);
         var gateway = new TuiStateGateway(() => state, s => state = s, renderCoordinator, appContext, CancellationToken.None);
-        var sessionContext = new TuiSessionContext { CurrentHarness = TuiIntegrationTestHost.CreateHarness() };
+        var sessionContext = new TuiSessionContext { CurrentRuntime = TuiIntegrationTestHost.CreateRuntimeFacade() };
         var options = new TuiHostOptions(
-            TuiIntegrationTestHost.CreateHarness(), "sid", null,
+            TuiIntegrationTestHost.CreateRuntimeFacade(), "sid", null,
             _ => Task.FromResult<string?>(null),
             CompleteCommand: _ => ["/model", "/tree"]);
 

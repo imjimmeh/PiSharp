@@ -10,6 +10,7 @@ using PiSharp.Packages;
 using PiSharp.Cli.Runtime;
 using PiSharp.Cli.Parsing;
 using PiSharp.Compatibility.Settings;
+using PiSharp.Client;
 using PiSharp.Runtime;
 using PiSharp.Runtime.IO;
 using PiSharp.Tui.Interactive.Components;
@@ -61,6 +62,10 @@ public static class Program
         }
 
 
+        if (parsed.DaemonCommand is not null)
+        {
+            return await DaemonMode.RunAsync(parsed.DaemonCommand, console, cancellationToken);
+        }
         CliFileLoggingRegistration? fileLogging = null;
         var cwd = Directory.GetCurrentDirectory();
         using var loggerFactory = LoggerFactory.Create(builder =>
@@ -84,6 +89,17 @@ public static class Program
                 cancellationToken);
             if (resolved is null) return 0;
             runtimeArgs = resolved;
+        }
+        if (mode == AppMode.Interactive && !parsed.Local)
+        {
+            var store = new DaemonLeaseStore(PiAgentPaths.FromCwd(cwd).GlobalPiSharpDirectory);
+            var lease = await InteractiveMode.SelectLeaseAsync(store, ct: cancellationToken);
+            if (lease is not null)
+            {
+                return await InteractiveMode.RunRemoteAsync(lease, runtimeArgs, console, cancellationToken);
+            }
+
+            await console.Error.WriteLineAsync("daemon unavailable; falling back to in-process mode".AsMemory(), cancellationToken);
         }
 
         var runtimeOptions = CliRuntimeOptionsMapper.FromCliArgs(
@@ -138,7 +154,7 @@ public static class Program
             AppMode.SubagentJson => await SubagentJsonMode.RunAsync(runtime, new SubagentJsonModeOptions(InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty), console, cancellationToken),
             AppMode.PrintJson => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Json, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
             AppMode.PrintText => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Text, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
-            AppMode.Interactive => await InteractiveMode.RunAsync(runtime, cancellationToken),
+            AppMode.Interactive => await InteractiveMode.RunAsync(runtime, cancellationToken, parsed.Local),
             _ => 2
         };
     }
