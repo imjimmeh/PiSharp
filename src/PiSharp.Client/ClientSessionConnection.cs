@@ -33,13 +33,21 @@ public sealed class ClientSessionConnection : IAsyncDisposable
     /// Sends a command, assigning a fresh <see cref="ServerCommandEnvelope.Id"/> when the caller
     /// omitted one, and returns the server's response.
     /// </summary>
-    public async Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, CancellationToken ct = default)
+    public Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, CancellationToken ct = default)
+        => SendAsync(envelope, payload: null, ct);
+
+    /// <summary>
+    /// Sends a command, assigning a fresh <see cref="ServerCommandEnvelope.Id"/> when the caller
+    /// omitted one, and returns the server's response. The optional <paramref name="payload"/> object's
+    /// properties are merged into the frame (see <see cref="IClientTransport.SendCommandAsync(ServerCommandEnvelope, object?, CancellationToken)"/>).
+    /// </summary>
+    public async Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct = default)
     {
         if (envelope.Id is null)
         {
             envelope = envelope with { Id = Guid.NewGuid().ToString("N") };
         }
-        return await _transport.SendCommandAsync(envelope, ct);
+        return await _transport.SendCommandAsync(envelope, payload, ct);
     }
 
     public async ValueTask DisposeAsync()

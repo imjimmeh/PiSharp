@@ -42,15 +42,17 @@ public sealed class ClientSessionConnectionTests
     }
 
     [Fact]
-    public async Task ConnectAsync_ForwardsToTransport()
+    public async Task SendCommand_WithPayload_ForwardsPayload()
     {
         var transport = new FakeTransport();
         await using var conn = new ClientSessionConnection(transport);
-        var uri = new Uri("ws://127.0.0.1:7878/ws");
-        await conn.ConnectAsync(uri, "secret-key");
-        Assert.Equal(uri, transport.LastUri);
-        Assert.Equal("secret-key", transport.LastApiKey);
+        await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.Attach, Id: "1", ServerSessionId: "srv_x"),
+            new AttachPayload(SinceSequence: 42));
+        Assert.Equal(42, Assert.IsType<AttachPayload>(transport.LastPayload).SinceSequence);
     }
+
+    private sealed record AttachPayload(long SinceSequence);
 
     private static ServerEventEnvelope Envelope(long sequence)
         => ServerEventEnvelope.FromFlat("srv_test", sequence, AgentSessionEvent.FromCore(new AgentEvent.AgentStart()));
@@ -60,6 +62,7 @@ public sealed class FakeTransport : IClientTransport
 {
     public Channel<ServerEventEnvelope> Events { get; } = Channel.CreateUnbounded<ServerEventEnvelope>();
     public ServerCommandEnvelope? LastCommand { get; private set; }
+    public object? LastPayload { get; private set; }
     public Uri? LastUri { get; private set; }
     public string? LastApiKey { get; private set; }
 
@@ -73,10 +76,15 @@ public sealed class FakeTransport : IClientTransport
     }
 
     public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
+        => SendCommandAsync(envelope, payload: null, ct);
+
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
     {
         LastCommand = envelope;
+        LastPayload = payload;
         return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type));
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
+

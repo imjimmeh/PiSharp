@@ -54,18 +54,24 @@ public sealed class ClientWebSocketTransport : IClientTransport
         _ = Task.Run(() => ReadLoopAsync(_readerCts.Token), CancellationToken.None);
     }
 
-    public async Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
+        => SendCommandCoreAsync(envelope, payload: null, ct);
+
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
+        => SendCommandCoreAsync(envelope, payload, ct);
+
+    private async Task<ServerResponse> SendCommandCoreAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
     {
         if (envelope.Id is null)
             throw new ArgumentException("Envelope Id is required for command correlation.", nameof(envelope));
 
+        var json = BuildFrame(envelope, payload);
         var tcs = new TaskCompletionSource<ServerResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!_pending.TryAdd(envelope.Id, tcs))
             throw new InvalidOperationException($"Command id '{envelope.Id}' is already in flight.");
 
         try
         {
-            var json = JsonSerializer.SerializeToUtf8Bytes(envelope, ServerJsonSerializer.Options);
             await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct);
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -84,6 +90,24 @@ public sealed class ClientWebSocketTransport : IClientTransport
         {
             _pending.TryRemove(envelope.Id, out _);
         }
+    }
+
+    /// <summary>
+    /// Builds the flat wire frame: envelope routing fields plus payload properties in one object,
+    /// mirroring the server's flat request records (e.g. <c>attach</c>'s <c>sinceSequence</c>).
+    /// </summary>
+    private static byte[] BuildFrame(ServerCommandEnvelope envelope, object? payload)
+    {
+        var frame = payload is null
+            ? new JsonObject()
+            : JsonSerializer.SerializeToNode(payload, ServerJsonSerializer.Options) as JsonObject
+              ?? throw new InvalidOperationException("Command payload must serialize to a JSON object.");
+
+        // Envelope routing fields take precedence over any payload fields with the same names.
+        frame["type"] = envelope.Type;
+        if (envelope.Id is not null) frame["id"] = envelope.Id;
+        if (envelope.ServerSessionId is not null) frame["serverSessionId"] = envelope.ServerSessionId;
+        return JsonSerializer.SerializeToUtf8Bytes(frame, ServerJsonSerializer.Options);
     }
 
     public async ValueTask DisposeAsync()
