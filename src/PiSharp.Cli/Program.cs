@@ -9,6 +9,7 @@ using PiSharp.Cli.Modes;
 using PiSharp.Cli.Packages;
 using PiSharp.Cli.Parsing;
 using PiSharp.Compatibility.Settings;
+using PiSharp.Client;
 using PiSharp.Runtime;
 using PiSharp.Runtime.IO;
 using PiSharp.Tui.Interactive.Components;
@@ -70,6 +71,17 @@ public static class Program
                 cancellationToken);
             if (resolved is null) return 0;
             runtimeArgs = resolved;
+        }
+        if (mode == AppMode.Interactive && !parsed.Local)
+        {
+            var store = new DaemonLeaseStore(PiAgentPaths.FromCwd(cwd).GlobalPiSharpDirectory);
+            var lease = await InteractiveMode.SelectLeaseAsync(store, ct: cancellationToken);
+            if (lease is not null)
+            {
+                return await InteractiveMode.RunRemoteAsync(lease, runtimeArgs, console, cancellationToken);
+            }
+
+            await console.Error.WriteLineAsync("daemon unavailable; falling back to in-process mode".AsMemory(), cancellationToken);
         }
 
         var runtimeOptions = CliRuntimeOptionsMapper.FromCliArgs(

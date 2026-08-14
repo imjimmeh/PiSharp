@@ -1,3 +1,9 @@
+using System.Text.Json;
+using PiSharp.Cli.IO;
+using PiSharp.Cli.Parsing;
+using PiSharp.Client;
+using PiSharp.Server.Contracts;
+using PiSharp.Server.Serialization;
 using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Environment;
 using PiSharp.Abstractions.Sessions;
@@ -221,6 +227,127 @@ public static class InteractiveMode
             ExtensionLoadCommandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" },
             LoggerFactory: runtime.LoggerFactory);
     }
+
+    /// <summary>
+    /// Selects the daemon lease for remote interactive mode: returns the stored lease when it is
+    /// still healthy, otherwise auto-starts a daemon and returns its fresh lease (null when the
+    /// daemon could not be started). Both checks are injectable so tests can avoid real daemons.
+    /// </summary>
+    internal static async Task<DaemonLease?> SelectLeaseAsync(
+        DaemonLeaseStore store,
+        Func<DaemonLease, CancellationToken, Task<bool>>? isHealthy = null,
+        Func<CancellationToken, Task<DaemonLease?>>? autoStart = null,
+        CancellationToken ct = default)
+    {
+        isHealthy ??= DaemonDiscovery.IsDaemonAvailableAsync;
+        autoStart ??= token => DaemonMode.TryAutoStartAsync(store, token);
+
+        var lease = await store.ReadAsync(ct);
+        if (lease is not null && await isHealthy(lease, ct)) return lease;
+
+        return await autoStart(ct);
+    }
+
+    /// <summary>
+    /// Runs the TUI against a daemon-hosted session over the wire. The daemon session stays live
+    /// after this client exits so a later client can re-attach (Task4.3).
+    /// </summary>
+    internal static async Task<int> RunRemoteAsync(DaemonLease lease, CliArgs runtimeArgs, IConsoleIO console, CancellationToken cancellationToken)
+    {
+        await using var transport = new ClientWebSocketTransport();
+        await using var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection);
+
+        await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}"), lease.ApiKey, cancellationToken);
+
+        var created = await CreateRemoteSessionAsync(connection, runtimeArgs, cancellationToken);
+        var sessionId = created.ServerSessionId;
+        backend.ServerSessionId = sessionId;
+
+        var startupMessages = await backend.GetStartupMessagesAsync(cancellationToken);
+        var theme = await backend.GetThemeAsync(cancellationToken);
+
+        var options = new TuiHostOptions(
+            backend,
+            sessionId,
+            SessionFile: null,
+            backend.GetSessionNameAsync,
+            DispatchCommandAsync: backend.DispatchCommandAsync,
+            CompleteCommand: text => backend.CompleteCommandAsync(text, CancellationToken.None).GetAwaiter().GetResult(),
+            WorkingDirectory: Directory.GetCurrentDirectory(),
+            FooterSnapshot: null,
+            ConfigureUiBridge: bridge =>
+            {
+                backend.UiRequestHandler = async (intent, ct) =>
+                {
+                    var result = await bridge.HandleAsync(
+                        new ExtensionUiIntent(intent.RequestId, intent.Kind, intent.Title, intent.Message, intent.Options, intent.Component, intent.ExtensionId),
+                        ct);
+                    return new ServerUiResponse(result.RequestId, result.Value, result.Cancelled);
+                };
+            },
+            StartupMessages: startupMessages,
+            PostStartupChecksAsync: (inject, ct) => backend.PostStartupChecksAsync(inject, ct),
+            Theme: theme,
+            GetExtensionShortcuts: () => backend.GetExtensionShortcutsAsync(CancellationToken.None).GetAwaiter().GetResult(),
+            GetExtensionRegistry: () => null,
+            ResolveTool: _ => null,
+            CycleThinkingLevelAsync: backend.CycleThinkingLevelAsync,
+            ProcessFileReferencesAsync: async (text, cwd, token) =>
+            {
+                var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, cwd, token);
+                return (processed.Text, processed.Images);
+            },
+            ProcessInputAsync: backend.ProcessInputAsync,
+            GetSessionSnapshotAsync: backend.GetSessionSnapshotAsync,
+            ForkFromEntryAsync: backend.ForkFromEntryAsync,
+            GetExtensionLoadStatus: () => backend.GetExtensionLoadStatusAsync(CancellationToken.None).GetAwaiter().GetResult(),
+            ExtensionLoadCommandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" },
+            LoggerFactory: null);
+
+        var host = new TuiHost(options);
+        var exit = await host.RunAsync(cancellationToken);
+
+        await backend.DisposeAsync();
+        return exit;
+    }
+
+    private static async Task<ServerSessionCreated> CreateRemoteSessionAsync(ClientSessionConnection connection, CliArgs runtimeArgs, CancellationToken cancellationToken)
+    {
+        var request = new CreateServerSessionRequest(
+            Cwd: Directory.GetCurrentDirectory(),
+            Provider: runtimeArgs.Provider,
+            Model: runtimeArgs.Model,
+            Thinking: runtimeArgs.Thinking,
+            ScopedModels: runtimeArgs.Models,
+            Tools: runtimeArgs.Tools,
+            NoTools: runtimeArgs.NoTools,
+            NoBuiltinTools: runtimeArgs.NoBuiltinTools,
+            Extensions: runtimeArgs.Extensions,
+            NoExtensions: runtimeArgs.NoExtensions,
+            NoSkills: runtimeArgs.NoSkills,
+            NoPromptTemplates: runtimeArgs.NoPromptTemplates,
+            NoThemes: runtimeArgs.NoThemes,
+            NoContextFiles: runtimeArgs.NoContextFiles);
+
+        var response = await connection.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.CreateSession), request, cancellationToken);
+        if (!response.Success)
+        {
+            throw new InvalidOperationException($"create_session failed: {response.Error?.Code}: {response.Error?.Message}");
+        }
+
+        return FromPayload<ServerSessionCreated>(response.Data)
+            ?? throw new InvalidOperationException("create_session returned no session.");
+    }
+
+    /// <summary>
+    /// Round-trips the opaque command <see cref="ServerResponse.Data"/> (a <see cref="JsonElement"/>
+    /// on the wire, or an anonymous object in-process) into a typed record using the server JSON
+    /// options — the same approach as <c>ClientToTuiAdapter.FromPayload</c>, which is internal to
+    /// PiSharp.Client and not visible here.
+    /// </summary>
+    private static T? FromPayload<T>(object? data)
+        => data is null ? default : JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(data, ServerJsonSerializer.Options), ServerJsonSerializer.Options);
 
     private static SlashCommandRegistry BuildCommandRegistry(SessionRuntime runtime)
         => SlashCommandRegistryFactory.Create(runtime);

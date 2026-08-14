@@ -153,6 +153,35 @@ public static class DaemonMode
         return alive ? 0 : 1;
     }
 
+    /// <summary>
+    /// Starts a foreground daemon on a free port using the same port/api-key/version logic as
+    /// <see cref="StartAsync"/>, for the interactive mode's remote path. When another process holds
+    /// the start lock, someone else is already starting or running the daemon: the stored lease is
+    /// returned as-is (null when it is not readable or the pid is dead).
+    /// </summary>
+    internal static async Task<DaemonLease?> TryAutoStartAsync(DaemonLeaseStore store, CancellationToken cancellationToken)
+    {
+        var port = PickFreePort();
+        var apiKey = Guid.NewGuid().ToString("N");
+        var version = $"{Environment.Version.Major}.{Environment.Version.Minor}";
+
+        using var startLock = DaemonLock.TryAcquire(store.LockPath);
+        if (startLock is null)
+        {
+            return await store.ReadAsync(cancellationToken);
+        }
+
+        var launcher = new DaemonLauncher(store);
+        return await launcher.StartDaemonAsync(
+            executable: Environment.ProcessPath ?? throw new InvalidOperationException("Could not resolve the current executable path."),
+            arguments: $"daemon foreground --port {port} --api-key {apiKey}",
+            port,
+            apiKey,
+            version,
+            cancellationToken,
+            startLock);
+    }
+
     private static int? ResolvePort(string? portValue)
     {
         if (portValue is null) return PickFreePort();
