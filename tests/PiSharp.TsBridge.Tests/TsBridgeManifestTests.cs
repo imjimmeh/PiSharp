@@ -434,7 +434,7 @@ public sealed class TsBridgeManifestTests
         });
 
         var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "PiSharp.TsBridge", "Node");
-        var generatorPath = Path.Combine(root, "dist", "shims", "shimGenerator.js");
+        var generatorPath = Path.Combine(root, "dist", "shims", "codegen.js");
         Assert.True(File.Exists(generatorPath), $"shimGenerator.js not found at {generatorPath}");
 
         var tmpDir = Path.Combine(Path.GetTempPath(), "pisharp-agent-session-real-" + Guid.NewGuid().ToString("N"));
@@ -543,7 +543,7 @@ public sealed class TsBridgeManifestTests
         Assert.Contains("\"sdk.demo\"", shimJson, StringComparison.Ordinal);
 
         var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "PiSharp.TsBridge", "Node");
-        var generatorPath = Path.Combine(root, "dist", "shims", "shimGenerator.js");
+        var generatorPath = Path.Combine(root, "dist", "shims", "codegen.js");
         Assert.True(File.Exists(generatorPath), $"shimGenerator.js not found at {generatorPath}");
 
         var tmpDir = Path.Combine(Path.GetTempPath(), "pisharp-rt-shim-" + Guid.NewGuid().ToString("N"));
