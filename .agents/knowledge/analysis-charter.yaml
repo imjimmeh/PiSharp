@@ -1,0 +1,89 @@
+schema_version: 1
+
+repository:
+  root: .
+  type: monorepo
+  current_commit: "646522ccc6edc48acc39e4545cd120af9f1dafba"
+  default_branch: main
+
+technology:
+  languages:
+    - name: csharp
+      confidence: high
+    - name: typescript
+      confidence: high
+      note: "TypeScript/JavaScript under extensions/ and the reference-only javascript/ tree"
+  package_managers:
+    - dotnet-cli
+    - npm
+  build_systems:
+    - dotnet-sdk
+    - msbuild
+  test_frameworks:
+    - xunit
+  target_framework: net10.0
+  frameworks:
+    - aspnetcore
+    - terminal-gui
+
+analysis:
+  mode: initial-bootstrap
+  skill_root: ./skills/project
+  knowledge_root: ./knowledge
+  verification_commit: "646522ccc6edc48acc39e4545cd120af9f1dafba"
+  verification_date: 2026-08-14
+
+  include:
+    - src
+    - tests
+    - extensions
+    - docs
+    - scripts
+    - .github
+    - PiSharp.sln
+    - Directory.Build.props
+    - Makefile
+
+  exclude:
+    - javascript
+    - bin
+    - obj
+    - node_modules
+    - .worktrees
+    - tmp
+
+  excluded_reasoning:
+    javascript: "Reference-only source from the original JS implementation; AGENTS.md forbids modification."
+    bin: "Generated build output."
+    obj: "Generated build output."
+    node_modules: "External dependencies."
+    .worktrees: "Auxiliary git worktrees, not part of the main source tree."
+    tmp: "Scratch reference files (Terminal.GUI sources, logs)."
+
+existing_guidance:
+  - path: AGENTS.md
+    role: repository-wide agent instructions; architecture boundaries, extension-first policy, TsBridge parity contract, build/test commands, known pitfalls
+  - path: docs/pisharp-developer-guide.md
+    role: high-level developer map linking to detailed guides
+  - path: docs/pisharp-implementation-status.md
+    role: P01-P31 portfolio status matrix with test evidence
+  - path: docs/specs/SDD-pi-csharp-port.md
+    role: original port architectural spec (source tree is the authority for current behavior)
+  - path: docs/specs/PRD-pi-csharp-port.md
+    role: original port product requirements
+
+constraints:
+  history_available: true
+  external_services_available: false
+  production_configuration_available: false
+  dotnet_sdk_available: true
+
+operating_constraints:
+  - "Do not modify product code; this skill produces documentation, maps, catalogues, and skills only."
+  - "Do not modify the javascript/ directory; it is reference-only."
+  - "Do not copy secret values; document secret-handling mechanisms and paths only."
+  - "Follow AGENTS.md architecture boundaries and extension-first policy."
+
+known_limitations:
+  - "External LLM providers, daemon runtime, and production configuration are not exercised; provider/daemon behaviour claims rest on code, tests, and docs, not live execution."
+  - "Git history used for workflow/ownership signals only, not as proof of architectural importance."

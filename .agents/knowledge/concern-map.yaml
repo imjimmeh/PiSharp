@@ -1,0 +1,726 @@
+schema_version: 1
+verified_at_commit: 646522ccc6edc48acc39e4545cd120af9f1dafba
+notes: 'Synthesized from the structural map, documentation audit, and focused concern investigation. Cross-cutting concerns span structural units; no directory tree shape is implied.
+
+  '
+concerns:
+- id: extension-platform
+  name: Extension platform and lifecycle
+  category: cross-cutting
+  summary: 'The two extension paths (native .dll via collectible AssemblyLoadContext, TypeScript via Node sidecar) register into one ExtensionRegistry/ExtensionManager surface: tools, slash commands, TUI
+    shortcuts, flags, prompt contributions, providers, events, middleware, UI, rules, skills, and state all flow through IExtensionApi. Native plugins are discovered under <cwd>/plugins, <cwd>/.pi/extensions,
+    and ~/.pi/extensions (per PluginHostOptions.FromCwd) and loaded through NativePluginHost''s collectible PluginLoadContext so they can be unloaded.
+
+    '
+  implemented_in:
+  - src/PiSharp.Extensions
+  - src/PiSharp.PluginHost
+  - src/PiSharp.TsBridge
+  - src/PiSharp.Runtime
+  related_units:
+  - pi-sharp-extensions
+  - pi-sharp-plugin-host
+  - pi-sharp-ts-bridge
+  - pi-sharp-runtime
+  - pi-sharp-cli
+  entry_points:
+  - src/PiSharp.Extensions/IExtensionApi.cs
+  - src/PiSharp.Extensions/ExtensionManager.cs
+  - src/PiSharp.PluginHost/NativePluginHost.cs
+  dependencies:
+    upstream:
+    - PiSharp.Abstractions
+    - PiSharp.Agent.Core
+    downstream:
+    - All feature-extension plugins (Ast, Git, Eval, Memory, PlanMode, Permissions, ...)
+    external:
+    - Node.js (TsBridge sidecar)
+    - .NET assembly loading (collectible ALC)
+  related_concerns:
+  - tsbridge-parity
+  - session-persistence
+  common_changes:
+  - add a native .NET extension/plugin
+  - add a TypeScript extension
+  - extend IExtensionApi with a new capability
+  - change extension discovery or load order
+  invariants:
+  - 'Extensions must not depend on runtime/CLI/TUI projects (AGENTS.md: keep extension bridge/plugin host concerns inside TsBridge/PluginHost).'
+  - Extension API additions must remain backward compatible with JS-Pi extension contracts.
+  - UI-specific extension behavior must be guarded by api.HasUi for non-interactive modes.
+  risk:
+    level: high
+    reasons:
+    - Extension-first policy means most new product behavior lands here; blast radius spans the whole runtime surface.
+    - Collectible ALC load/unload semantics are easy to break silently.
+    - Backward compatibility with the original JavaScript Pi extension contracts is a hard requirement.
+  documentation:
+  - docs/pisharp-native-extensions.md
+  - docs/pisharp-typescript-extensions.md
+  - docs/pisharp-plugins.md
+  confidence: high
+  evidence:
+  - path: src/PiSharp.PluginHost/PluginLoadContext.cs
+    supports: collectible AssemblyLoadContext loading
+    kind: implementation
+  - path: src/PiSharp.Extensions/ExtensionManager.cs
+    supports: single registry surface for both extension paths
+    kind: implementation
+  - path: AGENTS.md
+    supports: extension-first policy + backward-compat requirement
+    kind: documentation
+- id: tsbridge-parity
+  name: TypeScript bridge parity contract
+  category: cross-cutting
+  summary: 'TsBridgeManifestFactory.CreateApiSurfaceManifest() is the source of truth for the Pi <-> JavaScript Pi API surface. Every Runtime(...) manifest entry must be wired end-to-end (runtime action
+    -> ExtensionRuntimeBinding -> Node wrapper), and every Snapshot(...) entry must be populated live in RuntimeExtensionBinder.BuildSessionSnapshotAsync with no hard-coded fallbacks. Tests enforce that
+    the manifest contains no roadmap/unsupported statuses.
+
+    '
+  implemented_in:
+  - src/PiSharp.TsBridge/TsBridgeManifestFactory.cs
+  - src/PiSharp.TsBridge/Node/TsBridgeRunner.mjs
+  related_units:
+  - pi-sharp-ts-bridge
+  - pi-sharp-runtime
+  entry_points:
+  - src/PiSharp.TsBridge/TsBridgeManifestFactory.cs (CreateApiSurfaceManifest)
+  - src/PiSharp.TsBridge/RuntimeExtensionBinder.cs (BuildSessionSnapshotAsync)
+  dependencies:
+    upstream:
+    - PiSharp.Agent
+    - PiSharp.Extensions
+    downstream:
+    - Node sidecar runner
+    external:
+    - Node.js / npm (build-time sidecar compile)
+  related_concerns:
+  - extension-platform
+  - session-persistence
+  common_changes:
+  - add a TsBridge runtime action
+  - add a snapshot field
+  - extend the manifest
+  invariants:
+  - Never add Planned(...)/not-yet-supported/stale labels or broad compatibility stubs for missing JS Pi APIs (AGENTS.md).
+  - Never expose snapshot fields with hard-coded fallbacks like () => true/false/undefined/{}.
+  - Every Runtime(...) manifest entry must be wired across all layers before declaration.
+  risk:
+    level: high
+    reasons:
+    - Manifest is a contract; declaring unwired entries misleads every extension author.
+    - Cross-layer wiring (C# manifest, runtime actions, Node wrappers) has many failure points.
+  documentation:
+  - docs/pisharp-typescript-extensions.md
+  - AGENTS.md
+  confidence: high
+  evidence:
+  - path: src/PiSharp.TsBridge/TsBridgeManifestFactory.cs
+    supports: CreateApiSurfaceManifest as parity contract source of truth
+    kind: implementation
+  - path: tests/PiSharp.TsBridge.Tests
+    supports: manifest enforcement tests incl. no-roadmap-status test
+    kind: test
+  - path: AGENTS.md
+    supports: parity contract rules
+    kind: documentation
+- id: session-persistence
+  name: Session persistence and JSONL format
+  category: cross-cutting
+  summary: 'JSONL-backed session storage (JsonlSessionRepo) with session continuation, forking/branching, compaction, labels, model/thinking-level changes, and save-points. Default location ~/.pi/agent/sessions.
+    Compatibility with the original JS Pi JSONL session format is preserved (header version 3, leaf entries). PiSharp.Compatibility owns PiSettingsStore, PiAgentPaths, and PiResourceLoader (settings/session/resource
+    conventions).
+
+    '
+  implemented_in:
+  - src/PiSharp.Compatibility
+  - src/PiSharp.Runtime
+  - src/PiSharp.Agent
+  related_units:
+  - pi-sharp-agent
+  - pi-sharp-compatibility
+  - pi-sharp-runtime
+  entry_points:
+  - src/PiSharp.Agent/Sessions/JsonlSessionRepo.cs
+  - src/PiSharp.Compatibility/Settings/PiSettingsStore.cs
+  dependencies:
+    upstream:
+    - PiSharp.Abstractions
+    downstream:
+    - PiSharp.TsBridge (session snapshot surface)
+    - PiSharp.Server (live sessions)
+    external: []
+  related_concerns:
+  - settings-resource-discovery
+  - agent-harness
+  common_changes:
+  - change session storage format
+  - alter compaction behavior
+  - add a session metadata field
+  invariants:
+  - 'Session JSONL compatibility with JS Pi must be preserved (README: JSONL session compatibility by default).'
+  - Compaction and branch summarization must not lose the session tree shape.
+  risk:
+    level: high
+    reasons:
+    - User session data is long-lived; format drift breaks resume/continuation.
+    - Compat layer deliberately preserves JS Pi conventions (legacy paths, session shapes).
+  documentation:
+  - docs/pisharp-runtime.md
+  - docs/pisharp-vs-pi.md
+  confidence: high
+  evidence:
+  - path: src/PiSharp.Agent/Sessions
+    supports: JSONL session repo, branching, compaction services
+    kind: implementation
+  - path: tests/PiSharp.Agent.Tests
+    supports: session/JSONL/serialization/compaction coverage
+    kind: test
+- id: settings-resource-discovery
+  name: Settings layers and resource discovery
+  category: cross-cutting
+  summary: 'PiSettingsStore resolves settings across four layers (global/project x legacy/PiSharp): ~/.pi/agent/settings.json, ~/.pi/PiSharp/settings.json, <cwd>/.pi/settings.json, <cwd>/.pi/PiSharp/settings.json.
+    PiResourceLoader discovers extensions, skills, prompts, prompt templates, themes, context files, packages, system prompts, and append prompts. CLI flags override settings at runtime.
+
+    '
+  implemented_in:
+  - src/PiSharp.Compatibility
+  - src/PiSharp.Runtime
+  related_units:
+  - pi-sharp-compatibility
+  - pi-sharp-runtime
+  - pi-sharp-cli
+  entry_points:
+  - src/PiSharp.Compatibility/Settings/PiSettingsStore.cs
+  - src/PiSharp.Compatibility/Resources/PiResourceLoader.cs
+  - src/PiSharp.Compatibility/PiAgentPaths.cs
+  dependencies:
+    upstream: []
+    downstream:
+    - Everything that reads settings or resources
+    external: []
+  related_concerns:
+  - session-persistence
+  common_changes:
+  - add a settings key
+  - change resource discovery precedence
+  - alter path resolution
+  invariants:
+  - 'Settings precedence: CLI flags > project PiSharp > project legacy > global PiSharp > global legacy.'
+  - 'AGENTS.md: register extension flags/options before applying CLI flag values.'
+  risk:
+    level: medium
+    reasons:
+    - Precedence mistakes change behavior across every user environment.
+    - Legacy Pi settings paths must keep working.
+  documentation:
+  - docs/pisharp-runtime.md
+  - docs/pisharp-vs-pi.md
+  confidence: high
+  evidence:
+  - path: tests/PiSharp.Compatibility.Tests
+    supports: settings layer/atomic-write/offline/profile tests
+    kind: test
+  - path: docs/pisharp-runtime.md
+    supports: settings precedence and resource discovery
+    kind: documentation
+- id: daemon-protocol
+  name: Daemon and event-sourced wire protocol
+  category: cross-cutting
+  summary: 'PiSharp.Server (Kestrel PiServerHost: /health open, /ws API-key protected) hosts warm SessionRuntimes; PiSharp.Client is an event-sourced WebSocket client that reconstructs UI state by replaying
+    sequence-numbered events (retained 100k-envelope ring buffer, attach{sinceSequence}, gap recovery via get_state). Commands are flat ServerCommandEnvelope frames; async work returns accepted=true and
+    lifecycle flows over the event stream. Lease at ~/.pi/PiSharp/daemon.json. The daemon process is PiSharp.Cli `daemon foreground` hosting PiServerHost.
+
+    '
+  implemented_in:
+  - src/PiSharp.Server
+  - src/PiSharp.Client
+  - src/PiSharp.Sdk
+  - src/PiSharp.Cli
+  related_units:
+  - pi-sharp-server
+  - pi-sharp-client
+  - pi-sharp-cli
+  - pi-sharp-sdk
+  entry_points:
+  - src/PiSharp.Server/Hosting/PiServerHost.cs
+  - src/PiSharp.Server/WebSocket/PiServerWebSocketHandler.cs
+  - src/PiSharp.Client/ClientEventReducer.cs
+  dependencies:
+    upstream:
+    - PiSharp.Runtime (SessionRuntime per server session)
+    downstream:
+    - PiSharp.Tui (RemoteTuiBackend)
+    - pisharp-session-webapp (browser twin)
+    external: []
+  related_concerns:
+  - agent-harness
+  common_changes:
+  - add a daemon wire command
+  - change event envelope shape
+  - alter replay/gap-recovery behavior
+  invariants:
+  - Every new command needs a ServerCommandTypes const, a command record in ServerContracts.cs, and a case in PiServerWebSocketHandler (ADR consequence).
+  - Client state is mutated only by the pure ClientEventReducer + one-time command results.
+  - Protocol evolution must stay backward compatible or bump the version check.
+  risk:
+    level: high
+    reasons:
+    - Wire protocol is the contract between daemon, client, SDK, and webapp; breaking it breaks all consumers.
+    - API-key auth on /ws is a security boundary.
+    - Gap recovery and replay are subtle; a wrong reducer silently corrupts UI state.
+  documentation:
+  - docs/adr/2026-08-14-daemon-client-architecture.md
+  - docs/pisharp-developer-guide.md
+  confidence: high
+  evidence:
+  - path: docs/adr/2026-08-14-daemon-client-architecture.md
+    supports: canonical daemon/client decision
+    kind: documentation
+  - path: src/PiSharp.Client/ClientEventReducer.cs
+    supports: pure reducer contract
+    kind: implementation
+  - path: tests/PiSharp.Client.Tests
+    supports: client event/replay coverage
+    kind: test
+- id: model-providers
+  name: Model providers and credentials
+  category: cross-cutting
+  summary: 'IModelProvider abstraction with streaming and completion methods; ~11 built-in providers (Anthropic, OpenAI, Google/Vertex Gemini, AWS Bedrock, Mistral, GitHub Copilot, mock/Faux); ApiRegistry
+    + ModelRegistry; generated model catalog (BuiltInModels.g.cs regenerated by PiSharp.Ai.ModelGenerator at Cli build); models.json catalog loader; EnvApiKeyDetector + ProviderCredentialResolver; OAuth
+    storage (~/.pi/agent/auth.json) with HTTP/device flows.
+
+    '
+  implemented_in:
+  - src/PiSharp.Ai
+  - src/PiSharp.Ai.ModelGenerator
+  related_units:
+  - pi-sharp-ai
+  - pi-sharp-ai-model-generator
+  entry_points:
+  - src/PiSharp.Ai/Providers/IModelProvider.cs
+  - src/PiSharp.Ai/Providers/BuiltInProviders.cs
+  - src/PiSharp.Ai/Auth/EnvApiKeyDetector.cs
+  dependencies:
+    upstream:
+    - PiSharp.Abstractions
+    - PiSharp.Agent.Core
+    downstream:
+    - Everything that calls models
+    external:
+    - Anthropic / OpenAI / Google / Bedrock / Mistral / GitHub Copilot APIs
+  related_concerns:
+  - agent-harness
+  common_changes:
+  - add an LLM provider
+  - change credential resolution
+  - update the model catalog
+  invariants:
+  - Provider implementations must normalize streaming and completion through IModelProvider.
+  - Generated catalog (BuiltInModels.g.cs) must be regenerated, not hand-edited.
+  risk:
+    level: medium
+    reasons:
+    - Credential handling (env vars, OAuth tokens) is security-sensitive.
+    - Provider APIs drift; external behavior cannot be inspected locally.
+  documentation:
+  - docs/pisharp-providers.md
+  - docs/pisharp-adding-a-provider.md
+  confidence: high
+  evidence:
+  - path: src/PiSharp.Ai/Providers/IModelProvider.cs
+    supports: provider contract
+    kind: implementation
+  - path: tests/PiSharp.Ai.Tests
+    supports: provider/streaming/auth/catalog coverage
+    kind: test
+- id: agent-harness
+  name: Agent harness and event pipeline
+  category: cross-cutting
+  summary: 'AgentHarness<TMetadata> coordinates turns: session + model selection, phase tracking (Idle/turn/compaction), steering/follow-up/next-turn queue, tool registration, system-prompt composition,
+    agent loop, persistence, extension events, compaction/branch summarization. Loop events flow through a durability-first pipeline: PersistenceStage -> PhaseTransitionStage -> ToolMiddlewareStage -> ExtensionDispatchStage
+    -> ListenerNotificationStage. Hot event consumers are kept off the harness critical path; mutating extension hooks run synchronously.
+
+    '
+  implemented_in:
+  - src/PiSharp.Agent
+  - src/PiSharp.Runtime
+  related_units:
+  - pi-sharp-agent
+  - pi-sharp-runtime
+  entry_points:
+  - src/PiSharp.Agent/Harness/AgentHarness.cs
+  - src/PiSharp.Agent/Loops/AgentLoop.cs
+  dependencies:
+    upstream:
+    - PiSharp.Abstractions
+    - PiSharp.Agent.Core
+    downstream:
+    - PiSharp.TsBridge
+    - PiSharp.Server
+    - PiSharp.Tui
+    external: []
+  related_concerns:
+  - session-persistence
+  - extension-platform
+  common_changes:
+  - change the loop event pipeline
+  - alter compaction behavior
+  - add an agent event type
+  invariants:
+  - 'Durability-first ordering: session writes ahead of extension/listener notification (developer guide).'
+  - Mutating extension hooks stay synchronous because return values affect behavior.
+  risk:
+    level: high
+    reasons:
+    - Core loop changes affect every session, every turn.
+    - Pipeline stage order is load-bearing for durability.
+  documentation:
+  - docs/pisharp-developer-guide.md
+  - docs/pisharp-runtime.md
+  confidence: high
+  evidence:
+  - path: src/PiSharp.Agent/Harness/AgentHarness.cs
+    supports: harness coordination + pipeline
+    kind: implementation
+  - path: tests/PiSharp.Agent.Tests
+    supports: harness/loop pipeline event coverage
+    kind: test
+- id: tool-system
+  name: Built-in tools and tool contracts
+  category: cross-cutting
+  summary: 'BuiltInTools.CreateAll = read/bash/edit/write/grep/find/ls (CreateReadOnly = read/grep/find/ls). All tools implement IAgentTool, return model-visible content + structured details, and can be
+    extended or overridden by extensions. Shared helpers: JsonTool<TParameters,TDetails>, ToolSchemas (JSON schema generation), PathUtilities, FileMutationQueue, Truncation. Execution mode and argument-preparation
+    metadata are part of the TsBridge parity surface.
+
+    '
+  implemented_in:
+  - src/PiSharp.Tools
+  - src/PiSharp.Extensions
+  related_units:
+  - pi-sharp-tools
+  - pi-sharp-extensions
+  entry_points:
+  - src/PiSharp.Tools/BuiltInTools.cs
+  - src/PiSharp.Agent.Core/AgentToolContracts.cs
+  dependencies:
+    upstream:
+    - PiSharp.Abstractions
+    - PiSharp.Agent.Core
+    downstream:
+    - All tool consumers + extension tool registration
+    external: []
+  related_concerns:
+  - extension-platform
+  common_changes:
+  - add a built-in tool
+  - change tool schema generation
+  - add tool middleware
+  invariants:
+  - Tools must implement IAgentTool and return content + structured details.
+  risk:
+    level: medium
+    reasons:
+    - Tools execute user-visible side effects (bash, edit, write); schema drift breaks model call accuracy.
+  documentation:
+  - docs/pisharp-tools.md
+  confidence: high
+  evidence:
+  - path: src/PiSharp.Tools/BuiltInTools.cs
+    supports: built-in tool registration
+    kind: implementation
+  - path: tests/PiSharp.Tools.Tests
+    supports: tool behavior + schema coverage
+    kind: test
+- id: tui-remote-shell
+  name: TUI shell and keybindings
+  category: application
+  summary: 'Terminal.Gui 2.0 interactive shell (TuiHost + Interactive/ subtree): chat view, prompt editor, dialogs, diff view, selector, session tree, footer/header, rendering helpers, TuiRenderState derived
+    from ClientSessionState per frame. Runs in-process (--local / tests) or remotely against the daemon via RemoteTuiBackend. PiSharp-owned keybinding behavior is validated by tests/PiSharp.Tui.Tests/TuiRenderingTests.cs
+    and must be preserved.
+
+    '
+  implemented_in:
+  - src/PiSharp.Tui
+  related_units:
+  - pi-sharp-tui
+  - pi-sharp-client
+  - pi-sharp-cli
+  entry_points:
+  - src/PiSharp.Tui/TuiHost.cs
+  - src/PiSharp.Tui/Interactive/
+  dependencies:
+    upstream:
+    - PiSharp.Abstractions
+    - PiSharp.Agent.Core
+    - PiSharp.Agent
+    - PiSharp.Extensions
+    downstream: []
+    external:
+    - Terminal.Gui 2.0 (external library; refs at G:\tmp\tgui)
+  related_concerns:
+  - daemon-protocol
+  common_changes:
+  - add a TUI shortcut
+  - change prompt editor behavior
+  - alter rendering
+  invariants:
+  - Preserve PiSharp-owned keybindings validated in TuiRenderingTests.cs (AGENTS.md pitfall).
+  risk:
+    level: medium
+    reasons:
+    - Keybinding regressions break the primary interactive surface.
+    - Terminal.Gui is an external library with its own versioning (2.0.0).
+  documentation:
+  - docs/pisharp-tui-shortcut-development.md
+  - docs/pisharp-tui-tracing.md
+  - docs/terminal-gui-architecture-reference.md
+  - docs/specs/TUI-visual-parity-contract.md
+  confidence: high
+  evidence:
+  - path: tests/PiSharp.Tui.Tests/TuiRenderingTests.cs
+    supports: keybinding/rendering regression guard
+    kind: test
+  - path: src/PiSharp.Tui/PiSharp.Tui.csproj
+    supports: Terminal.Gui 2.0 reference
+    kind: manifest
+- id: plugin-portfolio
+  name: Plugin portfolio (P07-P31)
+  category: domain
+  summary: 'A shipped portfolio of native extension plugins built on the same IExtensionApi surface as any third-party extension: memory (P08), plan mode (P14), permissions (P29), agent messaging (P07),
+    web research (P28), IDE protocol clients LSP/DAP (P12), MCP (P27), eval/bench (P15), observability (P25), model roles (P20), internal URLs (P26), declarative tools (P21), continuity (P23), foreign compat
+    (P11), browser (P17), git (P24), advisor (P16), SDK (P22), AST editing (P30), packages/skills (P04), subagents (P06), continual harness (P09). Each is a net10.0 class library with [ExtensionMetadata("id")].
+    Daemon-side command surfaces: theme registry, mcp_status, plan-mode RPC, metrics, package/skill commands, advisor event lane.
+
+    '
+  implemented_in:
+  - src/PiSharp.Memory
+  - src/PiSharp.PlanMode
+  - src/PiSharp.Permissions
+  - src/PiSharp.AgentMessaging
+  - src/PiSharp.Research
+  - src/PiSharp.Plugins.Lsp
+  - src/PiSharp.Plugins.Debug
+  - src/PiSharp.Mcp
+  - src/PiSharp.Eval
+  - src/PiSharp.Telemetry.Otlp
+  - src/PiSharp.ModelRoles
+  - src/PiSharp.InternalUrls
+  - src/PiSharp.DeclarativeTools
+  - src/PiSharp.Continuity
+  - src/PiSharp.Plugins.ForeignCompat
+  - src/PiSharp.Browser
+  - src/PiSharp.Git
+  - src/PiSharp.Advisor
+  - src/PiSharp.Sdk
+  - src/PiSharp.Ast
+  - src/PiSharp.Subagents
+  - src/PiSharp.ContinualHarness
+  - src/PiSharp.Packages
+  related_units:
+  - (all listed above)
+  entry_points:
+  - Each plugin's IExtension implementation
+  dependencies:
+    upstream:
+    - PiSharp.Extensions
+    - PiSharp.Agent.Core
+    - PiSharp.Abstractions
+    downstream: []
+    external:
+    - Various (LSP/DAP servers, MCP servers, search APIs, Playwright, Git CLI, OTLP collector)
+  related_concerns:
+  - extension-platform
+  common_changes:
+  - add a new plugin
+  - extend an existing plugin surface
+  invariants:
+  - Plugins are net10.0 class libraries with [ExtensionMetadata('id')].
+  - New end-user functionality goes through extensions first (AGENTS.md).
+  risk:
+    level: medium
+    reasons:
+    - Portfolio is broad; each plugin has distinct external integrations.
+    - Runtime activation of statically-unreferenced plugins is not verified in this environment (see unresolved questions).
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  - docs/plans/2026-08-14-plugin-index.md
+  confidence: high
+  evidence:
+  - path: docs/pisharp-plugins.md
+    supports: portfolio map
+    kind: documentation
+  - path: docs/pisharp-implementation-status.md
+    supports: P01-P31 status + test evidence
+    kind: documentation
+- id: compatibility-layer
+  name: JS Pi compatibility layer
+  category: specialist
+  summary: 'Deliberate backward compatibility with the original JavaScript Pi: legacy settings under ~/.pi/agent/settings.json and <cwd>/.pi/settings.json, sessions under ~/.pi/agent/sessions, Pi-style
+    TypeScript extension/skill/package/context/ prompt conventions, JSONL session compatibility. PiSharp.Compatibility owns PiSettingsStore (GlobalLegacy/ProjectLegacy layers), PiAgentPaths, PiResourceLoader.
+    The javascript/ tree is reference-only and MUST NOT be modified.
+
+    '
+  implemented_in:
+  - src/PiSharp.Compatibility
+  - src/PiSharp.Plugins.ForeignCompat
+  - extensions/
+  related_units:
+  - pi-sharp-compatibility
+  - pi-sharp-plugins-foreign-compat
+  entry_points:
+  - src/PiSharp.Compatibility/Settings/PiSettingsStore.cs
+  - src/PiSharp.Compatibility/Resources/PiResourceLoader.cs
+  dependencies:
+    upstream: []
+    downstream:
+    - PiSharp.Runtime
+    - PiSharp.Packages
+    external: []
+  related_concerns:
+  - session-persistence
+  - settings-resource-discovery
+  common_changes:
+  - change a compatibility path
+  - alter resource loading conventions
+  invariants:
+  - javascript/ is reference-only; never modify (AGENTS.md hard guardrail).
+  - Legacy Pi settings/session conventions must keep working.
+  risk:
+    level: medium
+    reasons:
+    - Breaking compat silently breaks existing user data and JS Pi extensions.
+  documentation:
+  - docs/pisharp-vs-pi.md
+  - docs/pisharp-runtime.md
+  confidence: high
+  evidence:
+  - path: AGENTS.md
+    supports: javascript/ guardrail
+    kind: documentation
+  - path: tests/PiSharp.Compatibility.Tests
+    supports: settings/resource compat coverage
+    kind: test
+- id: add-native-extension
+  name: Add a native .NET extension/plugin
+  category: workflow
+  summary: 'Recurring workflow: create a net10.0 class library under src/ that implements IExtension, annotate with [ExtensionMetadata("id")], register tools/commands/ shortcuts/prompts/providers/events
+    through IExtensionApi, add a test project under tests/, and document in docs/pisharp-plugins.md + implementation-status. Loaded in-process via NativePluginHost (collectible ALC) from extension paths.
+
+    '
+  implemented_in:
+  - src/PiSharp.Extensions
+  - src/PiSharp.PluginHost
+  related_units:
+  - pi-sharp-extensions
+  - pi-sharp-plugin-host
+  dependencies:
+    upstream:
+    - PiSharp.Extensions (IExtensionApi)
+    downstream: []
+    external: []
+  related_concerns:
+  - extension-platform
+  - plugin-portfolio
+  common_changes:
+  - create plugin project
+  - register extension surface
+  invariants:
+  - Depend on Extensions/Agent.Core/Abstractions, never on Runtime/Cli/Tui.
+  - Plugin id must be unique ([ExtensionMetadata('id')]).
+  risk:
+    level: medium
+    reasons:
+    - Plugins run in-process; a bad plugin can destabilize the host.
+  documentation:
+  - docs/pisharp-native-extensions.md
+  - docs/pisharp-plugins.md
+  confidence: high
+  evidence:
+  - path: docs/pisharp-native-extensions.md
+    supports: plugin authoring workflow
+    kind: documentation
+  - path: src/PiSharp.Extensions/IExtensionApi.cs
+    supports: extension surface
+    kind: implementation
+- id: add-provider
+  name: Add an LLM provider
+  category: workflow
+  summary: 'Recurring workflow documented in docs/pisharp-adding-a-provider.md: implement IModelProvider (streaming + completion), register in BuiltInProviders.RegisterAll, add env-key detection in EnvApiKeyDetector,
+    optionally update the model catalog (regenerate BuiltInModels.g.cs via PiSharp.Ai.ModelGenerator rather than hand-editing), add provider tests (BuiltInProvidersTests pattern).
+
+    '
+  implemented_in:
+  - src/PiSharp.Ai
+  - src/PiSharp.Ai.ModelGenerator
+  related_units:
+  - pi-sharp-ai
+  - pi-sharp-ai-model-generator
+  dependencies:
+    upstream:
+    - PiSharp.Abstractions
+    - PiSharp.Agent.Core
+    downstream: []
+    external:
+    - target provider API
+  related_concerns:
+  - model-providers
+  common_changes:
+  - add provider implementation
+  - add credential detection
+  invariants:
+  - Streaming and completion must be normalized through IModelProvider.
+  - Model catalog entries come from the generator, not hand edits.
+  risk:
+    level: medium
+    reasons:
+    - Credential detection touches security-sensitive env handling.
+  documentation:
+  - docs/pisharp-adding-a-provider.md
+  - docs/pisharp-providers.md
+  confidence: high
+  evidence:
+  - path: docs/pisharp-adding-a-provider.md
+    supports: verified touchpoint files
+    kind: documentation
+- id: add-daemon-command
+  name: Add a daemon wire command
+  category: workflow
+  summary: 'Recurring workflow for the /ws protocol: add a ServerCommandTypes const, a command record in ServerContracts.cs, a case in PiServerWebSocketHandler, optionally a daemon-facing interface surface
+    (IPlanModeDaemonSurface / IContinuitySessionService pattern), and client/SDK handling where needed. ADR consequence: all three touchpoints must change together.
+
+    '
+  implemented_in:
+  - src/PiSharp.Server
+  - src/PiSharp.Client
+  - src/PiSharp.Sdk
+  related_units:
+  - pi-sharp-server
+  - pi-sharp-client
+  - pi-sharp-sdk
+  dependencies:
+    upstream:
+    - PiSharp.Runtime
+    downstream:
+    - PiSharp.Tui
+    - pisharp-session-webapp
+    external: []
+  related_concerns:
+  - daemon-protocol
+  common_changes:
+  - add command
+  - add event type
+  invariants:
+  - ServerCommandTypes const + ServerContracts record + PiServerWebSocketHandler case must move together.
+  risk:
+    level: high
+    reasons:
+    - Protocol consumers (client, SDK, webapp) must stay in sync.
+  documentation:
+  - docs/adr/2026-08-14-daemon-client-architecture.md
+  confidence: high
+  evidence:
+  - path: docs/adr/2026-08-14-daemon-client-architecture.md
+    supports: three-touchpoint command workflow
+    kind: documentation

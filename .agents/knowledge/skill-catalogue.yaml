@@ -1,0 +1,1023 @@
+schema_version: 1
+verified_at_commit: 646522ccc6edc48acc39e4545cd120af9f1dafba
+catalogue:
+- id: repository-overview
+  title: PiSharp repository overview
+  type: orientation
+  summary: 'What PiSharp is, how the ~52 src projects and 43 test projects fit together, the layer discipline (Abstractions/Agent.Core dependency-light, Runtime as composition root), the extension-first
+    policy, and which documentation is authoritative. Also carries the javascript/ reference-only guardrail and the daemon/client split.
+
+    '
+  proposed_scope:
+  - src
+  - tests
+  - docs/pisharp-developer-guide.md
+  - AGENTS.md
+  use_when:
+    concepts:
+    - pi
+    - pisharp
+    - repository layout
+    - project map
+    - architecture overview
+    - which docs are current
+    paths:
+    - src/**
+    - docs/**
+    tasks:
+    - orient on the repository before a change
+    - find which project owns a concern
+    - decide whether a change belongs in core or an extension
+  scores:
+    modification_frequency: 1
+    complexity: 2
+    cross_boundary_reach: 3
+    risk: 1
+    documentation_gap: 1
+    project_specificity: 3
+    agent_usefulness: 3
+    weighted_total: 30
+  decision: dedicated-skill
+  decision_reason: 'Essential orientation for every agent session; routes to all other skills and prevents architecture-boundary violations (AGENTS.md) and javascript/ edits.
+
+    '
+  related_candidates:
+  - architecture-boundaries
+  - local-development
+  - testing-strategy
+  assigned_investigation:
+    status: complete
+    source: coordinator (charter + structural map + documentation audit)
+  evidence:
+  - path: AGENTS.md
+    supports: guardrails, extension-first policy, build/test commands
+    kind: documentation
+  - path: docs/pisharp-developer-guide.md
+    supports: canonical project map + daemon/client architecture
+    kind: documentation
+- id: architecture-boundaries
+  title: Architecture and dependency boundaries
+  type: cross-cutting
+  summary: 'Layer discipline: Abstractions and Agent.Core are dependency-light contract layers; no dependencies from abstractions/core back into runtime/CLI/TUI; runtime wiring stays in PiSharp.Runtime;
+    extension bridge/plugin host concerns stay in TsBridge/PluginHost. Extension projects depend on Extensions/Agent.Core/ Abstractions, never on Runtime/Cli/Tui.
+
+    '
+  proposed_scope:
+  - src/PiSharp.Abstractions
+  - src/PiSharp.Agent.Core
+  - src/PiSharp.Runtime
+  - src/PiSharp.TsBridge
+  - src/PiSharp.PluginHost
+  use_when:
+    concepts:
+    - dependency boundary
+    - layer discipline
+    - project reference
+    - architecture
+    paths:
+    - src/**/*.csproj
+    tasks:
+    - add a project reference
+    - move code between projects
+    - introduce a new project
+  scores:
+    modification_frequency: 2
+    complexity: 3
+    cross_boundary_reach: 3
+    risk: 3
+    documentation_gap: 0
+    project_specificity: 3
+    agent_usefulness: 3
+    weighted_total: 38
+  decision: merge-into
+  decision_reason: 'The rules are short, fully captured by AGENTS.md, and enforced by the structural map; a standalone skill would duplicate repository-overview. Merged as a section in repository-overview.
+
+    '
+  related_candidates:
+  - repository-overview
+  assigned_investigation:
+    status: complete
+    source: coordinator (AGENTS.md + csproj manifest reads)
+  evidence:
+  - path: AGENTS.md
+    supports: architecture boundaries section
+    kind: documentation
+- id: local-development
+  title: Local development, build, and test
+  type: orientation
+  summary: 'Build/test/run workflow: dotnet build/test PiSharp.sln (all 52 src + 43 test C# projects), per-project test gates, PiSharp.Cli as the executable, install scripts and Makefile, CI (build+test
+    on master; release pack on v* tags), log/settings locations, TDD conventions, and the pitfall that per-project tests are the reliable gate for a single change.
+
+    '
+  proposed_scope:
+  - PiSharp.sln
+  - Directory.Build.props
+  - Makefile
+  - install.sh
+  - install.ps1
+  - .github/workflows
+  - tests
+  use_when:
+    concepts:
+    - build
+    - test
+    - run
+    - dotnet
+    - ci
+    - install
+    - debugging
+    paths:
+    - PiSharp.sln
+    - tests/**
+    - .github/workflows/**
+    tasks:
+    - build the solution
+    - run tests for one project
+    - run the CLI locally
+    - debug a failing test
+  scores:
+    modification_frequency: 2
+    complexity: 1
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 1
+    project_specificity: 2
+    agent_usefulness: 3
+    weighted_total: 28
+  decision: dedicated-skill
+  decision_reason: 'Every agent needs verified commands before touching code; sln membership and CI coverage have non-obvious details (extensions/ and webapp excluded).
+
+    '
+  related_candidates:
+  - testing-strategy
+  - repository-overview
+  assigned_investigation:
+    status: complete
+    source: coordinator (verified sln membership, AGENTS.md, Makefile, CI)
+  evidence:
+  - path: AGENTS.md
+    supports: build/test commands
+    kind: documentation
+  - path: .github/workflows/ci.yml
+    supports: CI gate
+    kind: workflow
+- id: testing-strategy
+  title: Testing strategy and conventions
+  type: orientation
+  summary: 'One test project per src project (tests/<Project>.Tests), xunit on net10.0, TDD red-green-refactor expectation, per-project gates preferred over full solution runs, and the implementation-status.md
+    evidence culture. Read-only test projects (Extensions.Testing) and InternalsVisibleTo usage.
+
+    '
+  proposed_scope:
+  - tests
+  - Directory.Build.props
+  use_when:
+    concepts:
+    - test
+    - tdd
+    - xunit
+    - test project
+    paths:
+    - tests/**
+    tasks:
+    - add a test project
+    - choose which tests to run
+    - follow TDD workflow
+  scores:
+    modification_frequency: 2
+    complexity: 1
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 1
+    project_specificity: 1
+    agent_usefulness: 2
+    weighted_total: 23
+  decision: merge-into
+  decision_reason: 'Commands and conventions overlap local-development; a separate skill would duplicate the build/test gate. Merged as the Testing section in local-development.
+
+    '
+  related_candidates:
+  - local-development
+  assigned_investigation:
+    status: complete
+    source: coordinator (csproj inventory + documentation audit)
+  evidence:
+  - path: tests
+    supports: one test project per src project
+    kind: test
+- id: extension-platform
+  title: Extension platform and lifecycle
+  type: cross-cutting
+  summary: 'Both extension paths (native .dll via collectible ALC; TypeScript via Node sidecar) register into one registry surface. IExtensionApi exposes Settings/State/Tools/Skills/Packages/Model/Events/Prompt/Completion/Search/
+    Urls/Rules/Telemetry/Ui/HasUi plus RegisterTool/Skill/Command/Shortcut/Flag/ Provider/MessageRenderer/MessageDecorator, On(event), Use(middleware). Native discovery: <cwd>/plugins, <cwd>/.pi/extensions,
+    ~/.pi/extensions. Workflow: add a native extension (net10.0 class library, [ExtensionMetadata("id")], depend only on Extensions/Agent.Core/Abstractions, add tests + docs).
+
+    '
+  proposed_scope:
+  - src/PiSharp.Extensions
+  - src/PiSharp.PluginHost
+  - src/PiSharp.TsBridge
+  - src/PiSharp.Runtime (extension binding)
+  use_when:
+    concepts:
+    - extension
+    - plugin
+    - IExtension
+    - IExtensionApi
+    - native extension
+    - TypeScript extension
+    paths:
+    - src/PiSharp.Extensions/**
+    - src/PiSharp.PluginHost/**
+    tasks:
+    - add a native .NET extension/plugin
+    - register tools/commands/shortcuts/flags from an extension
+    - extend IExtensionApi
+    - change extension discovery/loading
+  scores:
+    modification_frequency: 3
+    complexity: 3
+    cross_boundary_reach: 3
+    risk: 3
+    documentation_gap: 1
+    project_specificity: 3
+    agent_usefulness: 3
+    weighted_total: 40
+  decision: dedicated-skill
+  decision_reason: 'Extension-first policy makes this the primary place new product behavior lands; high blast radius, load-bearing lifecycle semantics, and both paths share one registry.
+
+    '
+  related_candidates:
+  - tsbridge-parity
+  - plugin-portfolio
+  - add-native-extension
+  assigned_investigation:
+    status: complete
+    source: coordinator (IExtensionApi.cs, ExtensionManager.cs, PluginHost reads)
+  evidence:
+  - path: src/PiSharp.Extensions/IExtensionApi.cs
+    supports: extension API surface
+    kind: implementation
+  - path: src/PiSharp.Extensions/ExtensionManager.cs
+    supports: single registry for both paths
+    kind: implementation
+  - path: src/PiSharp.PluginHost/PluginLoadContext.cs
+    supports: collectible ALC loading
+    kind: implementation
+- id: add-native-extension
+  title: Add a native .NET extension/plugin
+  type: workflow
+  summary: 'Recurring workflow: create net10.0 class library implementing IExtension with [ExtensionMetadata("id")], register surface through IExtensionApi, add a test project under tests/, document in
+    pisharp-plugins.md + implementation-status. Reference pattern: the P07-P31 plugin portfolio.
+
+    '
+  proposed_scope:
+  - src (new plugin project)
+  - tests (new test project)
+  - docs/pisharp-plugins.md
+  use_when:
+    concepts:
+    - add a plugin
+    - new extension
+    - plugin project
+    paths:
+    - src/PiSharp.Plugins.*
+    tasks:
+    - create a new native plugin
+    - add a plugin to the portfolio
+  scores:
+    modification_frequency: 2
+    complexity: 2
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 1
+    project_specificity: 3
+    agent_usefulness: 2
+    weighted_total: 29
+  decision: merge-into
+  decision_reason: 'The workflow is the plugin-portfolio/extension-platform pattern; a standalone workflow skill would duplicate them. Kept as the primary workflow inside extension-platform.
+
+    '
+  related_candidates:
+  - extension-platform
+  - plugin-portfolio
+  assigned_investigation:
+    status: complete
+    source: coordinator (docs/pisharp-native-extensions.md + plugin projects)
+  evidence:
+  - path: docs/pisharp-native-extensions.md
+    supports: plugin authoring workflow
+    kind: documentation
+- id: tsbridge-parity
+  title: TypeScript bridge parity contract
+  type: specialist
+  summary: 'TsBridgeManifestFactory.CreateApiSurfaceManifest() is the parity contract source of truth. Runtime(...) entries must be wired end-to-end (manifest -> runtime action -> ExtensionRuntimeBinding
+    -> Node wrapper). Snapshot(...) entries must be live in RuntimeExtensionBinder.BuildSessionSnapshotAsync with no hard-coded fallbacks. Tests enforce no roadmap/unsupported statuses.
+
+    '
+  proposed_scope:
+  - src/PiSharp.TsBridge/TsBridgeManifestFactory.cs
+  - src/PiSharp.TsBridge/RuntimeExtensionBinder.cs
+  - src/PiSharp.TsBridge/Node/src/runner
+  - src/PiSharp.TsBridge/Node/TsBridgeRunner.mjs
+  use_when:
+    concepts:
+    - tsbridge
+    - parity
+    - manifest
+    - runtime action
+    - snapshot
+    - TypeScript extension bridge
+    paths:
+    - src/PiSharp.TsBridge/**
+    tasks:
+    - add a TsBridge runtime action
+    - add a snapshot field
+    - extend the manifest
+    - fix parity test failures
+  scores:
+    modification_frequency: 2
+    complexity: 3
+    cross_boundary_reach: 3
+    risk: 3
+    documentation_gap: 0
+    project_specificity: 3
+    agent_usefulness: 3
+    weighted_total: 38
+  decision: dedicated-skill
+  decision_reason: 'AGENTS.md treats the manifest as a contract; unwired entries or fallback snapshots mislead every extension author. Cross-layer wiring has many failure points and dedicated enforcement
+    tests.
+
+    '
+  related_candidates:
+  - extension-platform
+  assigned_investigation:
+    status: complete
+    source: coordinator (TsBridgeManifestFactory.cs + AGENTS.md + doc audit)
+  evidence:
+  - path: src/PiSharp.TsBridge/TsBridgeManifestFactory.cs
+    supports: CreateApiSurfaceManifest parity contract
+    kind: implementation
+  - path: tests/PiSharp.TsBridge.Tests
+    supports: manifest enforcement tests
+    kind: test
+  - path: AGENTS.md
+    supports: parity contract rules
+    kind: documentation
+- id: plugin-portfolio
+  title: Plugin portfolio (P07-P31)
+  type: domain
+  summary: 'The shipped native plugin portfolio (memory, plan mode, permissions, agent messaging, research, LSP/DAP, MCP, eval, observability, model roles, internal URLs, declarative tools, continuity,
+    foreign compat, browser, git, advisor, SDK, AST, subagents, continual harness, packages/skills). Each is a net10.0 class library with [ExtensionMetadata("id")]. Daemon-side command surfaces (theme registry,
+    mcp_status, plan-mode RPC, metrics, package/skill commands, advisor event lane).
+
+    '
+  proposed_scope:
+  - src/PiSharp.Memory
+  - src/PiSharp.PlanMode
+  - src/PiSharp.Permissions
+  - src/PiSharp.AgentMessaging
+  - src/PiSharp.Research
+  - src/PiSharp.Plugins.Lsp
+  - src/PiSharp.Plugins.Debug
+  - src/PiSharp.Mcp
+  - src/PiSharp.Eval
+  - src/PiSharp.Telemetry.Otlp
+  - src/PiSharp.ModelRoles
+  - src/PiSharp.InternalUrls
+  - src/PiSharp.DeclarativeTools
+  - src/PiSharp.Continuity
+  - src/PiSharp.Plugins.ForeignCompat
+  - src/PiSharp.Browser
+  - src/PiSharp.Git
+  - src/PiSharp.Advisor
+  - src/PiSharp.Sdk
+  - src/PiSharp.Ast
+  - src/PiSharp.Subagents
+  - src/PiSharp.ContinualHarness
+  - src/PiSharp.Packages
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  use_when:
+    concepts:
+    - plugin
+    - portfolio
+    - memory
+    - plan mode
+    - permissions
+    - mcp
+    - lsp
+    - dap
+    - eval
+    - research
+    paths:
+    - src/PiSharp.Memory/**
+    - src/PiSharp.PlanMode/**
+    - src/PiSharp.Permissions/**
+    - src/PiSharp.Mcp/**
+    - src/PiSharp.Plugins.*/**
+    tasks:
+    - modify a shipped plugin
+    - understand which plugin owns a feature
+    - extend a plugin surface
+    - check implementation status
+  scores:
+    modification_frequency: 3
+    complexity: 2
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 1
+    project_specificity: 3
+    agent_usefulness: 2
+    weighted_total: 30
+  decision: dedicated-skill
+  decision_reason: 'Broad portfolio with distinct external integrations; agents must know which plugin owns a feature and the shared plugin conventions without reading 20 projects.
+
+    '
+  related_candidates:
+  - extension-platform
+  - add-native-extension
+  assigned_investigation:
+    status: complete
+    source: coordinator (docs/pisharp-plugins.md + structural map)
+  evidence:
+  - path: docs/pisharp-plugins.md
+    supports: portfolio map
+    kind: documentation
+  - path: docs/pisharp-implementation-status.md
+    supports: P01-P31 status + test evidence
+    kind: documentation
+- id: daemon-protocol
+  title: Daemon and event-sourced wire protocol
+  type: cross-cutting
+  summary: 'Server (Kestrel /health + /ws, API-key auth) hosts warm SessionRuntimes; Client is an event-sourced WebSocket client (pure ClientEventReducer, attach with sinceSequence, gap recovery via get_state,
+    retained 100k-envelope ring buffer). Commands: flat ServerCommandEnvelope; async work returns accepted and flows over events. Lease at ~/.pi/PiSharp/daemon.json. Workflow: add a daemon wire command
+    (ServerCommandTypes const + ServerContracts record + PiServerWebSocketHandler case together). Daemon process is PiSharp.Cli `daemon foreground` hosting PiServerHost.
+
+    '
+  proposed_scope:
+  - src/PiSharp.Server
+  - src/PiSharp.Client
+  - src/PiSharp.Cli/Modes/DaemonMode.cs
+  - src/PiSharp.Sdk
+  - docs/adr/2026-08-14-daemon-client-architecture.md
+  use_when:
+    concepts:
+    - daemon
+    - websocket
+    - wire protocol
+    - server command
+    - event sourcing
+    - replay
+    - attach
+    - lease
+    paths:
+    - src/PiSharp.Server/**
+    - src/PiSharp.Client/**
+    - src/PiSharp.Sdk/**
+    tasks:
+    - add a daemon wire command
+    - change the event envelope
+    - alter replay/gap recovery
+    - debug daemon/client behavior
+  scores:
+    modification_frequency: 2
+    complexity: 3
+    cross_boundary_reach: 3
+    risk: 3
+    documentation_gap: 1
+    project_specificity: 3
+    agent_usefulness: 3
+    weighted_total: 39
+  decision: dedicated-skill
+  decision_reason: 'Wire protocol is the contract between daemon, client, SDK, and webapp; the three-touchpoint command workflow and pure-reducer invariant are load-bearing and non-obvious.
+
+    '
+  related_candidates:
+  - add-daemon-command
+  - tui-development
+  assigned_investigation:
+    status: complete
+    source: coordinator (ADR + ClientEventReducer + structural map)
+  evidence:
+  - path: docs/adr/2026-08-14-daemon-client-architecture.md
+    supports: canonical daemon/client decision
+    kind: documentation
+  - path: src/PiSharp.Client/ClientEventReducer.cs
+    supports: pure reducer invariant
+    kind: implementation
+- id: add-daemon-command
+  title: Add a daemon wire command
+  type: workflow
+  summary: 'Recurring workflow: add a ServerCommandTypes const, a command record in ServerContracts.cs, a case in PiServerWebSocketHandler, and client/SDK handling where needed. Daemon-facing extension
+    surfaces follow the IPlanModeDaemonSurface / IContinuitySessionService pattern.
+
+    '
+  proposed_scope:
+  - src/PiSharp.Server
+  - src/PiSharp.Client
+  - src/PiSharp.Sdk
+  use_when:
+    concepts:
+    - new command
+    - wire command
+    - server contract
+    paths:
+    - src/PiSharp.Server/Contracts/**
+    - src/PiSharp.Server/WebSocket/**
+    tasks:
+    - add a daemon command
+    - add a wire event type
+  scores:
+    modification_frequency: 2
+    complexity: 2
+    cross_boundary_reach: 3
+    risk: 3
+    documentation_gap: 1
+    project_specificity: 3
+    agent_usefulness: 2
+    weighted_total: 34
+  decision: merge-into
+  decision_reason: 'Fully captured by the ADR consequence and the daemon-protocol skill; a standalone workflow skill would duplicate it. Kept as a workflow section in daemon-protocol.
+
+    '
+  related_candidates:
+  - daemon-protocol
+  assigned_investigation:
+    status: complete
+    source: coordinator (ADR)
+  evidence:
+  - path: docs/adr/2026-08-14-daemon-client-architecture.md
+    supports: three-touchpoint command workflow
+    kind: documentation
+- id: tui-development
+  title: TUI shell and keybindings
+  type: application
+  summary: 'Terminal.Gui 2.0 interactive shell (TuiHost + Interactive/ subtree): chat view, prompt editor, dialogs, diff view, selector, session tree, rendering. Runs in-process (--local / tests) or remotely
+    via RemoteTuiBackend against the daemon. TuiRenderState is derived from ClientSessionState per frame. Preserve PiSharp-owned keybindings validated in TuiRenderingTests.cs. External Terminal.Gui refs
+    at G:\tmp\tgui (2.0.0 in use).
+
+    '
+  proposed_scope:
+  - src/PiSharp.Tui
+  - tests/PiSharp.Tui.Tests
+  - docs/pisharp-tui-shortcut-development.md
+  - docs/pisharp-tui-tracing.md
+  - docs/terminal-gui-architecture-reference.md
+  use_when:
+    concepts:
+    - tui
+    - terminal gui
+    - keybinding
+    - shortcut
+    - prompt editor
+    - rendering
+    paths:
+    - src/PiSharp.Tui/**
+    - tests/PiSharp.Tui.Tests/**
+    tasks:
+    - add a TUI shortcut
+    - change prompt editor behavior
+    - alter rendering
+    - debug TUI performance
+  scores:
+    modification_frequency: 2
+    complexity: 2
+    cross_boundary_reach: 1
+    risk: 2
+    documentation_gap: 1
+    project_specificity: 2
+    agent_usefulness: 2
+    weighted_total: 25
+  decision: dedicated-skill
+  decision_reason: 'Primary interactive surface with a keybinding regression guard and an external UI library; shortcuts have a documented catalog pattern worth preserving.
+
+    '
+  related_candidates:
+  - daemon-protocol
+  - local-development
+  assigned_investigation:
+    status: complete
+    source: coordinator (doc audit + TuiRenderingTests + developer guide)
+  evidence:
+  - path: tests/PiSharp.Tui.Tests/TuiRenderingTests.cs
+    supports: keybinding/rendering guard
+    kind: test
+  - path: docs/pisharp-tui-shortcut-development.md
+    supports: shortcut catalog pattern
+    kind: documentation
+- id: model-providers
+  title: Model providers and credentials
+  type: cross-cutting
+  summary: 'IModelProvider (streaming + completion), ~11 built-in providers, ApiRegistry/ ModelRegistry, generated catalog (BuiltInModels.g.cs regenerated by PiSharp.Ai.ModelGenerator at Cli build), models.json
+    loader, EnvApiKeyDetector + ProviderCredentialResolver, OAuth storage (~/.pi/agent/auth.json). Workflow: add an LLM provider (implement IModelProvider, register in BuiltInProviders. RegisterAll, add
+    env-key detection, regenerate catalog, add tests).
+
+    '
+  proposed_scope:
+  - src/PiSharp.Ai
+  - src/PiSharp.Ai.ModelGenerator
+  - docs/pisharp-providers.md
+  - docs/pisharp-adding-a-provider.md
+  use_when:
+    concepts:
+    - provider
+    - model
+    - llm
+    - anthropic
+    - openai
+    - oauth
+    - api key
+    - credential
+    - model catalog
+    paths:
+    - src/PiSharp.Ai/**
+    - src/PiSharp.Ai.ModelGenerator/**
+    tasks:
+    - add an LLM provider
+    - change credential resolution
+    - update the model catalog
+  scores:
+    modification_frequency: 2
+    complexity: 2
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 0
+    project_specificity: 2
+    agent_usefulness: 2
+    weighted_total: 26
+  decision: dedicated-skill
+  decision_reason: 'Recurring provider-addition workflow with a verified recipe doc and security-sensitive credential handling; agents should not hand-edit the generated catalog.
+
+    '
+  related_candidates:
+  - add-provider
+  assigned_investigation:
+    status: complete
+    source: coordinator (doc audit + structural map)
+  evidence:
+  - path: docs/pisharp-adding-a-provider.md
+    supports: provider-addition recipe
+    kind: documentation
+  - path: src/PiSharp.Ai/Providers/IModelProvider.cs
+    supports: provider contract
+    kind: implementation
+- id: add-provider
+  title: Add an LLM provider
+  type: workflow
+  summary: 'Recurring workflow documented in docs/pisharp-adding-a-provider.md: implement IModelProvider, register in BuiltInProviders.RegisterAll, add env-key detection, regenerate BuiltInModels.g.cs via
+    the generator, add provider tests (BuiltInProvidersTests pattern).
+
+    '
+  proposed_scope:
+  - src/PiSharp.Ai
+  - src/PiSharp.Ai.ModelGenerator
+  use_when:
+    concepts:
+    - new provider
+    - provider api
+    paths:
+    - src/PiSharp.Ai/Providers/**
+    tasks:
+    - add a new LLM provider
+  scores:
+    modification_frequency: 1
+    complexity: 2
+    cross_boundary_reach: 1
+    risk: 2
+    documentation_gap: 0
+    project_specificity: 2
+    agent_usefulness: 2
+    weighted_total: 23
+  decision: merge-into
+  decision_reason: 'The recipe doc is authoritative and current; the workflow is fully captured by model-providers. Merged as a workflow section.
+
+    '
+  related_candidates:
+  - model-providers
+  assigned_investigation:
+    status: complete
+    source: coordinator (doc audit)
+  evidence:
+  - path: docs/pisharp-adding-a-provider.md
+    supports: workflow recipe
+    kind: documentation
+- id: sessions-and-persistence
+  title: Session persistence and JSONL compatibility
+  type: cross-cutting
+  summary: 'JSONL-backed sessions (JsonlSessionRepo) with continuation, forking/branching, compaction, labels, model/thinking changes, save-points; default ~/.pi/agent/sessions; JS Pi JSONL compatibility
+    (header version 3, leaf entries). Session JSONL internals are documented only in docs/analysis/current-state-catalog §2.6, not in current guides.
+
+    '
+  proposed_scope:
+  - src/PiSharp.Agent/Sessions
+  - src/PiSharp.Compatibility (session/resource conventions)
+  - src/PiSharp.Runtime
+  use_when:
+    concepts:
+    - session
+    - jsonl
+    - compaction
+    - resume
+    - fork
+    - session file
+    - compatibility
+    paths:
+    - src/PiSharp.Agent/Sessions/**
+    - src/PiSharp.Compatibility/**
+    tasks:
+    - change session storage format
+    - alter compaction behavior
+    - add a session metadata field
+    - debug session resume
+  scores:
+    modification_frequency: 2
+    complexity: 2
+    cross_boundary_reach: 2
+    risk: 3
+    documentation_gap: 1
+    project_specificity: 2
+    agent_usefulness: 3
+    weighted_total: 33
+  decision: dedicated-skill
+  decision_reason: 'User session data is long-lived; format drift breaks resume/continuation and JS Pi compatibility is a hard requirement; JSONL internals are under-documented.
+
+    '
+  related_candidates:
+  - compatibility-layer
+  assigned_investigation:
+    status: complete
+    source: coordinator (developer guide + doc audit + structural map)
+  evidence:
+  - path: src/PiSharp.Agent/Sessions
+    supports: JSONL session repo + compaction services
+    kind: implementation
+  - path: docs/analysis/pisharp-current-state-catalog.md
+    supports: only current JSONL internals reference (stale-ish)
+    kind: documentation
+- id: settings-and-resources
+  title: Settings layers and resource discovery
+  type: cross-cutting
+  summary: 'PiSettingsStore four-layer settings (global/project x legacy/PiSharp) at ~/.pi/agent/settings.json, ~/.pi/PiSharp/settings.json, <cwd>/.pi/settings.json, <cwd>/.pi/PiSharp/settings.json; PiResourceLoader
+    discovers extensions, skills, prompts, prompt templates, themes, context files, packages, system prompts, append prompts; CLI flags override settings. Extension scoped settings/state use namespaces
+    (extensions.<ns>. prefix; first-writer-wins claim).
+
+    '
+  proposed_scope:
+  - src/PiSharp.Compatibility
+  - src/PiSharp.Extensions (scoped settings/state)
+  - src/PiSharp.Runtime
+  use_when:
+    concepts:
+    - settings
+    - resource
+    - discovery
+    - precedence
+    - profile
+    - theme
+    - prompt template
+    - context file
+    paths:
+    - src/PiSharp.Compatibility/Settings/**
+    - src/PiSharp.Compatibility/Resources/**
+    - src/PiSharp.Compatibility/PiAgentPaths.cs
+    tasks:
+    - add a settings key
+    - change resource discovery precedence
+    - alter path resolution
+    - debug why a setting is ignored
+  scores:
+    modification_frequency: 2
+    complexity: 2
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 1
+    project_specificity: 2
+    agent_usefulness: 2
+    weighted_total: 27
+  decision: dedicated-skill
+  decision_reason: 'Precedence mistakes change behavior across every user environment; legacy Pi settings paths must keep working; several runtime-doc gaps (new flags/modes).
+
+    '
+  related_candidates:
+  - compatibility-layer
+  assigned_investigation:
+    status: complete
+    source: coordinator (doc audit + PiSettingsStore + ExtensionScopedSettings)
+  evidence:
+  - path: tests/PiSharp.Compatibility.Tests
+    supports: settings layer tests
+    kind: test
+  - path: src/PiSharp.Extensions/ExtensionScopedSettings.cs
+    supports: namespace-prefixed scoped settings
+    kind: implementation
+- id: agent-harness
+  title: Agent harness and event pipeline
+  type: domain
+  summary: 'AgentHarness<TMetadata> coordinates turns (session/model selection, phase tracking, steering/follow-up queue, tool registration, system prompt, agent loop, persistence, extension events, compaction).
+    Durability-first loop pipeline: PersistenceStage -> PhaseTransitionStage -> ToolMiddlewareStage -> ExtensionDispatchStage -> ListenerNotificationStage. Mutating extension hooks run synchronously; hot
+    consumers are kept off the critical path.
+
+    '
+  proposed_scope:
+  - src/PiSharp.Agent/Harness
+  - src/PiSharp.Agent/Loops
+  - src/PiSharp.Runtime
+  use_when:
+    concepts:
+    - harness
+    - agent loop
+    - event pipeline
+    - compaction
+    - system prompt
+    - turn
+    - steering
+    paths:
+    - src/PiSharp.Agent/Harness/**
+    - src/PiSharp.Agent/Loops/**
+    tasks:
+    - change the loop event pipeline
+    - alter compaction behavior
+    - add an agent event type
+    - change system prompt composition
+  scores:
+    modification_frequency: 2
+    complexity: 3
+    cross_boundary_reach: 3
+    risk: 3
+    documentation_gap: 1
+    project_specificity: 3
+    agent_usefulness: 3
+    weighted_total: 39
+  decision: dedicated-skill
+  decision_reason: 'Core loop changes affect every session and every turn; stage ordering is load-bearing for durability; pipeline stage semantics are non-obvious.
+
+    '
+  related_candidates:
+  - sessions-and-persistence
+  - extension-platform
+  assigned_investigation:
+    status: complete
+    source: coordinator (developer guide + structural map)
+  evidence:
+  - path: src/PiSharp.Agent/Harness/AgentHarness.cs
+    supports: harness + pipeline
+    kind: implementation
+  - path: docs/pisharp-developer-guide.md
+    supports: durability-first stage ordering
+    kind: documentation
+- id: tools-and-commands
+  title: Built-in tools and slash commands
+  type: cross-cutting
+  summary: 'BuiltInTools.CreateAll = read/bash/edit/write/grep/find/ls (CreateReadOnly = read/grep/find/ls); tools implement IAgentTool returning content + structured details; JsonTool<TParameters,TDetails>
+    + ToolSchemas for JSON-schema generation; extensions can register/override tools. Slash commands: catalog pattern in PiSharp.Cli/Commands (BuiltInSlashCommandCatalog + registry factory); extensions
+    register commands via RegisterCommand.
+
+    '
+  proposed_scope:
+  - src/PiSharp.Tools
+  - src/PiSharp.Cli/Commands
+  - src/PiSharp.Agent.Core/AgentToolContracts.cs
+  - docs/pisharp-tools.md
+  - docs/pisharp-slash-command-development.md
+  use_when:
+    concepts:
+    - tool
+    - slash command
+    - IAgentTool
+    - read
+    - bash
+    - edit
+    - tool schema
+    paths:
+    - src/PiSharp.Tools/**
+    - src/PiSharp.Cli/Commands/**
+    tasks:
+    - add a built-in tool
+    - add a slash command
+    - change tool schema generation
+    - add tool middleware
+  scores:
+    modification_frequency: 2
+    complexity: 2
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 1
+    project_specificity: 2
+    agent_usefulness: 2
+    weighted_total: 27
+  decision: dedicated-skill
+  decision_reason: 'Tools and slash commands are the most frequently extended surface; both have documented catalog patterns and extension registration paths.
+
+    '
+  related_candidates:
+  - extension-platform
+  assigned_investigation:
+    status: complete
+    source: coordinator (doc audit + BuiltInTools.cs + slash-command doc)
+  evidence:
+  - path: src/PiSharp.Tools/BuiltInTools.cs
+    supports: built-in tool registration
+    kind: implementation
+  - path: docs/pisharp-slash-command-development.md
+    supports: slash command catalog pattern
+    kind: documentation
+- id: compatibility-layer
+  title: JS Pi compatibility layer
+  type: specialist
+  summary: 'Deliberate backward compatibility with the original JavaScript Pi: legacy settings paths, ~/.pi/agent/sessions, Pi-style extension/skill/package/ context/prompt conventions, JSONL session compatibility.
+    javascript/ is reference-only and MUST NOT be modified (AGENTS.md hard guardrail). PiSharp.Compatibility owns PiSettingsStore/PiAgentPaths/PiResourceLoader.
+
+    '
+  proposed_scope:
+  - src/PiSharp.Compatibility
+  - javascript
+  - docs/pisharp-vs-pi.md
+  use_when:
+    concepts:
+    - compatibility
+    - legacy
+    - javascript
+    - js pi
+    - vs-pi
+    paths:
+    - src/PiSharp.Compatibility/**
+    - javascript/**
+    tasks:
+    - change a compatibility path
+    - research original JS Pi behavior
+    - alter resource loading conventions
+  scores:
+    modification_frequency: 1
+    complexity: 2
+    cross_boundary_reach: 2
+    risk: 2
+    documentation_gap: 0
+    project_specificity: 3
+    agent_usefulness: 2
+    weighted_total: 27
+  decision: merge-into
+  decision_reason: 'Compat rules are spread across sessions-and-persistence and settings-and-resources; the javascript/ guardrail and doc guidance belong in repository-overview. A standalone skill would
+    fragment the same content.
+
+    '
+  related_candidates:
+  - sessions-and-persistence
+  - settings-and-resources
+  - repository-overview
+  assigned_investigation:
+    status: complete
+    source: coordinator (AGENTS.md + doc audit)
+  evidence:
+  - path: AGENTS.md
+    supports: javascript/ guardrail
+    kind: documentation
+  - path: docs/pisharp-vs-pi.md
+    supports: compat comparison
+    kind: documentation
+decisions_summary:
+  dedicated_skills:
+  - repository-overview
+  - local-development
+  - extension-platform
+  - tsbridge-parity
+  - plugin-portfolio
+  - daemon-protocol
+  - tui-development
+  - model-providers
+  - sessions-and-persistence
+  - settings-and-resources
+  - agent-harness
+  - tools-and-commands
+  merged_into:
+  - candidate: architecture-boundaries
+    into: repository-overview
+    reason: Short rules fully captured by AGENTS.md; standalone would duplicate the overview.
+  - candidate: testing-strategy
+    into: local-development
+    reason: Commands and conventions overlap the build/test gate.
+  - candidate: add-native-extension
+    into: extension-platform
+    reason: The plugin workflow is the extension-platform pattern.
+  - candidate: add-daemon-command
+    into: daemon-protocol
+    reason: Captured by the ADR consequence and the daemon skill.
+  - candidate: add-provider
+    into: model-providers
+    reason: Recipe doc is authoritative; fully captured by the provider skill.
+  - candidate: compatibility-layer
+    into: sessions-and-persistence, settings-and-resources, repository-overview
+    reason: Compat rules split naturally across the owning concerns; guardrail lives in the overview.
+  rejected:
+  - candidate: browser-automation
+    reason: Single-plugin concern; covered by plugin-portfolio and extension-platform.
+  - candidate: pisharp-session-webapp
+    reason: Small undocumented Vite app; covered by daemon-protocol (same wire protocol).
+  - candidate: memory-system
+    reason: Memory internals are a plugin; covered by plugin-portfolio + extension-platform.
+  - candidate: research-search-providers
+    reason: Search provider registration is a documented IExtensionApi.Search surface; covered by plugin-portfolio + extension-platform.
+  - candidate: tsbridge-shim-generator
+    reason: Build-time codegen inside TsBridge; covered by tsbridge-parity.
+  - candidate: ai-model-generator
+    reason: Covered by model-providers (regeneration workflow).

@@ -1,0 +1,2071 @@
+schema_version: 1
+verified_at_commit: 646522ccc6edc48acc39e4545cd120af9f1dafba
+notes:
+- 52 C# projects (51 top-level src/ dirs + nested src/PiSharp.TsBridge/Tools/ShimExportGenerator) are all members of PiSharp.sln; plus one non-C# Vite app (pisharp-session-webapp) not in the sln.
+- 'Build/test gates: `dotnet build PiSharp.sln`, `dotnet test PiSharp.sln`; per-project `dotnet test tests/<Proj>.Tests/<Proj>.Tests.csproj`.'
+- 'PiSharp.sln does NOT include: extensions/ (TS), javascript/ (reference-only), or pisharp-session-webapp.'
+- AGENTS.md test-path claims verified to exist.
+units:
+- id: pi-sharp-abstractions
+  name: PiSharp.Abstractions
+  type: contract
+  path: src/PiSharp.Abstractions
+  purpose: Cross-cutting abstractions — IExecutionEnv/IFileSystem/IShell, sessions (ISession<TMetadata>, ISessionStorage, SessionTreeEntry), messages (AgentMessage, MessageContent), options (ThinkingLevel),
+    streaming, errors, Result pattern. Zero project dependencies.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - (contract types only; no runtime entry)
+  commands:
+    build: dotnet build src/PiSharp.Abstractions/PiSharp.Abstractions.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on: []
+  consumed_by:
+  - PiSharp.Agent.Core
+  - PiSharp.Agent
+  - PiSharp.Ai
+  - PiSharp.Tools
+  - PiSharp.Extensions
+  - PiSharp.TsBridge
+  - PiSharp.Runtime
+  - PiSharp.Ast
+  - PiSharp.InternalUrls
+  - PiSharp.Git
+  - PiSharp.Eval
+  - PiSharp.ModelRoles
+  - PiSharp.Research
+  - PiSharp.Mcp
+  - PiSharp.Memory
+  - PiSharp.Permissions
+  - PiSharp.PlanMode
+  - PiSharp.Plugins.Debug
+  - PiSharp.Plugins.Lsp
+  - PiSharp.Continuity
+  - PiSharp.ContinualHarness
+  - PiSharp.AgentMessaging
+  - PiSharp.Advisor
+  - PiSharp.Tui
+  - PiSharp.Sdk
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-developer-guide.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  - docs/specs/SDD-pi-csharp-port.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Abstractions/PiSharp.Abstractions.csproj
+    supports: no ProjectReference/PackageReference
+    kind: manifest
+  - path: docs/pisharp-developer-guide.md
+    supports: documented as cross-cutting abstractions layer
+    kind: documentation
+  test_focus: none — no dedicated test project (contracts exercised transitively)
+- id: pi-sharp-agent-core
+  name: PiSharp.Agent.Core
+  type: contract
+  path: src/PiSharp.Agent.Core
+  purpose: Core agent contracts — IAgentTool, AgentEvent union, AgentHarnessEvent/OwnEvent, ModelDescriptor, AgentLoopConfig, prompt interfaces + SystemPromptDocument, AssistantMessageEvent streaming contracts.
+    Depends only on Abstractions (AGENTS.md boundary).
+  technologies:
+  - C#
+  - net10.0
+  - Microsoft.Extensions.Logging.Abstractions
+  entry_points:
+  - (contract types only)
+  commands:
+    build: dotnet build src/PiSharp.Agent.Core/PiSharp.Agent.Core.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  consumed_by:
+  - PiSharp.Agent
+  - PiSharp.Ai
+  - PiSharp.Tools
+  - PiSharp.Extensions
+  - PiSharp.TsBridge
+  - PiSharp.Runtime
+  - PiSharp.Ast
+  - PiSharp.InternalUrls
+  - PiSharp.Git
+  - PiSharp.Eval
+  - PiSharp.ModelRoles
+  - PiSharp.Research
+  - PiSharp.Research.Search.Brave
+  - PiSharp.Research.Search.GoogleCse
+  - PiSharp.Research.Search.Serper
+  - PiSharp.Mcp
+  - PiSharp.Memory
+  - PiSharp.Permissions
+  - PiSharp.PlanMode
+  - PiSharp.Plugins.Debug
+  - PiSharp.Plugins.Lsp
+  - PiSharp.Plugins.ForeignCompat
+  - PiSharp.Continuity
+  - PiSharp.ContinualHarness
+  - PiSharp.AgentMessaging
+  - PiSharp.Advisor
+  - PiSharp.Tui
+  - PiSharp.Sdk
+  - tests/PiSharp.Extensions.Testing
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-developer-guide.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  - docs/specs/SDD-pi-csharp-port.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Agent.Core/PiSharp.Agent.Core.csproj
+    supports: single ProjectReference to Abstractions + logging abstractions only
+    kind: manifest
+  - path: docs/analysis/pisharp-current-state-catalog.md
+    supports: 'contract-only agent layer: IAgentTool, AgentEvent union, ModelDescriptor, AgentLoopConfig'
+    kind: documentation
+  test_focus: none — no dedicated test project
+- id: pi-sharp-agent
+  name: PiSharp.Agent
+  type: library
+  path: src/PiSharp.Agent
+  purpose: Agent implementation — AgentHarness<TMetadata> with 5-stage loop-event pipeline (Persistence/PhaseTransition/ToolMiddleware/ExtensionDispatch/ListenerNotification), AgentLoop, ToolCallExecutor,
+    JSONL session storage + repo, session branching/compaction (CompactionService, BranchSummarizationService), skills (SkillManager), prompt templates, theme documents, JSON serialization, streaming.
+  technologies:
+  - C#
+  - net10.0
+  - YamlDotNet
+  - Microsoft.Extensions.Logging.Abstractions
+  entry_points:
+  - AgentHarness<TMetadata> (Harness/AgentHarness.cs)
+  - AgentLoop (Loops/AgentLoop.cs)
+  commands:
+    build: dotnet build src/PiSharp.Agent/PiSharp.Agent.csproj
+    test: dotnet test tests/PiSharp.Agent.Tests/PiSharp.Agent.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Extensions
+  consumed_by:
+  - PiSharp.TsBridge
+  - PiSharp.Runtime
+  - PiSharp.Subagents
+  - PiSharp.InternalUrls
+  - PiSharp.Tui
+  external_integrations:
+  - file system (JSONL sessions, SKILL.md discovery)
+  data_stores:
+  - JSONL session files under ~/.pi/agent/sessions (JsonlSessionRepo)
+  documentation:
+  - docs/pisharp-developer-guide.md
+  - docs/pisharp-runtime.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Agent/PiSharp.Agent.csproj
+    supports: refs Abstractions, Agent.Core, Extensions; YamlDotNet
+    kind: manifest
+  - path: tests/PiSharp.Agent.Tests
+    supports: 'focus: harness + loop stages/events, agent loop, tool execution, JSONL sessions, serialization, compaction/branch summaries, skills, prompt templates, theme docs, streaming — ~187 tests (docs/pisharp-implementation-status.md)'
+    kind: test
+  test_focus: harness/loop pipeline events, sessions, serialization, compaction, skills/prompts, streaming
+- id: pi-sharp-ai
+  name: PiSharp.Ai
+  type: library
+  path: src/PiSharp.Ai
+  purpose: Provider abstraction (IModelProvider), ~11 built-in providers (Anthropic, OpenAI, Google/Vertex, Bedrock, Mistral, GitHub Copilot), ApiRegistry + ModelRegistry, generated model catalog (BuiltInModels.g.cs),
+    models.json catalog loader, credential resolution (EnvApiKeyDetector, ProviderCredentialResolver), OAuth storage + HTTP server, HTTP/SSE helpers, ModelCatalogGenerator, PublicApi extension surface.
+    Scripts/**/*.cs excluded from compile.
+  technologies:
+  - C#
+  - net10.0
+  - System.Text.Json
+  - raw HttpClient + local SSE
+  - Microsoft.Extensions.Logging.Abstractions
+  entry_points:
+  - PublicApi.cs (extension surface)
+  - Providers/BuiltInProviders.cs RegisterAll
+  - Models/Generation/ModelCatalogGenerator.cs
+  commands:
+    build: dotnet build src/PiSharp.Ai/PiSharp.Ai.csproj
+    test: dotnet test tests/PiSharp.Ai.Tests/PiSharp.Ai.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  consumed_by:
+  - PiSharp.Extensions
+  - PiSharp.Ai.ModelGenerator
+  - PiSharp.TsBridge
+  - PiSharp.Runtime
+  - PiSharp.Ast
+  - PiSharp.Git
+  - PiSharp.Research
+  - PiSharp.Mcp
+  external_integrations:
+  - Anthropic API
+  - OpenAI
+  - Google/Vertex Gemini
+  - AWS Bedrock
+  - Mistral
+  - GitHub Copilot OAuth
+  - models.dev catalog
+  - OAuth device/HTTP flows
+  data_stores:
+  - ~/.pi/agent/auth.json (OAuth tokens)
+  - ~/.pi/agent/models.json (user catalog override)
+  documentation:
+  - docs/pisharp-providers.md
+  - docs/pisharp-adding-a-provider.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Ai/PiSharp.Ai.csproj
+    supports: refs Abstractions + Agent.Core only; Scripts/** excluded from compile
+    kind: manifest
+  - path: docs/pisharp-adding-a-provider.md
+    supports: provider recipe paths, BuiltInModels.g.cs, EnvApiKeyDetector.ProviderEnvVarMap
+    kind: documentation
+  - path: tests/PiSharp.Ai.Tests
+    supports: 'focus: providers (Anthropic/OpenAI/Copilot/Faux/matrix/streams), OAuth+credential resolution, model catalog + models.json loader, tool serialization, ApiRegistry — ~212 tests'
+    kind: test
+  test_focus: providers, streaming normalization, auth/OAuth, model catalogs, registry
+- id: pi-sharp-ai-model-generator
+  name: PiSharp.Ai.ModelGenerator
+  type: code-generator
+  path: src/PiSharp.Ai.ModelGenerator
+  purpose: Build-time model/provider catalog generator. Program.cs (2 lines) delegates to PiSharp.Ai.Models.Generation.ModelCatalogGenerator.Main(args). Invoked by PiSharp.Cli GenerateModelCatalog MSBuild
+    target (RunModelCatalogGenerationOnBuild) and by docs for regeneration.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - Program.cs -> ModelCatalogGenerator.Main(args)
+  commands:
+    build: dotnet build src/PiSharp.Ai.ModelGenerator/PiSharp.Ai.ModelGenerator.csproj
+    test: null
+    run: dotnet run --project src/PiSharp.Ai.ModelGenerator -- src/PiSharp.Ai/Models/Generated/BuiltInModels.g.cs
+  deployable: false
+  depends_on:
+  - PiSharp.Ai
+  consumed_by:
+  - PiSharp.Cli build target (GenerateModelCatalog) — invoked via dotnet run, not ProjectReference
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-adding-a-provider.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Ai.ModelGenerator/Program.cs
+    supports: '`return await ModelCatalogGenerator.Main(args);`'
+    kind: implementation
+  - path: src/PiSharp.Cli/PiSharp.Cli.csproj
+    supports: GenerateModelCatalog target runs this project before build; output src/PiSharp.Ai/Models/Generated/BuiltInModels.g.cs
+    kind: configuration
+  test_focus: none — no dedicated test project
+- id: pi-sharp-tools
+  name: PiSharp.Tools
+  type: library
+  path: src/PiSharp.Tools
+  purpose: Built-in tool implementations — ReadTool, WriteTool, EditTool, BashTool, GrepTool/FindTool/LsTool — plus JsonTool<TParameters,TDetails>, ToolSchemas (JSON-schema generation), shared helpers (PathUtilities,
+    FileMutationQueue, Truncation, OutputAccumulator, ImageUtilities).
+  technologies:
+  - C#
+  - net10.0
+  - SixLabors.ImageSharp
+  - Microsoft.Extensions.FileSystemGlobbing
+  entry_points:
+  - BuiltInTools.cs (registration)
+  - JsonTool<TParameters,TDetails>
+  commands:
+    build: dotnet build src/PiSharp.Tools/PiSharp.Tools.csproj
+    test: dotnet test tests/PiSharp.Tools.Tests/PiSharp.Tools.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Extensions
+  consumed_by:
+  - PiSharp.Runtime
+  - PiSharp.Ast
+  - PiSharp.Subagents
+  - PiSharp.Git
+  - PiSharp.Eval
+  - PiSharp.DeclarativeTools
+  - PiSharp.Research
+  - PiSharp.Mcp
+  - PiSharp.AgentMessaging
+  - PiSharp.Memory
+  - PiSharp.Browser
+  - PiSharp.Plugins.Debug
+  - PiSharp.Plugins.Lsp
+  external_integrations:
+  - shell/process execution (BashTool via IExecutionEnv)
+  - file system
+  data_stores: []
+  documentation:
+  - docs/pisharp-tools.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Tools/PiSharp.Tools.csproj
+    supports: refs Abstractions, Agent.Core, Extensions; ImageSharp + FileSystemGlobbing
+    kind: manifest
+  - path: tests/PiSharp.Tools.Tests
+    supports: 'focus: read/write/edit/bash/search tools, schema generation, prompt metadata, content extractors, internal-URL reads, mutation queue, truncation'
+    kind: test
+  test_focus: built-in tools, tool schemas, execution-env abstraction
+- id: pi-sharp-extensions
+  name: PiSharp.Extensions
+  type: library
+  path: src/PiSharp.Extensions
+  purpose: Native extension platform — IExtension, IExtensionApi, ExtensionRegistry, ExtensionManager, ExtensionRuntimeBinding, ExtensionEvents, ExtensionUi, parity contracts, tool/skill/rule registration,
+    prompt patches, middleware, extension event bus, descriptor + metadata contracts.
+  technologies:
+  - C#
+  - net10.0
+  - Microsoft.Extensions.Logging.Abstractions
+  entry_points:
+  - ExtensionManager (IExtensionApi impl)
+  - ExtensionRegistry
+  - IExtensionApi.cs
+  commands:
+    build: dotnet build src/PiSharp.Extensions/PiSharp.Extensions.csproj
+    test: dotnet test tests/PiSharp.Extensions.Tests/PiSharp.Extensions.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Ai
+  consumed_by:
+  - PiSharp.Agent
+  - PiSharp.Tools
+  - PiSharp.PluginHost
+  - PiSharp.TsBridge
+  - PiSharp.Runtime
+  - PiSharp.Ast
+  - PiSharp.Subagents
+  - PiSharp.InternalUrls
+  - PiSharp.Git
+  - PiSharp.Eval
+  - PiSharp.ModelRoles
+  - PiSharp.DeclarativeTools
+  - PiSharp.Research
+  - PiSharp.Research.Search.Brave
+  - PiSharp.Research.Search.GoogleCse
+  - PiSharp.Research.Search.Serper
+  - PiSharp.Mcp
+  - PiSharp.Memory
+  - PiSharp.Permissions
+  - PiSharp.PlanMode
+  - PiSharp.Plugins.Debug
+  - PiSharp.Plugins.ForeignCompat
+  - PiSharp.Plugins.Lsp
+  - PiSharp.ContinualHarness
+  - PiSharp.Continuity
+  - PiSharp.Coordination
+  - PiSharp.Advisor
+  - PiSharp.Telemetry.Otlp
+  - PiSharp.Tui
+  - PiSharp.AgentMessaging
+  - tests/PiSharp.Extensions.Testing
+  external_integrations:
+  - file system (extension discovery)
+  - assembly loading
+  data_stores: []
+  documentation:
+  - docs/pisharp-native-extensions.md
+  - docs/pisharp-developer-guide.md
+  - docs/analysis/pisharp-extension-api-inventory.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Extensions/PiSharp.Extensions.csproj
+    supports: refs Abstractions, Agent.Core, Ai
+    kind: manifest
+  - path: tests/PiSharp.Extensions.Tests
+    supports: 'focus: registry, event bus, API parity/default/scoped APIs, state store, skills, rules, themes, model-role + research APIs, internal URL registry/security, search-provider registry'
+    kind: test
+  test_focus: extension API contracts, registry/event bus, parity, scoped APIs
+- id: pi-sharp-plugin-host
+  name: PiSharp.PluginHost
+  type: library
+  path: src/PiSharp.PluginHost
+  purpose: Native .dll plugin loader — NativePluginHost discovers *.dll under configured extension paths and loads each via collectible PluginLoadContext (AssemblyLoadContext isCollectible) so plugins can
+    be unloaded.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - NativePluginHost.Load(path) -> (descriptor, IExtension)
+  - PluginHost.cs Discover()
+  commands:
+    build: dotnet build src/PiSharp.PluginHost/PiSharp.PluginHost.csproj
+    test: dotnet test tests/PiSharp.PluginHost.Tests/PiSharp.PluginHost.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  consumed_by:
+  - PiSharp.Runtime
+  external_integrations:
+  - assembly loading (collectible ALC)
+  data_stores: []
+  documentation:
+  - docs/pisharp-native-extensions.md
+  - docs/pisharp-developer-guide.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.PluginHost/PluginHost.cs
+    supports: EnumerateFiles(dir, *.dll, AllDirectories) discovery
+    kind: implementation
+  - path: src/PiSharp.PluginHost/PluginLoadContext.cs
+    supports: LoadFromAssemblyPath + collectible ALC
+    kind: implementation
+  - path: tests/PiSharp.PluginHost.Tests
+    supports: 'focus: plugin load/unload behavior of the collectible ALC host'
+    kind: test
+  test_focus: plugin assembly load/unload semantics
+- id: pi-sharp-ts-bridge
+  name: PiSharp.TsBridge
+  type: library
+  path: src/PiSharp.TsBridge
+  purpose: Node sidecar bridge for TypeScript extensions — TsExtensionHost (109KB), TsBridgeManifestFactory (C# JS-parity manifest; AGENTS.md treats it as contract), JSON-RPC transport, TsDescriptorCache,
+    manifest-generated compatibility shims (Shims/*.Auto.g.cs via ShimExportGenerator + analyze-shim-exports.mjs), Node/ TypeScript runner (TsBridgeRunner.mjs, piApi.mjs, uiApi.mjs). Build compiles the
+    Node sidecar (npm ci + npm run build).
+  technologies:
+  - C#
+  - net10.0
+  - TypeScript/Node.js sidecar
+  - JSON-RPC
+  entry_points:
+  - TsExtensionHost.RuntimeActionAsync
+  - TsBridgeManifestFactory.CreateApiSurfaceManifest()
+  - Node/TsBridgeRunner.mjs
+  commands:
+    build: dotnet build src/PiSharp.TsBridge/PiSharp.TsBridge.csproj (runs npm ci + npm run build in Node/ when npm available)
+    test: dotnet test tests/PiSharp.TsBridge.Tests/PiSharp.TsBridge.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Agent
+  - PiSharp.Ai
+  - PiSharp.Extensions
+  consumed_by:
+  - PiSharp.Runtime
+  external_integrations:
+  - Node.js child process (sidecar)
+  - npm registry (build-time)
+  data_stores:
+  - ~/.pi/PiSharp/cache/ts-bridge (descriptor cache)
+  documentation:
+  - docs/pisharp-typescript-extensions.md
+  - docs/pisharp-developer-guide.md
+  - docs/analysis/pisharp-extension-api-inventory.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.TsBridge/PiSharp.TsBridge.csproj
+    supports: Node mjs/ts content copied to output; BuildTypeScriptBridge npm targets; GenerateShimExports target produces Shims/*.Auto.g.cs
+    kind: configuration
+  - path: AGENTS.md
+    supports: TsBridgeManifestFactory is the source of truth for Pi<->JS parity contract
+    kind: documentation
+  - path: tests/PiSharp.TsBridge.Tests
+    supports: 'focus: parity (164KB TsBridgeParityTests), manifest, UI host, JSON-RPC, client, tool/provider adapters, workflow sessions, settings/state bridge — ~198 tests'
+    kind: test
+  test_focus: JS parity contract, manifest, bridge protocol, UI, adapters
+- id: pi-sharp-compatibility
+  name: PiSharp.Compatibility
+  type: library
+  path: src/PiSharp.Compatibility
+  purpose: 'Pi (JS) compatibility layer — PiSettingsStore (4-layer settings: global/project x legacy/PiSharp), PiAgentPaths, PiResourceLoader (skills, prompts, themes, context files, package resources),
+    sessions/resources compatibility conventions. No project dependencies.'
+  technologies:
+  - C#
+  - net10.0
+  - Microsoft.Extensions.Configuration + Configuration.Json
+  entry_points:
+  - PiSettingsStore
+  - PiAgentPaths.FromCwd
+  - PiResourceLoader.LoadAsync
+  commands:
+    build: dotnet build src/PiSharp.Compatibility/PiSharp.Compatibility.csproj
+    test: dotnet test tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj
+    run: null
+  deployable: false
+  depends_on: []
+  consumed_by:
+  - PiSharp.Runtime
+  - PiSharp.Git
+  - PiSharp.Packages
+  - PiSharp.Mcp
+  - PiSharp.Plugins.ForeignCompat
+  - PiSharp.ContinualHarness
+  - PiSharp.Telemetry.Otlp
+  external_integrations:
+  - file system (settings/session/resource paths)
+  data_stores:
+  - ~/.pi/agent/settings.json
+  - ~/.pi/PiSharp/settings.json
+  - <cwd>/.pi/settings.json
+  - <cwd>/.pi/PiSharp/settings.json
+  - auth.json
+  - models.json
+  documentation:
+  - docs/pisharp-runtime.md
+  - docs/pisharp-vs-pi.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Compatibility/PiSharp.Compatibility.csproj
+    supports: no ProjectReference; only Microsoft.Extensions.Configuration(.Json)
+    kind: manifest
+  - path: tests/PiSharp.Compatibility.Tests
+    supports: 'focus: PiSettingsStore (layering, atomic writes, offline, profiles), resource loader (packages, prompts)'
+    kind: test
+  test_focus: settings layers, path resolution, resource loading
+- id: pi-sharp-packages
+  name: PiSharp.Packages
+  type: library
+  path: src/PiSharp.Packages
+  purpose: Package management core (P04/P31, moved from PiSharp.Cli) — PiPackageManager (npm/nuget registry installs), PiPackageSettingsService, PiPackageSourceParser, native extension installer, self-update
+    dispatch (DotnetToolSelfUpdateMethod, SystemProcessRunner, SelfUpdateService, SelfUpdateChecker, NuGetRegistryClient). InternalsVisibleTo PiSharp.Cli.Tests.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - PiPackageManager
+  - SelfUpdateService
+  - NuGetRegistryClient
+  commands:
+    build: dotnet build src/PiSharp.Packages/PiSharp.Packages.csproj
+    test: dotnet test tests/PiSharp.Cli.Tests/PiSharp.Cli.Tests.csproj (package coverage lives in Cli.Tests/Packages/ via InternalsVisibleTo)
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Compatibility
+  consumed_by:
+  - PiSharp.Runtime
+  - PiSharp.Cli
+  external_integrations:
+  - npm registry
+  - NuGet registry
+  - dotnet tool self-update
+  - process runner
+  data_stores:
+  - ~/.pi/agent/packages (installed packages)
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Packages/PiSharp.Packages.csproj
+    supports: refs Compatibility only; InternalsVisibleTo PiSharp.Cli.Tests
+    kind: manifest
+  - path: tests/PiSharp.Cli.Tests/Packages
+    supports: 'focus: PackageManagerTests (24KB), npm/nuget clients, version comparers, self-update methods, package settings/source parser'
+    kind: test
+  - path: src/PiSharp.Cli/Program.cs
+    supports: CreateDefaultPackageCommandRunnerAsync wires PiPackageManager + NativeExtensionInstaller + SelfUpdateService
+    kind: implementation
+  test_focus: covered by PiSharp.Cli.Tests (package manager, registries, self-update)
+- id: pi-sharp-runtime
+  name: PiSharp.Runtime
+  type: library
+  path: src/PiSharp.Runtime
+  purpose: Runtime bootstrap and wiring — PiRuntimeBootstrap.CreateRuntimeAsync (layered settings -> providers/models.json -> resources -> sessions -> tools -> native .dll extensions -> TS bridge), SessionRuntime
+    (main runtime object), RuntimeExtensionBinder, RuntimeModelSelector, ExtensionLoadCoordinator, StartupBenchmarkCollector, runtime subagent services (SubagentSessionService, JsPiSubagentEventTranslator),
+    IO (SystemExecutionEnv), Telemetry.
+  technologies:
+  - C#
+  - net10.0
+  - Microsoft.Extensions.Logging.Abstractions
+  entry_points:
+  - PiRuntimeBootstrap.CreateRuntimeAsync
+  - SessionRuntime
+  commands:
+    build: dotnet build src/PiSharp.Runtime/PiSharp.Runtime.csproj
+    test: dotnet test tests/PiSharp.Runtime.Tests/PiSharp.Runtime.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Agent
+  - PiSharp.Ai
+  - PiSharp.Tools
+  - PiSharp.Extensions
+  - PiSharp.PluginHost
+  - PiSharp.TsBridge
+  - PiSharp.Compatibility
+  - PiSharp.Packages
+  consumed_by:
+  - PiSharp.Cli
+  - PiSharp.Server
+  - PiSharp.Subagents
+  - PiSharp.PlanMode
+  external_integrations:
+  - file system (JSONL sessions, settings)
+  - Node.js via TsBridge (indirect)
+  data_stores:
+  - JSONL sessions (~/.pi/agent/sessions)
+  documentation:
+  - docs/pisharp-runtime.md
+  - docs/pisharp-developer-guide.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Runtime/PiSharp.Runtime.csproj
+    supports: 10 ProjectReferences incl. PluginHost, TsBridge, Compatibility, Packages
+    kind: manifest
+  - path: src/PiSharp.Runtime/Runtime/PiRuntimeBootstrap.cs
+    supports: wires ExtensionRegistry, ExtensionManager, NativePluginHost from ExtensionPaths filtered to .dll
+    kind: implementation
+  - path: tests/PiSharp.Runtime.Tests
+    supports: 'focus: bootstrap, SessionRuntime (75KB), extension binding services, skill runner, user bash hooks, resources_discover, subagents + guardrails + JS-Pi event translation, telemetry, managed
+      skills — ~216 tests'
+    kind: test
+  test_focus: bootstrap/startup, runtime wiring, extension binding, subagent services, telemetry
+- id: pi-sharp-cli
+  name: PiSharp.Cli
+  type: application
+  path: src/PiSharp.Cli
+  purpose: 'Executable entry point and CLI — argument parsing (CliParser), mode selection (Interactive, Print/JSON, RPC, ACP, SubagentJson, Daemon, Stats), slash commands, file logging, bootstrap (CliRuntimeOptionsMapper),
+    package commands, model-catalog generation trigger. PackAsTool: pisharp; self-update via NuGet (P31).'
+  technologies:
+  - C#
+  - net10.0
+  - Microsoft.Extensions.Logging(+Debug)
+  - Terminal.Gui via PiSharp.Tui
+  - WebSocket via PiSharp.Client
+  entry_points:
+  - Program.Main -> RunAsync (mode dispatch)
+  commands:
+    build: dotnet build src/PiSharp.Cli/PiSharp.Cli.csproj (GenerateModelCatalog target runs PiSharp.Ai.ModelGenerator before build)
+    test: dotnet test tests/PiSharp.Cli.Tests/PiSharp.Cli.Tests.csproj
+    run: dotnet run --project src/PiSharp.Cli -- [args]
+  deployable: true
+  depends_on:
+  - PiSharp.Runtime
+  - PiSharp.Client
+  - PiSharp.Server
+  - PiSharp.Tui
+  - PiSharp.Packages
+  consumed_by:
+  - tests/PiSharp.Cli.Tests only (terminal app)
+  external_integrations:
+  - terminal (Terminal.Gui TUI)
+  - WebSocket daemon (via Client/Server)
+  - NuGet (self-update)
+  - npm/nuget (package commands)
+  data_stores:
+  - ~/.pi/PiSharp/logs (file logging)
+  - daemon lease store (via PiSharp.Client)
+  documentation:
+  - docs/pisharp-developer-guide.md
+  - docs/analysis/pisharp-current-state-catalog.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Cli/PiSharp.Cli.csproj
+    supports: OutputType Exe, PackAsTool pisharp, PackageId PiSharp.Cli, GenerateModelCatalog target
+    kind: configuration
+  - path: src/PiSharp.Cli/Program.cs
+    supports: RunAsync dispatch to Rpc/Acp/SubagentJson/Print/Interactive modes; package command handling; daemon lease flow
+    kind: implementation
+  - path: tests/PiSharp.Cli.Tests
+    supports: 'focus: parsing, help, all modes, slash command registry (47KB), file logging, package commands/managers, bootstrap mapping, stdout guard — ~342 tests'
+    kind: test
+  test_focus: CLI parsing/modes/commands, logging, package + self-update, bootstrap mapping
+- id: pi-sharp-ast
+  name: PiSharp.Ast
+  type: library
+  path: src/PiSharp.Ast
+  purpose: AST/hashline structural editing (P30) — Roslyn-based CSharp pattern matcher/rewriter, AstGrepTool/AstEditTool/HashlinesTool/HashlineEditTool, HashLineIndex + ContentHasher, AstLanguageRegistry/IAstLanguageProvider,
+    StructuralEditingExtension, HostExecutionEnv.
+  technologies:
+  - C#
+  - net10.0
+  - Microsoft.CodeAnalysis.CSharp 5.3.0
+  entry_points:
+  - 'StructuralEditingExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Ast/PiSharp.Ast.csproj
+    test: dotnet test tests/PiSharp.Ast.Tests/PiSharp.Ast.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Ai
+  - PiSharp.Tools
+  - PiSharp.Extensions
+  consumed_by:
+  - none statically (tests only); intended native-extension loading via settings `extensions`/packages — unverified
+  external_integrations:
+  - Roslyn (C# compilation/pattern matching)
+  data_stores: []
+  documentation:
+  - docs/pisharp-implementation-status.md
+  - docs/pisharp-plugins.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Ast/PiSharp.Ast.csproj
+    supports: refs Abstractions, Agent.Core, Ai, Tools, Extensions; Roslyn 5.3.0
+    kind: manifest
+  - path: tests/PiSharp.Ast.Tests
+    supports: 'focus: CSharp pattern matcher/rewriter, AstGrep/AstEdit tools, hashline tools + index — 68 tests'
+    kind: test
+  - path: src/PiSharp.Runtime/Runtime/PiRuntimeBootstrap.cs
+    supports: native .dll paths come only from resources.ExtensionPaths; no static ref to Ast
+    kind: implementation
+  test_focus: AST pattern matching/editing tools, hashline registry
+- id: pi-sharp-subagents
+  name: PiSharp.Subagents
+  type: library
+  path: src/PiSharp.Subagents
+  purpose: Subagent framework extension — SubagentsExtension, TaskTool/YieldTool, SubagentSpawnCoordinator, agent definitions (AgentDefinition parser/registry/discovery + Bundled/*.md embedded resources),
+    AgentSchemaValidator, /agents command. Distinct from Runtime's Subagents/ SubagentSessionService (P06).
+  technologies:
+  - C#
+  - net10.0
+  - YamlDotNet
+  entry_points:
+  - 'SubagentsExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Subagents/PiSharp.Subagents.csproj
+    test: dotnet test tests/PiSharp.Subagents.Tests/PiSharp.Subagents.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Runtime
+  - PiSharp.Agent
+  - PiSharp.Tools
+  consumed_by:
+  - none statically (tests only); intended native-extension loading — unverified
+  external_integrations:
+  - child-process spawning (spawned agents)
+  data_stores:
+  - embedded agent definitions (Bundled/*.md resources)
+  documentation:
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Subagents/PiSharp.Subagents.csproj
+    supports: refs Extensions, Runtime, Agent, Tools; EmbeddedResource Bundled/*.md
+    kind: manifest
+  - path: tests/PiSharp.Subagents.Tests
+    supports: 'focus: extension, spawn coordinator, definition discovery/parser, schema validator, Task/Yield tools'
+    kind: test
+  test_focus: agent definition parsing/validation/discovery, spawning, tools
+- id: pi-sharp-git
+  name: PiSharp.Git
+  type: library
+  path: src/PiSharp.Git
+  purpose: 'Git integration extension (P24) — GitExtension registers commit + share commands/tools: CommitTool, CommitInventoryService/Planner/Executor, CommitGraph, CommitSlashCommand (atomic commits),
+    ShareSlashCommand + GitHubGistUploader (real gist upload with PAT; replaces old JS-Pi local-copy share), GitRunner, PorcelainParser. Doc phrase "removed ShareSessionSlashCommand + src/PiSharp.Git" conflicts
+    with project presence + 99 green tests — see ambiguities.'
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - 'GitExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Git/PiSharp.Git.csproj
+    test: dotnet test tests/PiSharp.Git.Tests/PiSharp.Git.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Tools
+  - PiSharp.Ai
+  - PiSharp.Compatibility
+  consumed_by:
+  - none statically (tests only); intended native-extension loading — unverified
+  external_integrations:
+  - git CLI (porcelain output parsing)
+  - GitHub gist API (PAT via env/auth store)
+  data_stores: []
+  documentation:
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Git/GitExtension.cs
+    supports: IExtension impl registering CommitTool, commit slash command, share command with GitHubGistUploader
+    kind: implementation
+  - path: tests/PiSharp.Git.Tests
+    supports: 'focus: commit inventory/planner/executor/graph, porcelain parser, gist uploader + token resolver, commit/share commands, change classifier — 99 tests'
+    kind: test
+  test_focus: commit pipeline, gist sharing, porcelain parsing
+- id: pi-sharp-eval
+  name: PiSharp.Eval
+  type: library
+  path: src/PiSharp.Eval
+  purpose: Eval/bench harness (P15) — EvalExtension, BenchRunner + BenchSpecParser/BenchResultWriter, EvalTool, kernel abstraction (IKernel, KernelRegistry, EvalKernelRegistry, KernelToolBridge), KernelSnapshotStore,
+    /bench + /kernel slash commands.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - 'EvalExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Eval/PiSharp.Eval.csproj
+    test: dotnet test tests/PiSharp.Eval.Tests/PiSharp.Eval.Tests.csproj (also covers PiSharp.Eval.Kernel.CSharp)
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Tools
+  consumed_by:
+  - PiSharp.Eval.Kernel.CSharp (kernel plugin); tests only; intended native-extension loading — unverified
+  external_integrations: []
+  data_stores:
+  - kernel snapshot store
+  - bench results (BenchResultWriter)
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Eval/PiSharp.Eval.csproj
+    supports: refs Extensions, Abstractions, Agent.Core, Tools
+    kind: manifest
+  - path: tests/PiSharp.Eval.Tests
+    supports: 'focus: kernel registry + bridge, C# kernel, bench spec/result writer, snapshot store, extension integration — 58 tests'
+    kind: test
+  test_focus: bench spec/runner, kernel registry + bridge, snapshots
+- id: pi-sharp-eval-kernel-csharp
+  name: PiSharp.Eval.Kernel.CSharp
+  type: library
+  path: src/PiSharp.Eval.Kernel.CSharp
+  purpose: Roslyn C# eval kernel for the Eval extension (P15) — CSharpKernel (Microsoft.CodeAnalysis.CSharp.Scripting), CSharpKernelFactory, KernelHost, KernelGlobals, KernelTools, CSharpKernelExtension.
+    Python kernel deliberately not built (P15 note).
+  technologies:
+  - C#
+  - net10.0
+  - Microsoft.CodeAnalysis.CSharp.Scripting 4.13.0
+  entry_points:
+  - 'CSharpKernelExtension : IExtension'
+  - CSharpKernelFactory
+  commands:
+    build: dotnet build src/PiSharp.Eval.Kernel.CSharp/PiSharp.Eval.Kernel.CSharp.csproj
+    test: dotnet test tests/PiSharp.Eval.Tests/PiSharp.Eval.Tests.csproj (CSharpKernelTests within)
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Eval
+  consumed_by:
+  - tests only (via Eval.Tests); pluggable kernel loaded alongside Eval — unverified
+  external_integrations:
+  - Roslyn scripting
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Eval.Kernel.CSharp/PiSharp.Eval.Kernel.CSharp.csproj
+    supports: refs Eval; Roslyn scripting 4.13.0
+    kind: manifest
+  - path: tests/PiSharp.Eval.Tests/CSharpKernelTests.cs
+    supports: kernel execution tests
+    kind: test
+  test_focus: covered by Eval.Tests (CSharpKernelTests, KernelToolBridgeTests)
+- id: pi-sharp-model-roles
+  name: PiSharp.ModelRoles
+  type: library
+  path: src/PiSharp.ModelRoles
+  purpose: Model roles extension (P20) — role->provider/model resolution from settings (ModelRolesSettingsParser, SettingsModelRoleResolver), ModelRolesExtension, TS modelRolesResolve/setModelRole actions.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - 'ModelRolesExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.ModelRoles/PiSharp.ModelRoles.csproj
+    test: dotnet test tests/PiSharp.ModelRoles.Tests/PiSharp.ModelRoles.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  consumed_by:
+  - none statically (tests only); intended native-extension loading — unverified
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.ModelRoles/PiSharp.ModelRoles.csproj
+    supports: refs Extensions, Agent.Core, Abstractions
+    kind: manifest
+  - path: tests/PiSharp.ModelRoles.Tests
+    supports: 'focus: settings parser, extension, settings resolver — 35 tests'
+    kind: test
+  test_focus: role resolution from settings, extension registration
+- id: pi-sharp-declarative-tools
+  name: PiSharp.DeclarativeTools
+  type: library
+  path: src/PiSharp.DeclarativeTools
+  purpose: Declarative tools extension (P21) — YAML/JSON tool definitions loaded from tool files (ToolFileParser, ToolDirectoryScanner), executed as scripts (ScriptToolExecutor), JSON-schema generation
+    (ToolSchemaBuilder), DeclarativeToolsExtension, settings.
+  technologies:
+  - C#
+  - net10.0
+  - YamlDotNet
+  entry_points:
+  - 'DeclarativeToolsExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.DeclarativeTools/PiSharp.DeclarativeTools.csproj
+    test: dotnet test tests/PiSharp.DeclarativeTools.Tests/PiSharp.DeclarativeTools.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Tools
+  consumed_by:
+  - none statically (tests only); intended native-extension loading — unverified
+  external_integrations:
+  - shell/script execution
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.DeclarativeTools/PiSharp.DeclarativeTools.csproj
+    supports: refs Extensions + Tools; YamlDotNet
+    kind: manifest
+  - path: tests/PiSharp.DeclarativeTools.Tests
+    supports: 'focus: tool file parser, script executor, directory scanner, schema builder, extension — 70 tests'
+    kind: test
+  test_focus: tool-file parsing, script execution, schema building
+- id: pi-sharp-internal-urls
+  name: PiSharp.InternalUrls
+  type: library
+  path: src/PiSharp.InternalUrls
+  purpose: Internal URL schemes extension (P26) — resolvers for skill://, agent://, diff:// (with DiffLedger capture), InternalUrlFieldPath, InternalUrlsExtension. Registers resolvers via IExtensionApi.Urls.RegisterResolver.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - 'InternalUrlsExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.InternalUrls/PiSharp.InternalUrls.csproj
+    test: dotnet test tests/PiSharp.InternalUrls.Tests/PiSharp.InternalUrls.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Agent
+  - PiSharp.Extensions
+  consumed_by:
+  - none statically (tests only); intended native-extension loading — unverified
+  external_integrations: []
+  data_stores:
+  - DiffLedger (diff capture)
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.InternalUrls/Resolvers
+    supports: SkillUrlResolver, AgentUrlResolver, DiffUrlResolver
+    kind: implementation
+  - path: tests/PiSharp.InternalUrls.Tests
+    supports: 'focus: resolvers (skill/agent/diff), field paths, DiffLedger, extension — 65 tests'
+    kind: test
+  test_focus: URL scheme resolution + security + diff ledger
+- id: pi-sharp-research
+  name: PiSharp.Research
+  type: library
+  path: src/PiSharp.Research
+  purpose: Web research extension (P28) — web_search tool + SearchCoordinator, WebUrlResolver (web:// fetch), PDF text extraction via PdfPig, arXiv metadata parser, provider registry; search providers plug
+    in via IExtensionApi.SearchProviders.
+  technologies:
+  - C#
+  - net10.0
+  - PdfPig 0.1.15
+  - System.Net.Http
+  entry_points:
+  - 'ResearchExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Research/PiSharp.Research.csproj
+    test: dotnet test tests/PiSharp.Research.Tests/PiSharp.Research.Tests.csproj (also covers the three search providers)
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Extensions
+  - PiSharp.Ai
+  - PiSharp.Tools
+  consumed_by:
+  - none statically (tests only); intended native-extension loading — unverified
+  external_integrations:
+  - Brave Search API
+  - Google Custom Search Engine
+  - Serper API
+  - arXiv
+  - PDF parsing (PdfPig)
+  - web fetch
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Research/PiSharp.Research.csproj
+    supports: refs Abstractions, Agent.Core, Extensions, Ai, Tools; PdfPig
+    kind: manifest
+  - path: tests/PiSharp.Research.Tests
+    supports: 'focus: web search tool, coordinator, all three providers, URL resolver, PDF extractor, arXiv parser — 82 tests'
+    kind: test
+  test_focus: search tool/coordinator, providers, URL/PDF/arXiv extraction
+- id: pi-sharp-research-search-brave
+  name: PiSharp.Research.Search.Brave
+  type: library
+  path: src/PiSharp.Research.Search.Brave
+  purpose: Brave search provider plugin for PiSharp.Research — BraveSearchProvider + BraveExtension (registers into search provider registry).
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - 'BraveExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Research.Search.Brave/PiSharp.Research.Search.Brave.csproj
+    test: dotnet test tests/PiSharp.Research.Tests/PiSharp.Research.Tests.csproj (BraveSearchProviderTests within)
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  consumed_by:
+  - tests only (via Research.Tests); provider plugin for PiSharp.Research — unverified
+  external_integrations:
+  - Brave Search API
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Research.Search.Brave/BraveSearchProvider.cs
+    supports: provider implementation
+    kind: implementation
+  - path: tests/PiSharp.Research.Tests/BraveSearchProviderTests.cs
+    supports: provider behavior tests
+    kind: test
+  test_focus: covered by Research.Tests (BraveSearchProviderTests)
+- id: pi-sharp-research-search-google-cse
+  name: PiSharp.Research.Search.GoogleCse
+  type: library
+  path: src/PiSharp.Research.Search.GoogleCse
+  purpose: Google Custom Search Engine provider plugin for PiSharp.Research — GoogleCseSearchProvider + GoogleCseExtension.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - 'GoogleCseExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Research.Search.GoogleCse/PiSharp.Research.Search.GoogleCse.csproj
+    test: dotnet test tests/PiSharp.Research.Tests/PiSharp.Research.Tests.csproj (GoogleCseSearchProviderTests within)
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  consumed_by:
+  - tests only (via Research.Tests); provider plugin — unverified
+  external_integrations:
+  - Google Custom Search Engine API
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Research.Search.GoogleCse/GoogleCseSearchProvider.cs
+    supports: provider implementation
+    kind: implementation
+  - path: tests/PiSharp.Research.Tests/GoogleCseSearchProviderTests.cs
+    supports: provider behavior tests
+    kind: test
+  test_focus: covered by Research.Tests (GoogleCseSearchProviderTests)
+- id: pi-sharp-research-search-serper
+  name: PiSharp.Research.Search.Serper
+  type: library
+  path: src/PiSharp.Research.Search.Serper
+  purpose: Serper search provider plugin for PiSharp.Research — SerperSearchProvider + SerperExtension.
+  technologies:
+  - C#
+  - net10.0
+  entry_points:
+  - 'SerperExtension : IExtension'
+  commands:
+    build: dotnet build src/PiSharp.Research.Search.Serper/PiSharp.Research.Search.Serper.csproj
+    test: dotnet test tests/PiSharp.Research.Tests/PiSharp.Research.Tests.csproj (SerperSearchProviderTests within)
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  consumed_by:
+  - tests only (via Research.Tests); provider plugin — unverified
+  external_integrations:
+  - Serper API
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Research.Search.Serper/SerperSearchProvider.cs
+    supports: provider implementation
+    kind: implementation
+  - path: tests/PiSharp.Research.Tests/SerperSearchProviderTests.cs
+    supports: provider behavior tests
+    kind: test
+  test_focus: covered by Research.Tests (SerperSearchProviderTests)
+- id: pi-sharp-server
+  name: PiSharp.Server
+  type: library
+  path: src/PiSharp.Server
+  purpose: 'Daemon web host library: PiServerHost (Kestrel /health + /ws), PiServerWebSocketHandler (~50 wire commands), ServerSessionRegistry, ServerContracts (wire protocol), ThemeRegistry, TelemetryMetricsAggregator.
+    Hosted by PiSharp.Cli `daemon foreground`; not a standalone exe.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Server/Hosting/PiServerHost.cs
+  - src/PiSharp.Server/Contracts/ServerContracts.cs
+  commands:
+    build: dotnet build src/PiSharp.Server/PiSharp.Server.csproj
+    test: dotnet test tests/PiSharp.Server.Tests/PiSharp.Server.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Runtime
+  consumed_by:
+  - PiSharp.Cli
+  - PiSharp.Client
+  - PiSharp.Sdk
+  - PiSharp.Telemetry.Otlp
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/adr/2026-08-14-daemon-client-architecture.md
+  - docs/pisharp-developer-guide.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Server/PiSharp.Server.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-client
+  name: PiSharp.Client
+  type: library
+  path: src/PiSharp.Client
+  purpose: 'Event-sourced daemon client: ClientWebSocketTransport, ClientEventReducer (pure reducer), ClientToTuiAdapter, RemoteTuiBackend (ITuiRuntimeFacade), P01 daemon lease machinery. Only cross-edge:
+    references PiSharp.Server for Contracts reuse.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Client/ClientEventReducer.cs
+  - src/PiSharp.Client/RemoteTuiBackend.cs
+  commands:
+    build: dotnet build src/PiSharp.Client/PiSharp.Client.csproj
+    test: dotnet test tests/PiSharp.Client.Tests/PiSharp.Client.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Server
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  consumed_by:
+  - PiSharp.Cli
+  - PiSharp.Tui
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/adr/2026-08-14-daemon-client-architecture.md
+  - docs/pisharp-developer-guide.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Client/PiSharp.Client.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-sdk
+  name: PiSharp.Sdk
+  type: library
+  path: src/PiSharp.Sdk
+  purpose: 'Programmatic daemon client SDK (P22): PiSharpClient + SessionConnection (attach/replay/reducer/UiRequest lane).'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Sdk/PiSharpClient.cs
+  commands:
+    build: dotnet build src/PiSharp.Sdk/PiSharp.Sdk.csproj
+    test: dotnet test tests/PiSharp.Sdk.Tests/PiSharp.Sdk.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Server
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Sdk/PiSharp.Sdk.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-tui
+  name: PiSharp.Tui
+  type: library
+  path: src/PiSharp.Tui
+  purpose: 'Terminal.Gui 2.0 interactive shell library: TuiHost + Interactive/ subtree (chat view, prompt editor, dialogs, diff view, selector, session tree, shortcuts). Hosted by PiSharp.Cli in-process
+    or remotely via Client; no standalone TUI binary.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Tui/TuiHost.cs
+  - src/PiSharp.Tui/Interactive/
+  commands:
+    build: dotnet build src/PiSharp.Tui/PiSharp.Tui.csproj
+    test: dotnet test tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  - PiSharp.Agent.Core
+  - PiSharp.Agent
+  - PiSharp.Extensions
+  consumed_by:
+  - PiSharp.Cli
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-tui-shortcut-development.md
+  - docs/pisharp-tui-tracing.md
+  - docs/terminal-gui-architecture-reference.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Tui/PiSharp.Tui.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-coordination
+  name: PiSharp.Coordination
+  type: library
+  path: src/PiSharp.Coordination
+  purpose: 'Multi-agent coordination native extension: named-pipe daemon + client, agent roster, chat messaging (roster/send/inbox tools), file-activity tracking, soft conflict warnings, subagent event
+    observation. Repo-local daemon distinct from per-user session daemon.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Coordination/CoordinationExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Coordination/PiSharp.Coordination.csproj
+    test: dotnet test tests/PiSharp.Coordination.Tests/PiSharp.Coordination.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-agent-coordination.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Coordination/PiSharp.Coordination.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-coordination-daemon
+  name: PiSharp.Coordination.Daemon
+  type: application
+  path: src/PiSharp.Coordination.Daemon
+  purpose: Standalone coordination daemon executable (--repo-root/--pipe-name); undocumented in current guides.
+  technologies: []
+  entry_points:
+  - src/PiSharp.Coordination.Daemon/Program.cs
+  commands:
+    build: dotnet build src/PiSharp.Coordination.Daemon/PiSharp.Coordination.Daemon.csproj
+    test: null
+    run: null
+  deployable: true
+  depends_on:
+  - PiSharp.Coordination
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-agent-coordination.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.Coordination.Daemon/PiSharp.Coordination.Daemon.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-permissions
+  name: PiSharp.Permissions
+  type: library
+  path: src/PiSharp.Permissions
+  purpose: 'Approval-gate extension (P29): allow/deny/ask middleware over ui_request lane, grants, audit.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Permissions/PermissionsExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Permissions/PiSharp.Permissions.csproj
+    test: dotnet test tests/PiSharp.Permissions.Tests/PiSharp.Permissions.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Permissions/PiSharp.Permissions.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-agent-messaging
+  name: PiSharp.AgentMessaging
+  type: library
+  path: src/PiSharp.AgentMessaging
+  purpose: 'In-process agent messaging (P07): roster/router/persisted outbox, hub + agent_message tools, event lane.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.AgentMessaging/AgentMessagingExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.AgentMessaging/PiSharp.AgentMessaging.csproj
+    test: dotnet test tests/PiSharp.AgentMessaging.Tests/PiSharp.AgentMessaging.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Tools
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.AgentMessaging/PiSharp.AgentMessaging.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-continuity
+  name: PiSharp.Continuity
+  type: library
+  path: src/PiSharp.Continuity
+  purpose: 'Continuity suite (P23): goals/heartbeat/cron/autonomous; IContinuitySessionService daemon-facing surface.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Continuity/ContinuityExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Continuity/PiSharp.Continuity.csproj
+    test: dotnet test tests/PiSharp.Continuity.Tests/PiSharp.Continuity.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Continuity/PiSharp.Continuity.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-continuity-contracts
+  name: PiSharp.Continuity.Contracts
+  type: contract
+  path: src/PiSharp.Continuity.Contracts
+  purpose: Zero-dep wire contracts for the continuity daemon surface.
+  technologies: []
+  entry_points:
+  - (contract types only)
+  commands:
+    build: dotnet build src/PiSharp.Continuity.Contracts/PiSharp.Continuity.Contracts.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on: []
+  consumed_by:
+  - PiSharp.Continuity
+  - PiSharp.Server
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Continuity.Contracts/PiSharp.Continuity.Contracts.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-memory
+  name: PiSharp.Memory
+  type: library
+  path: src/PiSharp.Memory
+  purpose: 'Memory core plugin (P08): retain/recall/reflect/memory_edit/learn tools, mental-model prompt injection, autolearn.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Memory/MemoryExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Memory/PiSharp.Memory.csproj
+    test: dotnet test tests/PiSharp.Memory.Tests/PiSharp.Memory.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Tools
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Memory/PiSharp.Memory.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-memory-abstractions
+  name: PiSharp.Memory.Abstractions
+  type: contract
+  path: src/PiSharp.Memory.Abstractions
+  purpose: Memory contracts + static MemoryServices registry (cross-ALC backend registration).
+  technologies: []
+  entry_points:
+  - (contract types only)
+  commands:
+    build: dotnet build src/PiSharp.Memory.Abstractions/PiSharp.Memory.Abstractions.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  consumed_by:
+  - PiSharp.Memory
+  - PiSharp.Memory.Backends.File
+  - PiSharp.Memory.Backends.Off
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Memory.Abstractions/PiSharp.Memory.Abstractions.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-memory-backend-file
+  name: PiSharp.Memory.Backends.File
+  type: library
+  path: src/PiSharp.Memory.Backends.File
+  purpose: JSONL file memory backend (pisharp-memory-file).
+  technologies: []
+  entry_points:
+  - (IExtension impl)
+  commands:
+    build: dotnet build src/PiSharp.Memory.Backends.File/PiSharp.Memory.Backends.File.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Memory.Abstractions
+  - PiSharp.Extensions
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Memory.Backends.File/PiSharp.Memory.Backends.File.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-memory-backend-off
+  name: PiSharp.Memory.Backends.Off
+  type: library
+  path: src/PiSharp.Memory.Backends.Off
+  purpose: No-op memory backend (pisharp-memory-off).
+  technologies: []
+  entry_points:
+  - (IExtension impl)
+  commands:
+    build: dotnet build src/PiSharp.Memory.Backends.Off/PiSharp.Memory.Backends.Off.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Memory.Abstractions
+  - PiSharp.Extensions
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Memory.Backends.Off/PiSharp.Memory.Backends.Off.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-continual-harness
+  name: PiSharp.ContinualHarness
+  type: library
+  path: src/PiSharp.ContinualHarness
+  purpose: 'pisharp-refine (P09): versioned/rollbackable supplemental harness state (prompt/subagent/skill/memory).'
+  technologies: []
+  entry_points:
+  - src/PiSharp.ContinualHarness/ContinualHarnessExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.ContinualHarness/PiSharp.ContinualHarness.csproj
+    test: dotnet test tests/PiSharp.ContinualHarness.Tests/PiSharp.ContinualHarness.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Compatibility
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.ContinualHarness/PiSharp.ContinualHarness.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-plan-mode
+  name: PiSharp.PlanMode
+  type: library
+  path: src/PiSharp.PlanMode
+  purpose: 'Plan-mode extension (P14): read-only planning phase state machine + IPlanModeDaemonSurface (daemon RPC).'
+  technologies: []
+  entry_points:
+  - src/PiSharp.PlanMode/PlanModeExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.PlanMode/PiSharp.PlanMode.csproj
+    test: dotnet test tests/PiSharp.PlanMode.Tests/PiSharp.PlanMode.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.PlanMode/PiSharp.PlanMode.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-mcp
+  name: PiSharp.Mcp
+  type: library
+  path: src/PiSharp.Mcp
+  purpose: 'MCP client (P27): server reconciliation, tool adapter, OAuth, transport factory (ModelContextProtocol 2.2.0).'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Mcp/McpExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Mcp/PiSharp.Mcp.csproj
+    test: dotnet test tests/PiSharp.Mcp.Tests/PiSharp.Mcp.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Tools
+  - PiSharp.Ai
+  - PiSharp.Compatibility
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Mcp/PiSharp.Mcp.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-mcp-transports-http
+  name: PiSharp.Mcp.Transports.Http
+  type: library
+  path: src/PiSharp.Mcp.Transports.Http
+  purpose: HTTP/SSE MCP transport factory.
+  technologies: []
+  entry_points:
+  - (transport factory)
+  commands:
+    build: dotnet build src/PiSharp.Mcp.Transports.Http/PiSharp.Mcp.Transports.Http.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Mcp
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Mcp.Transports.Http/PiSharp.Mcp.Transports.Http.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-mcp-transports-stdio
+  name: PiSharp.Mcp.Transports.Stdio
+  type: library
+  path: src/PiSharp.Mcp.Transports.Stdio
+  purpose: Stdio MCP transport factory.
+  technologies: []
+  entry_points:
+  - (transport factory)
+  commands:
+    build: dotnet build src/PiSharp.Mcp.Transports.Stdio/PiSharp.Mcp.Transports.Stdio.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Mcp
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Mcp.Transports.Stdio/PiSharp.Mcp.Transports.Stdio.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-plugins-debug
+  name: PiSharp.Plugins.Debug
+  type: library
+  path: src/PiSharp.Plugins.Debug
+  purpose: 'DAP debug client extension (P12): debugpy/dlv-dap/lldb-dap/vsdbg adapters.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Plugins.Debug/DebugExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Plugins.Debug/PiSharp.Plugins.Debug.csproj
+    test: dotnet test tests/PiSharp.Plugins.Debug.Tests/PiSharp.Plugins.Debug.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Plugins.ProtocolJsonRpc
+  - PiSharp.Tools
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Plugins.Debug/PiSharp.Plugins.Debug.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-plugins-lsp
+  name: PiSharp.Plugins.Lsp
+  type: library
+  path: src/PiSharp.Plugins.Lsp
+  purpose: LSP client extension (P12) + post-write diagnostics middleware.
+  technologies: []
+  entry_points:
+  - src/PiSharp.Plugins.Lsp/LspExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Plugins.Lsp/PiSharp.Plugins.Lsp.csproj
+    test: dotnet test tests/PiSharp.Plugins.Lsp.Tests/PiSharp.Plugins.Lsp.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Plugins.ProtocolJsonRpc
+  - PiSharp.Tools
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Plugins.Lsp/PiSharp.Plugins.Lsp.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-plugins-protocol-jsonrpc
+  name: PiSharp.Plugins.ProtocolJsonRpc
+  type: library
+  path: src/PiSharp.Plugins.ProtocolJsonRpc
+  purpose: Shared framed JSON-RPC + child-process infrastructure for DAP/LSP (not itself an extension).
+  technologies: []
+  entry_points:
+  - (JSON-RPC transport helpers)
+  commands:
+    build: dotnet build src/PiSharp.Plugins.ProtocolJsonRpc/PiSharp.Plugins.ProtocolJsonRpc.csproj
+    test: dotnet test tests/PiSharp.Plugins.ProtocolJsonRpc.Tests/PiSharp.Plugins.ProtocolJsonRpc.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Abstractions
+  consumed_by:
+  - PiSharp.Plugins.Debug
+  - PiSharp.Plugins.Lsp
+  external_integrations: []
+  data_stores: []
+  documentation: []
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Plugins.ProtocolJsonRpc/PiSharp.Plugins.ProtocolJsonRpc.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-plugins-foreign-compat
+  name: PiSharp.Plugins.ForeignCompat
+  type: library
+  path: src/PiSharp.Plugins.ForeignCompat
+  purpose: 'Foreign rules/skills ingress (P11): Claude/Codex/Gemini/OpenCode/Cursor/Cline/GitHub rule providers.'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Plugins.ForeignCompat/ForeignCompatExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Plugins.ForeignCompat/PiSharp.Plugins.ForeignCompat.csproj
+    test: dotnet test tests/PiSharp.Plugins.ForeignCompat.Tests/PiSharp.Plugins.ForeignCompat.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Compatibility
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Plugins.ForeignCompat/PiSharp.Plugins.ForeignCompat.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-advisor
+  name: PiSharp.Advisor
+  type: library
+  path: src/PiSharp.Advisor
+  purpose: Second-model turn-review advisor extension (P16), off by default; daemon advisor_note lane.
+  technologies: []
+  entry_points:
+  - src/PiSharp.Advisor/AdvisorExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Advisor/PiSharp.Advisor.csproj
+    test: dotnet test tests/PiSharp.Advisor.Tests/PiSharp.Advisor.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Advisor/PiSharp.Advisor.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-telemetry-otlp
+  name: PiSharp.Telemetry.Otlp
+  type: library
+  path: src/PiSharp.Telemetry.Otlp
+  purpose: OTLP exporter plugin (P25); OpenTelemetry SDK referenced only here.
+  technologies: []
+  entry_points:
+  - src/PiSharp.Telemetry.Otlp/TelemetryOtlpExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Telemetry.Otlp/PiSharp.Telemetry.Otlp.csproj
+    test: dotnet test tests/PiSharp.Telemetry.Otlp.Tests/PiSharp.Telemetry.Otlp.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Compatibility
+  - PiSharp.Server
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Telemetry.Otlp/PiSharp.Telemetry.Otlp.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-browser
+  name: PiSharp.Browser
+  type: library
+  path: src/PiSharp.Browser
+  purpose: 'Playwright-driven browser automation extension (P17): browser tooling (browser tool, tab control, screenshots).'
+  technologies: []
+  entry_points:
+  - src/PiSharp.Browser/BrowserExtension.cs
+  commands:
+    build: dotnet build src/PiSharp.Browser/PiSharp.Browser.csproj
+    test: dotnet test tests/PiSharp.Browser.Tests/PiSharp.Browser.Tests.csproj
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.Extensions
+  - PiSharp.Agent.Core
+  - PiSharp.Abstractions
+  - PiSharp.Tools
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-plugins.md
+  - docs/pisharp-implementation-status.md
+  status:
+    lifecycle: active
+    confidence: high
+  evidence:
+  - path: src/PiSharp.Browser/PiSharp.Browser.csproj
+    supports: project manifest
+    kind: manifest
+  test_focus: null
+- id: pi-sharp-ts-bridge-shim-export-generator
+  name: PiSharp.TsBridge.Tools.ShimExportGenerator
+  type: code-generator
+  path: src/PiSharp.TsBridge/Tools/ShimExportGenerator
+  purpose: Code generator producing TsBridge shim exports (ShimExports.Auto.g.cs / SdkShimRuntimeActions.Auto.g.cs) from shim-exports.fallback.json / PiSdkSourcePath via analyze-shim-exports.mjs; runs as
+    part of the TsBridge build.
+  technologies: []
+  entry_points:
+  - src/PiSharp.TsBridge/Tools/ShimExportGenerator/Program.cs
+  commands:
+    build: dotnet build src/PiSharp.TsBridge/Tools/ShimExportGenerator/ShimExportGenerator.csproj
+    test: null
+    run: null
+  deployable: false
+  depends_on:
+  - PiSharp.TsBridge
+  consumed_by:
+  - PiSharp.TsBridge (build target)
+  external_integrations: []
+  data_stores: []
+  documentation:
+  - docs/pisharp-typescript-extensions.md
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/PiSharp.TsBridge/Tools/ShimExportGenerator/ShimExportGenerator.csproj
+    supports: nested codegen tool in sln
+    kind: manifest
+  test_focus: null
+- id: pisharp-session-webapp
+  name: pisharp-session-webapp
+  type: application
+  path: src/pisharp-session-webapp
+  purpose: Vite/TypeScript browser session manager speaking the daemon /ws protocol (browser twin of PiSharp.Client). NOT a C# project; not in PiSharp.sln.
+  technologies:
+  - TypeScript
+  - Vite
+  entry_points:
+  - src/pisharp-session-webapp/src
+  - src/pisharp-session-webapp/vite.config.ts
+  commands:
+    build: npm install && npm run build (in src/pisharp-session-webapp; not part of dotnet build)
+    test: null
+    run: npm run dev (in src/pisharp-session-webapp)
+  deployable: true
+  depends_on:
+  - PiSharp.Server (wire protocol only)
+  consumed_by: []
+  external_integrations: []
+  data_stores: []
+  documentation: []
+  status:
+    lifecycle: active
+    confidence: medium
+  evidence:
+  - path: src/pisharp-session-webapp/package.json
+    supports: Vite/TypeScript app; no .csproj; not in PiSharp.sln
+    kind: manifest
+  test_focus: null
