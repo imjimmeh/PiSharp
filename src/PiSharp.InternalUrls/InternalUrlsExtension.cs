@@ -43,6 +43,12 @@ public sealed class InternalUrlsExtension : IExtension
         _diffLedgerCapacity = diffLedgerCapacity;
     }
 
+    /// <summary>Parameterless constructor required by the native plugin host; all accessors degrade to API defaults.</summary>
+    public InternalUrlsExtension()
+        : this(null, null, null, null)
+    {
+    }
+
     public async Task InitializeAsync(IExtensionApi api, CancellationToken cancellationToken = default)
     {
         var env = _env ?? api.ExecutionEnv;

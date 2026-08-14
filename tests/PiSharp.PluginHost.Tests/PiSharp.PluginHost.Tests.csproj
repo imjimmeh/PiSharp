@@ -14,5 +14,7 @@
     <ProjectReference Include="..\..\src\PiSharp.PluginHost\PiSharp.PluginHost.csproj" />
     <ProjectReference Include="..\..\src\PiSharp.Extensions\PiSharp.Extensions.csproj" />
     <ProjectReference Include="..\..\src\PiSharp.Coordination\PiSharp.Coordination.csproj" />
+    <ProjectReference Include="..\..\src\PiSharp.Extensions.Rules\PiSharp.Extensions.Rules.csproj" />
+    <ProjectReference Include="..\..\src\PiSharp.InternalUrls\PiSharp.InternalUrls.csproj" />
   </ItemGroup>
 </Project>

@@ -1,5 +1,7 @@
 using PiSharp.PluginHost;
 using PiSharp.Coordination;
+using PiSharp.Extensions.Rules;
+using PiSharp.InternalUrls;
 using Xunit;
 
 namespace PiSharp.PluginHost.Tests;
@@ -79,5 +81,23 @@ public sealed class PluginHostTests
         var host = new NativePluginHost(new PluginHostOptions([root]));
 
         Assert.Empty(host.Discover());
+    }
+
+    [Theory]
+    [InlineData(typeof(CoordinationExtension))]
+    [InlineData(typeof(RulesExtension))]
+    [InlineData(typeof(InternalUrlsExtension))]
+    public void LoadCreatesPluginWithParameterlessConstructor(Type extensionType)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-plugin-load-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var sourcePath = extensionType.Assembly.Location;
+        var pluginPath = Path.Combine(root, Path.GetFileName(sourcePath));
+        File.Copy(sourcePath, pluginPath);
+        var host = new NativePluginHost(new PluginHostOptions([], [pluginPath]));
+
+        var plugin = host.Load(pluginPath);
+
+        Assert.IsAssignableFrom<PiSharp.Extensions.IExtension>(plugin.Extension);
     }
 }

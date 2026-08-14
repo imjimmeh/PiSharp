@@ -1,7 +1,13 @@
 using PiSharp.Agent.Core.Prompting;
+using PiSharp.Extensions;
+
+[assembly: ExtensionMetadata(
+    "pisharp-rules",
+    Name = "PiSharp Rules",
+    Version = "1.0.0",
+    Description = "Registers the --no-rules / --disable-sticky flags, file and sticky rule providers, and the rules stream-delta interceptor.")]
 
 namespace PiSharp.Extensions.Rules;
-
 /// <summary>
 /// <c>pisharp-rules</c> extension entry (P10 plan §5.5): registers the <c>--no-rules</c>
 /// (and <c>--disable-sticky</c>) flags, the built-in file + sticky rule providers, the
@@ -32,6 +38,11 @@ public sealed class RulesExtension : IExtension, IDisposable
     {
         _overrideHomeDirectory = homeDirectory;
         _registerInterceptor = registerInterceptor;
+    }
+
+    /// <summary>Parameterless constructor required by the native plugin host; all options use defaults.</summary>
+    public RulesExtension()
+    {
     }
 
     /// <summary>The engine owned by this extension (the interceptor instance).</summary>
