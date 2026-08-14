@@ -1,0 +1,49 @@
+using PiSharp.Server.Contracts;
+
+namespace PiSharp.Server.Runtime;
+
+/// <summary>Outcome of a sequence replay against the retained event log.</summary>
+public sealed record ReplayResult(long FromSequence, long HeadSequence, bool Gap, IReadOnlyList<ServerEventEnvelope> Events);
+
+/// <summary>
+/// Lock-guarded ring buffer of the most recent <c>capacity</c> session envelopes, replayable by the
+/// per-session monotonic <see cref="ServerEventEnvelope.Sequence"/>. A replay reports a gap when the
+/// requested <c>sinceSequence</c> predates the oldest retained envelope.
+/// </summary>
+public sealed class RetainedEventLog(int capacity)
+{
+    private readonly object _gate = new();
+    private readonly ServerEventEnvelope[] _buffer = new ServerEventEnvelope[capacity];
+    private int _start;   // index of the oldest retained envelope
+    private int _count;
+    private long _head;
+
+    public long HeadSequence { get { lock (_gate) return _head; } }
+
+    public void Append(ServerEventEnvelope envelope)
+    {
+        lock (_gate)
+        {
+            if (_count < capacity) { _buffer[(_start + _count) % capacity] = envelope; _count++; }
+            else { _buffer[_start] = envelope; _start = (_start + 1) % capacity; }
+            _head = envelope.Sequence;
+        }
+    }
+
+    public ReplayResult ReplayFrom(long sinceSequence)
+    {
+        lock (_gate)
+        {
+            var oldest = _head - _count + 1;
+            var gap = sinceSequence < oldest;
+            if (gap) sinceSequence = oldest;
+            var events = new List<ServerEventEnvelope>();
+            for (var i = 0; i < _count; i++)
+            {
+                var envelope = _buffer[(_start + i) % capacity];
+                if (envelope.Sequence >= sinceSequence) events.Add(envelope);
+            }
+            return new ReplayResult(sinceSequence, _head, gap, events);
+        }
+    }
+}

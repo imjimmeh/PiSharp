@@ -19,13 +19,14 @@ public sealed class LiveServerSession : IAsyncDisposable
     private long _sequence;
     private bool _disposed;
 
-    public LiveServerSession(string id, PiSharp.Runtime.SessionRuntime runtime, Func<LiveServerSession, string, string, CancellationToken, Task>? runtimeSessionChanged = null, int eventCapacity = 1024)
+    public LiveServerSession(string id, PiSharp.Runtime.SessionRuntime runtime, Func<LiveServerSession, string, string, CancellationToken, Task>? runtimeSessionChanged = null, int eventCapacity = 100_000)
     {
         Id = id;
         Runtime = runtime;
         _runtimeSessionChanged = runtimeSessionChanged;
         _runtimeSessionId = runtime.Session.Metadata.Id;
         _eventCapacity = eventCapacity;
+        EventLog = new RetainedEventLog(eventCapacity);
         BindCurrentHarness();
         Runtime.SetRebindSession(OnRuntimeReboundAsync);
     }
@@ -35,6 +36,7 @@ public sealed class LiveServerSession : IAsyncDisposable
     public string RuntimeSessionId => _runtimeSessionId;
     public SemaphoreSlim Gate { get; } = new(1, 1);
     public CancellationToken LifetimeToken => _lifetime.Token;
+    public RetainedEventLog EventLog { get; }
 
     public async IAsyncEnumerable<ServerEventEnvelope> ReadEventsAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -53,6 +55,21 @@ public sealed class LiveServerSession : IAsyncDisposable
         finally
         {
             if (_subscribers.TryRemove(key, out var removed)) removed.Writer.TryComplete();
+        }
+    }
+
+    /// <summary>
+    /// Replays retained envelopes with <see cref="ServerEventEnvelope.Sequence"/> at or after
+    /// <paramref name="sinceSequence"/> from <see cref="EventLog"/>. Task 1.2 wires the live channel
+    /// tail into this reader; here it only exposes the retained replay.
+    /// </summary>
+    public async IAsyncEnumerable<ServerEventEnvelope> ReplayEventsAsync(long sinceSequence, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var replay = EventLog.ReplayFrom(sinceSequence);
+        foreach (var envelope in replay.Events)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return envelope;
         }
     }
 
@@ -143,6 +160,7 @@ public sealed class LiveServerSession : IAsyncDisposable
         {
             var sequence = Interlocked.Increment(ref _sequence);
             var envelope = ServerEventEnvelope.FromFlat(Id, sequence, evt.ToFlat());
+            EventLog.Append(envelope);
             foreach (var subscriber in _subscribers.Values) subscriber.Writer.TryWrite(envelope);
             return Task.CompletedTask;
         });
