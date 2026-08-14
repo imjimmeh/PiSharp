@@ -195,6 +195,30 @@ public sealed class ServerSessionRegistryTests
         Assert.False(registry.TryGet(created.ServerSessionId, out _));
     }
 
+    [Fact]
+    public async Task CreateSessionWireCarriesNoTsExtensionsFlagToRuntimeFactory()
+    {
+        CreateServerSessionRequest? seen = null;
+        var registry = new ServerSessionRegistry((request, _) =>
+        {
+            seen = request;
+            return CreateRuntimeAsync(request.Cwd);
+        });
+        var handler = new PiSharp.Server.WebSockets.PiServerWebSocketHandler(
+            registry,
+            new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<PiSharp.Server.WebSockets.PiServerWebSocketHandler>.Instance);
+        var root = TempRoot();
+        var response = await handler.DispatchTextCommandAsync(System.Text.Json.JsonSerializer.Serialize(
+            new { id = "c", type = ServerCommandTypes.CreateSession, cwd = root, noTsExtensions = true },
+            ServerJsonSerializer.Options));
+
+        Assert.True(response.Success, response.Error?.Message);
+        Assert.NotNull(seen);
+        Assert.True(seen!.NoTsExtensions);
+    }
+
+
     private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan? timeout = null)
     {
         var deadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));

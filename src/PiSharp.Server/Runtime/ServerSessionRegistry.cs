@@ -185,7 +185,7 @@ public sealed partial class ServerSessionRegistry : IAsyncDisposable
             SessionsRoot: request.SessionsRoot,
             Model: new RuntimeModelOptions(request.Provider, request.Model, request.Thinking, request.ScopedModels),
             Tools: new RuntimeToolOptions(request.Tools, request.NoTools, request.NoBuiltinTools),
-            Resources: new RuntimeResourceOptions(request.Extensions, DisableExtensions: request.NoExtensions, DisableSkills: request.NoSkills, DisablePromptTemplates: request.NoPromptTemplates, DisableThemes: request.NoThemes, DisableContextFiles: request.NoContextFiles),
+            Resources: new RuntimeResourceOptions(request.Extensions, DisableExtensions: request.NoExtensions, DisableTypeScriptExtensions: request.NoTsExtensions, DisableSkills: request.NoSkills, DisablePromptTemplates: request.NoPromptTemplates, DisableThemes: request.NoThemes, DisableContextFiles: request.NoContextFiles),
             Session: new RuntimeSessionStartupOptions(SessionIdOrPath: request.SessionIdOrPath, ContinueLatestForCwd: request.ContinueLatestForCwd, NewSessionId: request.SessionId),
             Telemetry: telemetry),
             cancellationToken: cancellationToken);

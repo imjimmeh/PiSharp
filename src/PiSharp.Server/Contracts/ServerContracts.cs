@@ -96,6 +96,7 @@ public sealed record CreateServerSessionRequest(
     bool NoBuiltinTools = false,
     IReadOnlyList<string>? Extensions = null,
     bool NoExtensions = false,
+    bool NoTsExtensions = false,
     bool NoSkills = false,
     bool NoPromptTemplates = false,
     bool NoThemes = false,

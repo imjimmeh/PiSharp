@@ -414,6 +414,7 @@ public static class InteractiveMode
             NoBuiltinTools: runtimeArgs.NoBuiltinTools,
             Extensions: runtimeArgs.Extensions,
             NoExtensions: runtimeArgs.NoExtensions,
+            NoTsExtensions: runtimeArgs.NoTsExtensions,
             NoSkills: runtimeArgs.NoSkills,
             NoPromptTemplates: runtimeArgs.NoPromptTemplates,
             NoThemes: runtimeArgs.NoThemes,
