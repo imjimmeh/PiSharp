@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
 using PiSharp.Server.Serialization;
@@ -9,6 +10,7 @@ public sealed class DaemonLeaseStore(string directory)
     public string LeasePath => Path.Combine(directory, "daemon.json");
     public string LockPath => Path.Combine(directory, "daemon.lock");
 
+    /// <summary>Returns the live lease, or null when no usable lease exists (missing/corrupt file, dead pid, or IO failure).</summary>
     public async Task<DaemonLease?> ReadAsync(CancellationToken ct = default)
     {
         try
@@ -27,14 +29,26 @@ public sealed class DaemonLeaseStore(string directory)
     public async Task WriteAsync(DaemonLease lease, CancellationToken ct = default)
     {
         Directory.CreateDirectory(directory);
-        await using var stream = new FileStream(LeasePath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await JsonSerializer.SerializeAsync(stream, lease, ServerJsonSerializer.Options, ct);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(LeasePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        var tempPath = LeasePath + ".tmp";
+        await using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            await JsonSerializer.SerializeAsync(stream, lease, ServerJsonSerializer.Options, ct);
+        }
+
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(tempPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.Move(tempPath, LeasePath, overwrite: true);
     }
 
     internal static bool ProcessAlive(int pid)
     {
-        try { return Process.GetProcessById(pid) is { HasExited: false }; }
-        catch (ArgumentException) { return false; }
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (Exception ex) when (ex is ArgumentException or Win32Exception or NotSupportedException)
+        {
+            return false;
+        }
     }
 }

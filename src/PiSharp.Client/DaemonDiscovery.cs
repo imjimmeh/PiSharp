@@ -14,7 +14,7 @@ public static class DaemonDiscovery
         using var client = new HttpClient { Timeout = HealthCheckTimeout };
         try
         {
-            var response = await client.GetAsync($"http://127.0.0.1:{lease.Port}/health", ct);
+            using var response = await client.GetAsync($"http://127.0.0.1:{lease.Port}/health", ct);
             return response.StatusCode == HttpStatusCode.OK;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
