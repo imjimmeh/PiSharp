@@ -33,6 +33,11 @@ public sealed class EvalExtensionIntegrationTests
 
     private static string OutputOf(AgentToolResult<object?> result)
         => string.Concat(result.Content.OfType<TextContent>().Select(c => c.Text));
+    private static JsonElement EvalPayloadOf(AgentToolResult<object?> result)
+        => JsonDocument.Parse(OutputOf(result)).RootElement;
+
+    private static string EvalOutputText(AgentToolResult<object?> result)
+        => EvalPayloadOf(result).GetProperty("output").GetString() ?? "";
 
     [Fact]
     public async Task Initialize_RegistersToolCommandsAndLifecycleHooks()
@@ -68,13 +73,11 @@ public sealed class EvalExtensionIntegrationTests
         try
         {
             var first = await host.RunToolAsync("eval", new { code = "int answer = 42;" });
-            Assert.DoesNotContain("Error", OutputOf(first));
+            Assert.False(EvalPayloadOf(first).GetProperty("isError").GetBoolean());
 
             var second = await host.RunToolAsync("eval", new { code = "answer * 2" });
-            var text = OutputOf(second);
-            Assert.DoesNotContain("Error", text);
-            Assert.Contains("84", text);
-            Assert.Contains("\"kernel\": \"csharp\"", text);
+            Assert.Contains("84", EvalOutputText(second));
+            Assert.Equal("csharp", EvalPayloadOf(second).GetProperty("kernel").GetString());
         }
         finally
         {
@@ -92,11 +95,11 @@ public sealed class EvalExtensionIntegrationTests
             await host.RunToolAsync("eval", new { code = "int answer = 42;" });
 
             var reset = await host.RunToolAsync("eval", new { code = "int answer = 7;", reset = true });
-            Assert.Contains("\"wasReset\": true", OutputOf(reset));
+            Assert.True(EvalPayloadOf(reset).GetProperty("wasReset").GetBoolean());
 
             var check = await host.RunToolAsync("eval", new { code = "answer" });
-            Assert.DoesNotContain("Error", OutputOf(check));
-            Assert.Contains("7", OutputOf(check));
+            Assert.False(EvalPayloadOf(check).GetProperty("isError").GetBoolean());
+            Assert.Contains("7", EvalOutputText(check));
         }
         finally
         {
@@ -115,11 +118,9 @@ public sealed class EvalExtensionIntegrationTests
                 : Task.FromResult(new AgentToolResult<object?>([new TextContent("Error: nope")], null)));
         try
         {
-            var result = await host.RunToolAsync("eval", new { code = "Tools.Read(\"a.txt\")" });
-            var text = OutputOf(result);
-            Assert.DoesNotContain("Error", text);
-            Assert.Contains("canned:a.txt", text);
-
+            var result = await host.RunToolAsync("eval", new { code = "await Tools.Read(\"a.txt\")" });
+            Assert.False(EvalPayloadOf(result).GetProperty("isError").GetBoolean());
+            Assert.Contains("canned:a.txt", EvalOutputText(result));
             // Loopback emits only eval_loopback_* events — never tool_call/tool_execution_*.
             var loopbackEvents = host.EmittedEvents.Where(e => e.EventName.StartsWith("eval_loopback_", StringComparison.Ordinal)).ToArray();
             Assert.Equal(2, loopbackEvents.Length);
@@ -142,9 +143,8 @@ public sealed class EvalExtensionIntegrationTests
                 new InvalidOperationException("must not be invoked")));
         try
         {
-            var result = await host.RunToolAsync("eval", new { code = "Tools.Run(\"bash\", new { command = \"rm -rf /\" })" });
-            var text = OutputOf(result);
-            Assert.Contains("not allowed", text);
+            var result = await host.RunToolAsync("eval", new { code = "await Tools.Run(\"bash\", new { command = \"rm -rf /\" })" });
+            Assert.Contains("not allowed", EvalOutputText(result));
         }
         finally
         {
@@ -165,10 +165,8 @@ public sealed class EvalExtensionIntegrationTests
 
             // The snapshot event was emitted by the compaction hook.
             Assert.Contains(host.EmittedEvents, e => e.EventName == EvalEventNames.Snapshot);
-
-            // Kernel state is intact after compaction.
             var result = await host.RunToolAsync("eval", new { code = "x" });
-            Assert.Contains("42", OutputOf(result));
+            Assert.Contains("42", EvalOutputText(result));
         }
         finally
         {

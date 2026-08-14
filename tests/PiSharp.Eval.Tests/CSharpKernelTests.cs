@@ -110,9 +110,9 @@ public sealed class CSharpKernelTests
     {
         await using var kernel = await StartKernelAsync();
 
-        // Deliberate runaway CPU loop; timeout 200 ms. The loop cannot be interrupted
-        // in-process, so the kernel poisons itself and the next call resets transparently.
-        var timedOut = await kernel.ExecuteAsync("while (true) { }", new KernelExecuteOptions(TimeoutMs: 200));
+        // Deliberate runaway script that outlives the timeout; 10s bound so the abandoned
+        // task terminates on its own instead of spinning a threadpool thread forever.
+        var timedOut = await kernel.ExecuteAsync("await Task.Delay(10000)", new KernelExecuteOptions(TimeoutMs: 200));
         Assert.True(timedOut.TimedOut);
         Assert.True(timedOut.IsError);
 
@@ -169,22 +169,20 @@ public sealed class CSharpKernelTests
     {
         await using var kernel = await StartKernelAsync();
         // A delegate is not JSON-serializable → lossy variable.
-        await kernel.ExecuteAsync("int keep = 5; Action<int> f = x => x + 1;");
+        await kernel.ExecuteAsync("int keep = 5; Func<int,int> g = x => x + 1;");
 
         var snapshot = await kernel.SnapshotAsync();
         Assert.True(snapshot.Lossy);
-        Assert.Contains(snapshot.Variables, v => v.Name == "f" && v.Lossy && v.Json is null);
+        Assert.Contains(snapshot.Variables, v => v.Name == "g" && v.Lossy && v.Json is null);
 
         await using var fresh = await StartKernelAsync();
         await fresh.RestoreAsync(snapshot);
 
+        // Restore warning surfaces on the next execution's output (the first one drains it).
         var keep = await fresh.ExecuteAsync("keep");
         Assert.False(keep.IsError);
         Assert.Contains("5", keep.Output);
-
-        // Restore warning surfaces on the next execution's output.
-        var warning = await fresh.ExecuteAsync("1 + 1");
-        Assert.Contains("lossy", warning.Output);
+        Assert.Contains("lossy", keep.Output);
     }
 
     [Fact]

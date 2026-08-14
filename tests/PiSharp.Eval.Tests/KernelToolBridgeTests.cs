@@ -22,7 +22,7 @@ public sealed class KernelToolBridgeTests
             => Task.FromResult<IReadOnlyList<string>>([]);
         public Task<IReadOnlyList<string>> GetAllToolsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<string>>([]);
-        public Task SetActiveToolsAsync(IReadOnlyList<string> toolNames, CancellationToken cancellationToken = default)
+        public Task SetActiveToolsAsync(IReadOnlyList<string>? toolNames, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
         public Task<AgentToolResult<object?>> ExecuteToolAsync(string toolName, JsonElement parameters, CancellationToken cancellationToken = default)

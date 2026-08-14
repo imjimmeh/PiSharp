@@ -5,16 +5,20 @@ namespace PiSharp.Eval.Tests;
 
 public sealed class EvalKernelRegistryTests
 {
-    private sealed class FakeFactory(string name) : IKernelFactory
+    private sealed class FakeFactory : IKernelFactory
     {
-        public string KernelName { get; } = name;
-        public IKernel Create() => new FakeKernel(name);
+        private readonly string _name;
+        public FakeFactory(string name) => _name = name;
+        public string KernelName => _name;
+        public IKernel Create() => new FakeKernel(_name);
     }
 
-    private sealed class FakeKernel(string name) : IKernel
+    private sealed class FakeKernel : IKernel
     {
-        public string Name { get; } = name;
-        public string Language => name;
+        private readonly string _name;
+        public FakeKernel(string name) => _name = name;
+        public string Name => _name;
+        public string Language => _name;
         public bool IsRunning => true;
         public Task StartAsync(KernelStartOptions options, CancellationToken ct = default) => Task.CompletedTask;
         public Task<KernelExecuteResult> ExecuteAsync(string code, KernelExecuteOptions? options = null, CancellationToken ct = default)
@@ -25,6 +29,7 @@ public sealed class EvalKernelRegistryTests
         public Task ResetAsync(CancellationToken ct = default) => Task.CompletedTask;
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+
 
     public EvalKernelRegistryTests()
     {

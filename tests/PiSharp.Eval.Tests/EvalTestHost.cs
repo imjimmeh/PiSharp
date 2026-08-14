@@ -16,6 +16,7 @@ internal sealed class EvalTestHost : IAsyncDisposable
     private readonly ExtensionManager _manager;
     private readonly EvalExtension _extension;
     private readonly ExtensionRuntimeBinding _binding;
+    private readonly string _sessionName;
 
     public ExtensionRegistry Registry => _manager.Registry;
     public List<(string EventName, object? Payload)> EmittedEvents { get; }
@@ -27,6 +28,7 @@ internal sealed class EvalTestHost : IAsyncDisposable
         EvalExtension extension,
         ExtensionRuntimeBinding binding,
         string cwd,
+        string sessionName,
         List<(string EventName, object? Payload)> emittedEvents,
         List<AgentMessage> sentMessages)
     {
@@ -34,16 +36,17 @@ internal sealed class EvalTestHost : IAsyncDisposable
         _extension = extension;
         _binding = binding;
         Cwd = cwd;
+        _sessionName = sessionName;
         EmittedEvents = emittedEvents;
         SentMessages = sentMessages;
     }
-
     public static async Task<EvalTestHost> CreateAsync(
         string cwd,
         Func<string, JsonElement, CancellationToken, Task<AgentToolResult<object?>>>? executeToolByName = null,
         Func<IReadOnlyList<AgentMessage>?, CancellationToken, Task<ExtensionCompletionResult>>? complete = null,
-        string? sessionName = "test-session")
+        string? sessionName = null)
     {
+        sessionName ??= $"test-{Guid.NewGuid():N}"[..16];
         var registry = new ExtensionRegistry();
         var events = new List<(string EventName, object? Payload)>();
         var sent = new List<AgentMessage>();
@@ -61,7 +64,7 @@ internal sealed class EvalTestHost : IAsyncDisposable
                 return Task.CompletedTask;
             },
         };
-        var host = new EvalTestHost(new ExtensionManager(registry), new EvalExtension(), binding, cwd, events, sent);
+        var host = new EvalTestHost(new ExtensionManager(registry), new EvalExtension(), binding, cwd, sessionName, events, sent);
 
         if (executeToolByName is not null)
         {
@@ -91,6 +94,28 @@ internal sealed class EvalTestHost : IAsyncDisposable
 
         return host;
     }
+
+    /// <summary>
+    /// Removes snapshot files this host may have persisted under the user-profile
+    /// fallback root so tests never leak state into later runs.
+    /// </summary>
+    private static void CleanupSnapshots(string sessionName)
+    {
+        var snapshotRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".pi", "PiSharp", "eval", "kernels", sessionName);
+        try
+        {
+            if (Directory.Exists(snapshotRoot))
+            {
+                Directory.Delete(snapshotRoot, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // Best-effort cleanup; a leftover file cannot affect other tests (unique session names).
+        }
+     }
 
     public IAgentTool? FindTool(string name)
         => Registry.Tools.FirstOrDefault(t => t.Value.Name == name)?.Value;
