@@ -86,6 +86,7 @@ public sealed class ExampleExtension : IExtension
 | `Search` | Search/retrieval surface. |
 | `Packages` | Package lifecycle (`install`/`update`/`remove`/`list` backed by `IPackageCommandRunner`). |
 | `Rules` | Rule engine: register `IRuleProvider`s, apply rules with `RuleApplyMode`, list providers. |
+| `StreamDelta` | Mid-stream interception (P10 TTSR): register an `IStreamDeltaInterceptor`; `null` when the host does not wire one. |
 | `Telemetry` | Telemetry export surface (OTLP). |
 
 Top-level convenience methods mirror the grouped APIs:

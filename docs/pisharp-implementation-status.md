@@ -23,10 +23,10 @@ Legend: ✅ done · 🟡 partially done (deviations recorded in the plan/plugin 
 | --- | --- | --- | --- |
 | P08 memory system | `PiSharp.Memory` + Abstractions + File/Off backends | ✅ | Memory 91/91 |
 | P09 continual harness | `PiSharp.ContinualHarness` (`/refine`) | ✅ | ContinualHarness 42/42 |
-| P10 rules engine | `Rule`/`IRuleProvider`/`IExtensionApi.Rules`, `RuleApplyMode`, auto-retry events, rules dir + sticky providers, `--no-rules` | ✅ | Extensions 174/174 · Agent 187/187 |
+| P10 rules engine | `Rule`/`IRuleProvider`/`IExtensionApi.Rules` + `StreamDelta` interceptor api, `PiSharp.Extensions.Rules` (engine, file + sticky providers, `--no-rules`/`--disable-sticky`) | ✅ | Extensions 186/186 · Agent 187/187 · Rules 46/46 |
 | P11 foreign compat | `PiSharp.Plugins.ForeignCompat` rule providers | ✅ | ForeignCompat 47/47 |
 | P12 IDE protocol clients | `PiSharp.Plugins.Lsp`, `PiSharp.Plugins.Debug`, `PiSharp.Plugins.ProtocolJsonRpc` | ✅ | Lsp 31/31 · ProtocolJsonRpc 14/14 · Debug 2/2 |
-| P13 ACP mode | `CliMode.Acp` + `--approval-mode` | ✅ | Cli 342/342 |
+| P13 ACP mode | `PiSharp.Acp` ACP JSON-RPC server (session mgmt, permission gate, event translation) + `CliMode.Acp` | ✅ | Acp 63/63 · Cli 342/342 |
 | P14 plan mode | `PiSharp.PlanMode` (C1–C4) + C5 daemon RPC | ✅ | PlanMode 79/79 · PlanMode.Rpc 12/12 |
 | P15 eval/bench | `PiSharp.Eval` + `PiSharp.Eval.Kernel.CSharp` (Roslyn; Python kernel skipped per plan) | ✅ | Eval 58/58 |
 | P16 advisor | `PiSharp.Advisor` + daemon `advisor_note` lane | ✅ | Advisor 28/28 · Advisor.Daemon 11/11 |
@@ -39,7 +39,7 @@ Legend: ✅ done · 🟡 partially done (deviations recorded in the plan/plugin 
 | P23 continuity suite | `PiSharp.Continuity` + daemon wire commands | ✅ | Continuity 43/43 · Server.ContinuityCommands 26/26 |
 | P24 git integrations | removed `ShareSessionSlashCommand` + `src/PiSharp.Git` | ✅ | Git 99/99 |
 | P25 observability | `IExtensionApi.Telemetry`, `PiSharp.Telemetry.Otlp`, C5–C7 `get_metrics`/`get_session_stats` | ✅ | Telemetry.Otlp 24/24 · Server.Observability 18/18 |
-| P26 internal URLs | `PiSharp.InternalUrls` (`skill://`, `agent://`, `diff://`) | ✅ | InternalUrls 65/65 |
+| P26 internal URLs | `PiSharp.InternalUrls` (`skill://`, `agent://`, `diff://`); optional `InternalUrls.GitHub` companion not built (P24-gated per plan) | ✅ | InternalUrls 65/65 |
 | P27 MCP client | `PiSharp.Mcp` + HTTP/stdio transports; C2 `mcp_status` | ✅ | Mcp 39/39 · Mcp.Status 6/6 |
 | P28 research | `PiSharp.Research` + Serper/GoogleCse/Brave | ✅ | Research 82/82 |
 | P29 permissions gating | `PiSharp.Permissions` | ✅ | Permissions 91/91 |
@@ -47,10 +47,10 @@ Legend: ✅ done · 🟡 partially done (deviations recorded in the plan/plugin 
 | P31 distribution | self-update dispatch + `VersionInfo` | ✅ | Cli 342/342 |
 ## Verify gate
 
-Full-union `dotnet build PiSharp.sln` (96 projects): 0 errors. Full-union `dotnet test PiSharp.sln`:
-all 42 test projects green except the pre-existing Tui integration timing flakes
-(`InlineSelection*` / `DeferredStartup*` — pass in isolation; established pre-existing, not
-regressions). Verified 2026-08-14.
+Full-union `dotnet build PiSharp.sln` (100 projects): 0 errors. Full-union `dotnet test PiSharp.sln`:
+all 44 test projects green except the pre-existing Tui integration timing flakes
+(`InlineSelection*` / `DeferredStartup*`) and occasional ModelRoles union-load flake — both pass
+in isolation; established pre-existing, not regressions. Verified 2026-08-14.
 
 ## Known deferred (outside this portfolio's scope)
 
