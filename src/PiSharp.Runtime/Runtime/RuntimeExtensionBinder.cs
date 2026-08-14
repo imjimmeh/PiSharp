@@ -31,6 +31,8 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
         _subagentService = new SubagentSessionService(runtime);
 
         var binding = runtime.ExtensionBinding;
+        binding.RuntimeSettings = runtime.SettingsService;
+        binding.RuntimeState = runtime.StateService;
         binding.SendMessageAsync = runtime.SendExtensionMessageAsync;
         binding.SendUserMessageAsync = (content, delivery, token) =>
             runtime.SendExtensionMessageAsync(AgentMessages.User(content), delivery, triggerTurn: delivery == ExtensionMessageDelivery.NextTurn, token);

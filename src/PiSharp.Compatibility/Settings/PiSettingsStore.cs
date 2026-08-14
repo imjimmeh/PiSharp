@@ -2,9 +2,9 @@ namespace PiSharp.Compatibility.Settings;
 
 public sealed class PiSettingsStore
 {
-    public async Task<PiSettingsSnapshot> LoadAsync(string cwd, string? homeDirectory = null, CancellationToken cancellationToken = default)
+    public async Task<PiSettingsSnapshot> LoadAsync(string cwd, string? homeDirectory = null, string? profile = null, CancellationToken cancellationToken = default)
     {
-        var paths = PiAgentPaths.FromCwd(cwd, homeDirectory);
+        var paths = PiAgentPaths.FromCwd(cwd, homeDirectory, profile);
         var configuration = PiSettingsConfiguration.Build(paths);
         var global = await LoadDocumentAsync(paths.GlobalSettingsPath, cancellationToken);
         var globalPiSharp = await LoadDocumentAsync(paths.GlobalPiSharpSettingsPath, cancellationToken);
@@ -17,7 +17,7 @@ public sealed class PiSettingsStore
             new PiSettingsLayerDocument(PiSettingsLayer.ProjectPiSharp, projectPiSharp)
         ], out var provenance);
         var resolvedSettings = PiSettings.FromConfiguration(configuration, merged.Settings);
-        return new PiSettingsSnapshot(paths, global, project, merged, globalPiSharp, projectPiSharp, provenance)
+        return new PiSettingsSnapshot(paths, global, project, merged, globalPiSharp, projectPiSharp, paths.Profile, provenance)
         {
             ResolvedSettings = resolvedSettings
         };
@@ -54,6 +54,19 @@ public sealed class PiSettingsStore
     {
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-        await File.WriteAllTextAsync(path, document.ToJson(), cancellationToken);
+        var json = document.ToJson();
+        // Atomic replace: write a unique temp file in the same directory, then move over the
+        // target so concurrent readers/writers never observe a partial settings file.
+        var tempPath = Path.Combine(directory ?? string.Empty, $"{Path.GetFileName(path)}.tmp-{Guid.NewGuid():N}");
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, json, cancellationToken);
+            File.Move(tempPath, path, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(tempPath); } catch { /* best-effort temp cleanup */ }
+            throw;
+        }
     }
 }

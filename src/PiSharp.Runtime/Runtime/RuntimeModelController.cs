@@ -11,11 +11,9 @@ using System.Runtime.CompilerServices;
 namespace PiSharp.Runtime;
 
 internal sealed class RuntimeModelController(
-    PiSettingsStore? settingsStore,
-    PiSettingsSnapshot? settingsSnapshot,
+    ExtensionSettingsService settingsService,
     ILoggerFactory? loggerFactory = null)
 {
-    private PiSettingsSnapshot? _settingsSnapshot = settingsSnapshot;
     private RuntimeModelSelection? _pendingPersistence;
     private readonly ILogger _logger = loggerFactory?.CreateLogger<RuntimeModelController>() ?? NullLogger<RuntimeModelController>.Instance;
 
@@ -80,24 +78,16 @@ internal sealed class RuntimeModelController(
 
     private async Task PersistModelSelectionAsync(RuntimeModelSelection selection, CancellationToken cancellationToken)
     {
-        if (settingsStore is null || _settingsSnapshot is null) return;
+        var snapshot = settingsService.CurrentSnapshot;
+        if (snapshot is null) return;
 
-        var providerLayer = _settingsSnapshot.SourceLayerFor("defaultProvider") ?? PiSettingsLayer.GlobalLegacy;
-        var modelLayer = _settingsSnapshot.SourceLayerFor("defaultModel") ?? providerLayer;
-        var thinkingLayer = _settingsSnapshot.SourceLayerFor("defaultThinking") ?? modelLayer;
+        var providerLayer = snapshot.SourceLayerFor("defaultProvider") ?? PiSettingsLayer.GlobalLegacy;
+        var modelLayer = snapshot.SourceLayerFor("defaultModel") ?? providerLayer;
+        var thinkingLayer = snapshot.SourceLayerFor("defaultThinking") ?? modelLayer;
         var serializedThinking = selection.ThinkingLevel.ToString().ToLowerInvariant();
-        var layers = new[] { providerLayer, modelLayer, thinkingLayer }.Distinct().ToArray();
 
-        foreach (var layer in layers)
-        {
-            await settingsStore.SaveLayerAsync(_settingsSnapshot, layer, document =>
-            {
-                if (layer == providerLayer) document.SetString("defaultProvider", selection.Model.Provider);
-                if (layer == modelLayer) document.SetString("defaultModel", selection.Model.Id);
-                if (layer == thinkingLayer) document.SetString("defaultThinking", serializedThinking);
-            }, cancellationToken);
-        }
-
-        _settingsSnapshot = await settingsStore.LoadAsync(_settingsSnapshot.Paths.Cwd, _settingsSnapshot.Paths.HomeDirectory, cancellationToken);
+        await settingsService.SetRawOnLayerAsync("defaultProvider", selection.Model.Provider, providerLayer, "runtime:model", cancellationToken);
+        await settingsService.SetRawOnLayerAsync("defaultModel", selection.Model.Id, modelLayer, "runtime:model", cancellationToken);
+        await settingsService.SetRawOnLayerAsync("defaultThinking", serializedThinking, thinkingLayer, "runtime:model", cancellationToken);
     }
 }

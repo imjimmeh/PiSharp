@@ -7,9 +7,10 @@ public sealed class PiPackageCommandRunner : IPackageCommandRunner
     private readonly PiPackageSettingsService _settingsService;
     private readonly PiPackageManager _packageManager;
     private readonly NativeExtensionInstaller? _nativeExtensionInstaller;
+    private readonly SelfUpdateService? _selfUpdateService;
 
     public PiPackageCommandRunner(PiPackageSettingsService settingsService, PiPackageManager packageManager)
-        : this(settingsService, packageManager, null)
+        : this(settingsService, packageManager, null, null)
     {
     }
 
@@ -17,10 +18,20 @@ public sealed class PiPackageCommandRunner : IPackageCommandRunner
         PiPackageSettingsService settingsService,
         PiPackageManager packageManager,
         NativeExtensionInstaller? nativeExtensionInstaller)
+        : this(settingsService, packageManager, nativeExtensionInstaller, null)
+    {
+    }
+
+    public PiPackageCommandRunner(
+        PiPackageSettingsService settingsService,
+        PiPackageManager packageManager,
+        NativeExtensionInstaller? nativeExtensionInstaller,
+        SelfUpdateService? selfUpdateService)
     {
         _settingsService = settingsService;
         _packageManager = packageManager;
         _nativeExtensionInstaller = nativeExtensionInstaller;
+        _selfUpdateService = selfUpdateService;
     }
 
     public async Task InstallAsync(string source, bool local, bool force = false, bool offline = false)
@@ -57,9 +68,17 @@ public sealed class PiPackageCommandRunner : IPackageCommandRunner
     {
         if (request.Self)
         {
-            throw new InvalidOperationException("Self-update is not yet implemented. Use your package manager to update PiSharp.");
-        }
+            if (_selfUpdateService is null)
+                throw new InvalidOperationException("Self-update is not configured for this invocation.");
 
+            await _selfUpdateService.UpdateAsync(request.AddSource, request.Offline, CancellationToken.None);
+            var leasePath = Path.Combine(_settingsService.SnapshotPaths.GlobalPiSharpDirectory, "daemon.json");
+            if (File.Exists(leasePath))
+            {
+                await _selfUpdateService.PrintDaemonNoticeAsync(leasePath, Console.Out, CancellationToken.None);
+            }
+            return;
+        }
         if (request.Extensions || request.ExtensionSource is not null)
         {
             await UpdateExtensionsAsync(request);

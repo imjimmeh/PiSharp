@@ -73,6 +73,10 @@ public static class CliParser
                 case "--offline": b.Offline = true; break;
                 case "--verbose": b.Verbose = true; break;
                 case "--benchmark-startup": b.BenchmarkStartup = true; break;
+                case "--profile": b.Profile = NextValue(); break;
+                case "--approval-mode": b.ApprovalMode = ParseApprovalMode(NextValue(), b); break;
+                case "--check-updates": b.CheckUpdates = true; break;
+                case "--no-check-updates": b.NoCheckUpdates = true; break;
                 default:
                     if (arg.StartsWith("--", StringComparison.Ordinal)) CaptureUnknownLong(arg, args, ref i, b);
                     else if (arg.StartsWith("-", StringComparison.Ordinal)) b.Error($"Unknown option: {arg}");
@@ -199,6 +203,7 @@ public static class CliParser
         var extensions = false;
         var extensionSource = (string?)null;
         var force = false;
+        var addSource = (string?)null;
 
         // Phase 1: consume positional args (source, pi, self — not flags)
         while (i + 1 < args.Count)
@@ -243,6 +248,14 @@ public static class CliParser
                     }
                     extensionSource = args[++i];
                     break;
+                case "--add-source":
+                    if (i + 1 >= args.Count)
+                    {
+                        b.Error("Missing value for --add-source.");
+                        continue;
+                    }
+                    addSource = args[++i];
+                    break;
                 case "--force":
                     force = true;
                     break;
@@ -260,7 +273,7 @@ public static class CliParser
             b.Error("Conflicting update targets: pi/self and --extensions.");
         }
 
-        b.PackageCommand = new PackageCommandArgs(PackageCommandKind.Update, source, Self: self, Extensions: extensions, ExtensionSource: extensionSource, Force: force);
+        b.PackageCommand = new PackageCommandArgs(PackageCommandKind.Update, source, Self: self, Extensions: extensions, ExtensionSource: extensionSource, Force: force, AddSource: addSource);
         return true;
     }
 
@@ -282,6 +295,7 @@ public static class CliParser
     public static AppMode SelectAppMode(CliArgs args, bool stdinRedirected)
     {
         if (args.Mode == CliMode.Rpc) return AppMode.Rpc;
+        if (args.Mode == CliMode.Acp) return AppMode.Acp;
         if (args.Mode == CliMode.SubagentJson) return AppMode.SubagentJson;
         if (args.Mode == CliMode.Json && args.Print && args.NoSession) return AppMode.SubagentJson;
         if (args.Mode == CliMode.Json) return AppMode.PrintJson;
@@ -298,6 +312,7 @@ public static class CliParser
             "text" => CliMode.Text,
             "json" => CliMode.Json,
             "rpc" => CliMode.Rpc,
+            "acp" => CliMode.Acp,
             "subagent-json" => CliMode.SubagentJson,
             _ => b.ErrorAndReturn<CliMode?>($"Invalid --mode '{value}'.")
         };
@@ -305,6 +320,15 @@ public static class CliParser
 
     private static ThinkingLevel? ParseThinking(string? value, Builder b)
         => Enum.TryParse<ThinkingLevel>(value, true, out var level) ? level : b.WarningAndReturn<ThinkingLevel?>($"Invalid --thinking '{value}'.");
+
+    private static AcpApprovalMode? ParseApprovalMode(string? value, Builder b)
+        => value?.ToLowerInvariant() switch
+        {
+            "yolo" => AcpApprovalMode.Yolo,
+            "ask" => AcpApprovalMode.Ask,
+            "read-only" => AcpApprovalMode.ReadOnly,
+            _ => b.WarningAndReturn<AcpApprovalMode?>($"Invalid --approval-mode '{value}'.")
+        };
 
     private static void CaptureUnknownLong(string arg, IReadOnlyList<string> args, ref int index, Builder b)
     {
@@ -330,6 +354,9 @@ public static class CliParser
         public string? Provider, Model, ApiKey, SystemPrompt, Session, Fork, SessionDir, Export, Import, Share, LoginProvider, ListModels;
         public ThinkingLevel? Thinking;
         public CliMode? Mode;
+        public string? Profile;
+        public AcpApprovalMode? ApprovalMode;
+        public bool CheckUpdates, NoCheckUpdates;
         public bool Continue, Resume, Help, Version, NoSession, NoTools, NoBuiltinTools, NoExtensions, Print, Logout, Reload, CompatibilityMode = true, NoSkills, NoPromptTemplates, NoThemes, NoContextFiles, NoResources, ListAllModels, Offline, Verbose, BenchmarkStartup;
         public List<string> AppendSystemPrompt { get; } = [];
         public List<string> Models { get; } = [];
@@ -347,7 +374,7 @@ public static class CliParser
         public T WarningAndReturn<T>(string message) { Warning(message); return default!; }
         public T ErrorAndReturn<T>(string message) { Error(message); return default!; }
 
-        public CliArgs Build() => new(PackageCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
+        public CliArgs Build() => new(PackageCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Profile, ApprovalMode, CheckUpdates, NoCheckUpdates, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
     }
 }
 

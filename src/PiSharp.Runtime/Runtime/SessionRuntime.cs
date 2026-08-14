@@ -53,16 +53,32 @@ public sealed class SessionRuntime(
     private IDisposable? _bridgeInputSubscription;
     private IDisposable? _bridgeSessionBeforeSwitchSubscription;
     private IDisposable? _bridgeSessionBeforeForkSubscription;
+    private IDisposable? _bridgeSettingsChangedSubscription;
     private IDisposable? _bridgeSessionShutdownSubscription;
     private IDisposable? _extensionDispatchSubscription;
     private readonly RuntimeSessionController _sessionController = new(repo, createOptions, harnessFactory, extensionManager);
-    private readonly RuntimeModelController _modelController = new(settingsStore, settingsSnapshot, loggerFactory);
+    private readonly ExtensionSettingsService _settingsService = new(settingsStore, settingsSnapshot, extensionManager?.Registry, loggerFactory);
+    private readonly ExtensionStateService _stateService = BuildStateService(settingsSnapshot, createOptions.Cwd, loggerFactory);
+    private RuntimeModelController? _modelController;
     private readonly RuntimeExtensionReloader _extensionReloader = new();
     private readonly ILogger _logger = loggerFactory?.CreateLogger<SessionRuntime>() ?? NullLogger<SessionRuntime>.Instance;
     private readonly object _backgroundActivationGate = new();
+    private RuntimeModelController ModelController => _modelController ??= new(_settingsService, loggerFactory);
     private readonly CancellationTokenSource _backgroundActivationCancellation = new();
     private Task? _backgroundActivationTask;
 
+    internal ExtensionSettingsService SettingsService => _settingsService;
+    internal ExtensionStateService StateService => _stateService;
+    private static ExtensionStateService BuildStateService(PiSettingsSnapshot? snapshot, string cwd, ILoggerFactory? loggerFactory)
+    {
+        var paths = snapshot is null
+            ? PiAgentPaths.FromCwd(cwd)
+            : PiAgentPaths.FromCwd(cwd, snapshot.Paths.HomeDirectory, snapshot.Paths.Profile);
+        return new ExtensionStateService(
+            Path.Combine(paths.GlobalPiSharpDirectory, "extensions"),
+            Path.Combine(paths.ProjectPiSharpDirectory, "extensions"),
+            loggerFactory);
+    }
     public ILoggerFactory? LoggerFactory { get; } = loggerFactory;
 
     internal ISessionRepo<JsonlSessionMetadata, JsonlSessionCreateOptions, JsonlSessionListOptions> SessionRepo { get; } = repo;
@@ -175,6 +191,10 @@ public sealed class SessionRuntime(
                 "extension:ts-bridge",
                 ExtensionEventNames.SessionShutdown,
                 TsHost.ForwardExtensionEventAsync);
+            _bridgeSettingsChangedSubscription = ExtensionManager.Registry.RegisterHandler(
+                "extension:ts-bridge",
+                ExtensionEventNames.SettingsChanged,
+                TsHost.ForwardExtensionEventAsync);
         }
     }
 
@@ -194,6 +214,8 @@ public sealed class SessionRuntime(
         _bridgeSessionBeforeForkSubscription?.Dispose();
         _bridgeSessionBeforeForkSubscription = null;
         _bridgeSessionShutdownSubscription?.Dispose();
+        _bridgeSettingsChangedSubscription?.Dispose();
+        _bridgeSettingsChangedSubscription = null;
         _bridgeSessionShutdownSubscription = null;
     }
 
@@ -281,10 +303,10 @@ public sealed class SessionRuntime(
         => _extensionReloader.ReloadAsync(this, cancellationToken);
 
     public async Task SetModelAsync(RuntimeModelSelection selection, string source = "runtime", CancellationToken cancellationToken = default)
-        => CurrentModelSelection = await _modelController.SetModelAsync(Harness, selection, source, cancellationToken);
+        => CurrentModelSelection = await ModelController.SetModelAsync(Harness, selection, source, cancellationToken);
 
     public async Task SetModelAsync(ModelDescriptor model, string source = "runtime", CancellationToken cancellationToken = default)
-        => CurrentModelSelection = await _modelController.SetModelAsync(Harness, CurrentModelSelection, model, source, cancellationToken);
+        => CurrentModelSelection = await ModelController.SetModelAsync(Harness, CurrentModelSelection, model, source, cancellationToken);
 
     public async Task SetThinkingLevelAsync(ThinkingLevel level, CancellationToken cancellationToken = default)
     {
@@ -295,7 +317,7 @@ public sealed class SessionRuntime(
             harnessId,
             previousSelection.ThinkingLevel,
             level);
-        CurrentModelSelection = await _modelController.SetThinkingLevelAsync(Harness, previousSelection, level, cancellationToken);
+        CurrentModelSelection = await ModelController.SetThinkingLevelAsync(Harness, previousSelection, level, cancellationToken);
         _logger.LogDebug(
             "Runtime thinking level update completed harnessId={HarnessId} previousSelectionThinking={PreviousSelectionThinking} nextSelectionThinking={NextSelectionThinking} harnessThinking={HarnessThinking}",
             harnessId,
@@ -313,7 +335,7 @@ public sealed class SessionRuntime(
             CurrentModelSelection.ThinkingLevel,
             CurrentModelSelection.Model.Provider,
             CurrentModelSelection.Model.Id);
-        await _modelController.PersistPendingSelectionAsync(cancellationToken);
+        await ModelController.PersistPendingSelectionAsync(cancellationToken);
         _logger.LogDebug(
             "Runtime persisted current model selection harnessId={HarnessId} selectionThinking={SelectionThinking} model={Provider}/{ModelId}",
             harnessId,

@@ -9,9 +9,10 @@ namespace PiSharp.Cli.Bootstrap;
 
 public static class CliRuntimeOptionsMapper
 {
-    public static PiRuntimeOptions FromCliArgs(CliArgs args, PiSharp.Abstractions.Environment.IExecutionEnv env, HttpClient? httpClient = null)
+    public static PiRuntimeOptions FromCliArgs(CliArgs args, PiSharp.Abstractions.Environment.IExecutionEnv env, HttpClient? httpClient = null, string? profile = null)
         => new(
             Env: env,
+            Profile: profile,
             Model: new RuntimeModelOptions(args.Provider, args.Model, args.Thinking, args.Models),
             Tools: new RuntimeToolOptions(args.Tools, args.NoTools, args.NoBuiltinTools),
             Resources: new RuntimeResourceOptions(

@@ -573,4 +573,11 @@ public sealed class FakeProcessRunner : IPackageProcessRunner
         WorkingDirectories.Add(workingDirectory);
         return Task.CompletedTask;
     }
+
+    public Task<ProcessRunResult> RunCaptureAsync(string fileName, string arguments, string? workingDirectory = null, CancellationToken cancellationToken = default)
+    {
+        Commands.Add($"{fileName} {arguments}");
+        WorkingDirectories.Add(workingDirectory);
+        return Task.FromResult(new ProcessRunResult(0, string.Empty, string.Empty));
+    }
 }

@@ -8,6 +8,7 @@ public sealed record PiRuntimeOptions(
     IExecutionEnv Env,
     string? SessionsRoot = null,
     string? HomeDirectory = null,
+    string? Profile = null,
     RuntimeModelOptions? Model = null,
     RuntimeToolOptions? Tools = null,
     RuntimeResourceOptions? Resources = null,

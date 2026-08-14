@@ -55,7 +55,44 @@ public sealed class SystemProcessRunner : IPackageProcessRunner
 
         if (process.ExitCode != 0)
             throw new InvalidOperationException($"Process '{fileName} {arguments}' exited with code {process.ExitCode}.");
-
         process.Dispose();
+    }
+
+    public async Task<ProcessRunResult> RunCaptureAsync(string fileName, string arguments, string? workingDirectory = null, CancellationToken cancellationToken = default)
+    {
+        var psi = new ProcessStartInfo(fileName, arguments)
+        {
+            WorkingDirectory = workingDirectory ?? Directory.GetCurrentDirectory(),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        using var process = new Process { StartInfo = psi };
+        try
+        {
+            process.Start();
+        }
+        catch (Win32Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not find executable '{fileName}' on PATH. {ex.Message}", ex);
+        }
+
+        var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None);
+            throw;
+        }
+
+        await Task.WhenAll(stdout, stderr);
+        return new ProcessRunResult(process.ExitCode, stdout.Result ?? string.Empty, stderr.Result ?? string.Empty);
     }
 }

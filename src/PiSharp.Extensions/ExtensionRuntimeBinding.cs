@@ -30,6 +30,8 @@ public sealed class ExtensionRuntimeBinding
     public IExtensionToolApi Tools { get; }
     public IExtensionSkillApi Skills { get; }
     public IExtensionModelApi Model { get; }
+    public IExtensionRuntimeSettings? RuntimeSettings { get; set; }
+    public IExtensionRuntimeState? RuntimeState { get; set; }
 
     public Func<AgentMessage, ExtensionMessageDelivery, bool, CancellationToken, Task> SendMessageAsync { get; set; } = (_, _, _, _) => Task.CompletedTask;
     public Func<string, ExtensionMessageDelivery, CancellationToken, Task> SendUserMessageAsync { get; set; } = (_, _, _) => Task.CompletedTask;

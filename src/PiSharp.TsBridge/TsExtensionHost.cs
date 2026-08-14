@@ -971,6 +971,19 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
             TsBridgeRuntimeActions.AgentSessionSetModel => await AgentSessionSetModelAsync(request.Payload, cancellationToken),
             TsBridgeRuntimeActions.AgentSessionSetThinkingLevel => await AgentSessionSetThinkingLevelAsync(request.Payload, cancellationToken),
             TsBridgeRuntimeActions.AgentSessionDispose => await AgentSessionDisposeAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.SettingsGet => await SettingsGetAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.SettingsGetCore => await SettingsGetCoreAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.SettingsSet => await SettingsSetAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.SettingsRemove => await SettingsRemoveAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateGet => await StateGetAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateSet => await StateSetAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateRemove => await StateRemoveAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateGetAll => await StateGetAllAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateListKeys => await StateListKeysAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateClear => await StateClearAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateGetSchemaVersion => await StateGetSchemaVersionAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateSetSchemaVersion => await StateSetSchemaVersionAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.StateRegisterMigration => await StateRegisterMigrationAsync(request.Payload, cancellationToken),
             _ => new JsonRpcError(-32601, $"Unknown runtime action '{request.Action}'.")
         };
     }
@@ -1565,6 +1578,135 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
         }
 
         return new TsResourceReadResult(uri, Error: $"Failed to read resource '{uri}'.");
+    }
+
+    private IExtensionSettingsApi ScopedSettings(string extensionId)
+        => new ExtensionScopedSettings(new ExtensionDescriptor(extensionId, extensionId, "0.0.0"), _runtimeBinding?.RuntimeSettings);
+
+    private IExtensionStateApi ScopedState(string extensionId)
+        => new ExtensionScopedState(new ExtensionDescriptor(extensionId, extensionId, "0.0.0"), _runtimeBinding?.RuntimeState);
+
+    private static ExtensionSettingsScope ParseSettingsScope(string? scope)
+        => scope switch
+        {
+            "global" => ExtensionSettingsScope.Global,
+            "project" => ExtensionSettingsScope.Project,
+            _ => ExtensionSettingsScope.Source
+        };
+
+    private static ExtensionStateScope ParseStateScope(string? scope)
+        => string.Equals(scope, "project", StringComparison.OrdinalIgnoreCase) ? ExtensionStateScope.Project : ExtensionStateScope.User;
+
+    private static int? GetInt(object? payload, string property)
+    {
+        var value = GetPayloadValue(payload, property);
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : null;
+    }
+
+    private async Task<object?> SettingsGetAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var key = GetString(payload, "key") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key)) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'key' is required.");
+        return new TsRuntimeActionResult(ScopedSettings(extensionId).Get(key));
+    }
+
+    private async Task<object?> SettingsGetCoreAsync(object? payload, CancellationToken cancellationToken)
+    {
+        var path = GetString(payload, "path") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(path)) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'path' is required.");
+        return new TsRuntimeActionResult(_runtimeBinding?.RuntimeSettings?.GetRaw(path));
+    }
+
+    private async Task<object?> SettingsSetAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var key = GetString(payload, "key") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key)) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'key' is required.");
+        var scope = ParseSettingsScope(GetString(payload, "scope"));
+        var valueElement = GetPayloadValue(payload, "value");
+        object? value = valueElement.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ? null : valueElement;
+        await ScopedSettings(extensionId).SetAsync(key, value, scope, cancellationToken);
+        return new TsRuntimeActionResult();
+    }
+
+    private async Task<object?> SettingsRemoveAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var key = GetString(payload, "key") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key)) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'key' is required.");
+        var scope = ParseSettingsScope(GetString(payload, "scope"));
+        await ScopedSettings(extensionId).RemoveAsync(key, scope, cancellationToken);
+        return new TsRuntimeActionResult();
+    }
+
+    private async Task<object?> StateGetAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var key = GetString(payload, "key") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key)) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'key' is required.");
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        return new TsRuntimeActionResult(await ScopedState(extensionId).GetAsync(key, scope, cancellationToken));
+    }
+
+    private async Task<object?> StateSetAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var key = GetString(payload, "key") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key)) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'key' is required.");
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        var valueElement = GetPayloadValue(payload, "value");
+        object? value = valueElement.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ? null : valueElement;
+        await ScopedState(extensionId).SetAsync(key, value, scope, cancellationToken);
+        return new TsRuntimeActionResult();
+    }
+
+    private async Task<object?> StateRemoveAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var key = GetString(payload, "key") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key)) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'key' is required.");
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        await ScopedState(extensionId).RemoveAsync(key, scope, cancellationToken);
+        return new TsRuntimeActionResult();
+    }
+
+    private async Task<object?> StateGetAllAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        return new TsRuntimeActionResult(await ScopedState(extensionId).GetAllAsync(scope, cancellationToken));
+    }
+
+    private async Task<object?> StateListKeysAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        return new TsRuntimeActionResult(await ScopedState(extensionId).ListKeysAsync(scope, cancellationToken));
+    }
+
+    private async Task<object?> StateClearAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        await ScopedState(extensionId).ClearAsync(scope, cancellationToken);
+        return new TsRuntimeActionResult();
+    }
+
+    private async Task<object?> StateGetSchemaVersionAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        return new TsRuntimeActionResult(await ScopedState(extensionId).GetSchemaVersionAsync(scope, cancellationToken));
+    }
+
+    private async Task<object?> StateSetSchemaVersionAsync(string extensionId, object? payload, CancellationToken cancellationToken)
+    {
+        var version = GetInt(payload, "version");
+        if (version is null) return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'version' is required.");
+        var scope = ParseStateScope(GetString(payload, "scope"));
+        return new TsRuntimeActionResult(await ScopedState(extensionId).SetSchemaVersionAsync(version.Value, scope, cancellationToken));
+    }
+
+    private async Task<object?> StateRegisterMigrationAsync(object? payload, CancellationToken cancellationToken)
+    {
+        // TS extensions migrate manually (plan §3.7): the bridge cannot transport functions, so
+        // this is a declarative acknowledgement validating the shape only.
+        var fromVersion = GetInt(payload, "fromVersion");
+        var toVersion = GetInt(payload, "toVersion");
+        if (fromVersion is null || toVersion is null || toVersion <= fromVersion)
+            return new TsRuntimeActionResult(Ok: false, Error: "Invalid params: 'fromVersion' < 'toVersion' are required.");
+        return new TsRuntimeActionResult();
     }
 
     private static ExtensionSkillRegistration ToExtensionSkillRegistration(TsSkillRegistration registration)

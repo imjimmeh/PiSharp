@@ -475,6 +475,40 @@ export function createPiApi({ extensionId, state, deps }: { extensionId: string;
 			list: (): Promise<unknown> => runtime(actions.listResources, {}),
 			read: (uri: string): Promise<unknown> => runtime(actions.readResource, { uri }),
 		},
+		settings: {
+			get: (key: string): Promise<unknown> =>
+				((runtime(actions.settingsGet, { key })) as Promise<Record<string, unknown>>).then(
+					(result) => (result as Record<string, unknown> | undefined)?.value,
+				),
+			getCore: (path: string): Promise<unknown> =>
+				((runtime(actions.settingsGetCore, { path })) as Promise<Record<string, unknown>>).then(
+					(result) => (result as Record<string, unknown> | undefined)?.value,
+				),
+			set: (key: string, value: unknown, scope: "source" | "global" | "project" = "source"): Promise<unknown> =>
+				runtime(actions.settingsSet, { key, value, scope } as Record<string, unknown>),
+			remove: (key: string, scope: "source" | "global" | "project" = "source"): Promise<unknown> =>
+				runtime(actions.settingsRemove, { key, scope }),
+			onChange: (handler: (change: { key: string; value: unknown; layer: string; sourceId: string }) => void): Disposable =>
+				toUnsubscribe(addEventHandler(state, "settings_changed", handler as EventHandler)),
+		},
+		state: {
+			get: async (key: string, scope: "user" | "project" = "user"): Promise<unknown> =>
+				((await runtime(actions.stateGet, { key, scope })) as Record<string, unknown> | undefined)?.value,
+			set: (key: string, value: unknown, scope: "user" | "project" = "user"): Promise<unknown> =>
+				runtime(actions.stateSet, { key, value, scope } as Record<string, unknown>),
+			remove: (key: string, scope: "user" | "project" = "user"): Promise<unknown> =>
+				runtime(actions.stateRemove, { key, scope }),
+			getAll: async (scope: "user" | "project" = "user"): Promise<unknown> =>
+				((await runtime(actions.stateGetAll, { scope })) as Record<string, unknown> | undefined)?.value ?? {},
+			listKeys: async (scope: "user" | "project" = "user"): Promise<unknown> =>
+				((await runtime(actions.stateListKeys, { scope })) as Record<string, unknown> | undefined)?.value ?? [],
+			clear: (scope: "user" | "project" = "user"): Promise<unknown> =>
+				runtime(actions.stateClear, { scope }),
+			getSchemaVersion: async (scope: "user" | "project" = "user"): Promise<unknown> =>
+				((await runtime(actions.stateGetSchemaVersion, { scope })) as Record<string, unknown> | undefined)?.value,
+			setSchemaVersion: async (version: number, scope: "user" | "project" = "user"): Promise<unknown> =>
+				((await runtime(actions.stateSetSchemaVersion, { version, scope })) as Record<string, unknown> | undefined)?.value,
+		},
 		ui: createUiApi({ extensionId, state, sendRequest }) as UiApi,
 	};
 }

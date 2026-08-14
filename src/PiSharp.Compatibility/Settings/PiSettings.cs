@@ -204,6 +204,7 @@ public sealed record PiSettingsSnapshot(
     PiSettingsDocument Merged,
     PiSettingsDocument? GlobalPiSharp = null,
     PiSettingsDocument? ProjectPiSharp = null,
+    string? Profile = null,
     IReadOnlyDictionary<string, PiSettingsLayer>? Provenance = null)
 {
     public PiSettings? ResolvedSettings { get; init; }

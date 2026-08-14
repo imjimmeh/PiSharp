@@ -48,6 +48,7 @@ public static class ExtensionEventNames
     public const string SessionTree = "session_tree";
     public const string ModelSelect = "model_select";
     public const string ThinkingLevelSelect = "thinking_level_select";
+    public const string SettingsChanged = "settings_changed";
     public const string ResourcesUpdate = "resources_update";
 }
 

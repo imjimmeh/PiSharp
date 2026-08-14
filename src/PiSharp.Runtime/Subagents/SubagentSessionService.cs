@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
@@ -10,9 +11,19 @@ namespace PiSharp.Runtime.Subagents;
 
 public sealed class SubagentSessionService : IAsyncDisposable
 {
+    /// <summary>Tool name the structured-result (<c>yield</c>) contract is keyed on. The plugin's
+    /// YieldTool registers under this name and the service captures its terminating result.</summary>
+    public const string YieldToolName = "yield";
+
+    /// <summary>Tool name that spawns subagents; stripped from at-cap children so they cannot escalate.</summary>
+    public const string SpawnToolName = "task";
     private readonly SessionRuntime _runtime;
     private readonly ConcurrentDictionary<string, SubagentSessionHandle> _handles = new();
     private readonly ConcurrentDictionary<string, SessionSubscriberState> _subscribers = new();
+    /// <summary>Sentinel active-tool name used when a depth-cap child must run tool-less: the harness
+    /// treats an empty <c>SetActiveTools</c> list as "inherit all", so a set that strips down to
+    /// nothing is expressed with an unresolvable name (filtered out at tool resolution).</summary>
+    private const string NoToolsSentinel = "__subagents_no_tools__";
 
     private sealed class SessionSubscriberState
     {
@@ -23,6 +34,7 @@ public sealed class SubagentSessionService : IAsyncDisposable
     public SubagentSessionService(SessionRuntime runtime)
     {
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        SubagentRuntimeAccess.Register(this);
     }
 
     public IDisposable Subscribe(string sessionId, Func<object, Task> callback)
@@ -43,6 +55,33 @@ public sealed class SubagentSessionService : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        // C2 — spawn guardrails are enforced here, at the child-creation boundary, so no caller can
+        // bypass the cap by avoiding the coordinator.
+        var policy = options.SpawnPolicy ?? SubagentSpawnPolicy.Default;
+        var agentName = options.AgentName;
+        var parentAgentName = options.ParentAgentName;
+
+        // Rule 1: disabled agent.
+        if (agentName is not null && policy.DisabledAgents?.Contains(agentName) == true)
+            throw new SubagentSpawnBlockedException(agentName, "disabled");
+
+        // Rule 2: self-recursion — a parent may not spawn an agent with its own name unless it
+        // explicitly declares that name in its `spawns` allowlist.
+        if (agentName is not null
+            && parentAgentName is not null
+            && StringComparer.Ordinal.Equals(agentName, parentAgentName)
+            && !(policy.ParentSpawns?.Contains(agentName) == true))
+            throw new SubagentSpawnBlockedException(agentName, "self-recursion");
+
+        // Rule 3: depth cap.
+        var depth = options.Depth;
+        if (depth + 1 > policy.MaxRecursionDepth)
+            throw new SubagentSpawnBlockedException(agentName ?? "<anonymous>", "max-recursion-depth");
+
+        // Rule 4: spawns allowlist.
+        if (agentName is not null && policy.ParentSpawns is not null && !policy.ParentSpawns.Contains(agentName))
+            throw new SubagentSpawnBlockedException(agentName, "not-allowed");
+
         var createOptions = _runtime.CreateOptions with
         {
             Id = null,
@@ -62,11 +101,44 @@ public sealed class SubagentSessionService : IAsyncDisposable
             await harness.SetModelAsync(model, "subagent", cancellationToken);
             await harness.SetThinkingLevelAsync(thinkingLevel, cancellationToken);
 
+            // C1 — inject extra tools (e.g. `yield`) before restricting the active set, so a tool
+            // registered here is never shadowed by the restriction below.
+            if (options.Tools is not null)
+            {
+                foreach (var tool in options.Tools)
+                {
+                    if (string.IsNullOrWhiteSpace(tool.Name))
+                        throw new ArgumentException("Child tools must declare a name.", nameof(options));
+                    harness.RegisterTool("subagent", tool);
+                }
+            }
+
+            // Skill policy: an explicit selection replaces the parent's inherited set;
+            // null inherits the parent's selection (SetSelectedSkills(null) is a no-op).
+            if (options.SelectedSkillNames is not null)
+                harness.SetSelectedSkills(options.SelectedSkillNames);
+
+            // The child at the depth cap loses the spawn tool so it cannot escalate.
+            var atDepthCap = depth + 1 == policy.MaxRecursionDepth;
+            IReadOnlyList<string>? activeToolNames = options.ActiveToolNames;
+            if (atDepthCap)
+            {
+                var fullSet = options.ActiveToolNames ?? harness.AllToolNames;
+                var stripped = fullSet.Where(name => !StringComparer.Ordinal.Equals(name, SpawnToolName)).ToArray();
+                activeToolNames = stripped.Length > 0 ? stripped : [NoToolsSentinel];
+            }
+
+            if (activeToolNames is not null)
+                harness.SetActiveTools(activeToolNames);
             var handle = new SubagentSessionHandle
             {
                 SessionId = childSession.Metadata.Id,
                 Session = childSession,
                 Harness = harness,
+                Depth = depth + 1,
+                AgentName = agentName,
+                ParentAgentName = parentAgentName,
+                OutputSchema = options.OutputSchema,
             };
 
             _handles[childSession.Metadata.Id] = handle;
@@ -141,7 +213,10 @@ public sealed class SubagentSessionService : IAsyncDisposable
     }
 
     public async ValueTask DisposeAsync()
-        => await DisposeAllAsync(CancellationToken.None);
+    {
+        await DisposeAllAsync(CancellationToken.None);
+        SubagentRuntimeAccess.Unregister(this);
+    }
 
     public async Task<SubagentPromptResult> PromptAsync(string sessionId, string prompt, CancellationToken cancellationToken)
     {
@@ -151,7 +226,21 @@ public sealed class SubagentSessionService : IAsyncDisposable
         await handle.Harness.WaitForIdleAsync();
         var context = await handle.Session.BuildContextAsync(cancellationToken);
 
-        return new SubagentPromptResult(sessionId, assistant, context.Messages);
+        // C2 — structured-result capture: the terminating `yield` tool result carries the validated
+        // JSON in its Details; store it on the handle and surface it on the prompt result.
+        var structuredResult = context.Messages
+            .OfType<ToolResultMessage>()
+            .Where(message => StringComparer.Ordinal.Equals(message.ToolName, YieldToolName) && !message.IsError)
+            .LastOrDefault()
+            ?.Details switch
+        {
+            JsonElement element => element,
+            JsonDocument document => document.RootElement.Clone(),
+            _ => (JsonElement?)null
+        };
+        handle.StructuredResult = structuredResult;
+
+        return new SubagentPromptResult(sessionId, assistant, context.Messages, structuredResult);
     }
 
     public Task SteerAsync(string sessionId, string text, CancellationToken cancellationToken)

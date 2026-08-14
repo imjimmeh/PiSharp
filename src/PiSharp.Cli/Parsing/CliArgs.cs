@@ -3,8 +3,9 @@ using PiSharp.Extensions;
 
 namespace PiSharp.Cli.Parsing;
 
-public enum CliMode { Text, Json, Rpc, SubagentJson }
-public enum AppMode { Interactive, PrintText, PrintJson, Rpc, SubagentJson }
+public enum CliMode { Text, Json, Rpc, SubagentJson, Acp }
+public enum AppMode { Interactive, PrintText, PrintJson, Rpc, SubagentJson, Acp }
+public enum AcpApprovalMode { Yolo, Ask, ReadOnly }
 public enum CliDiagnosticType { Warning, Error }
 public sealed record CliDiagnostic(CliDiagnosticType Type, string Message);
 
@@ -16,7 +17,8 @@ public sealed record PackageCommandArgs(
     bool Force = false,
     bool Self = false,
     bool Extensions = false,
-    string? ExtensionSource = null);
+    string? ExtensionSource = null,
+    string? AddSource = null);
 
 public sealed record CliArgs(
     PackageCommandArgs? PackageCommand = null,
@@ -62,6 +64,10 @@ public sealed record CliArgs(
     bool Offline = false,
     bool Verbose = false,
     bool BenchmarkStartup = false,
+    string? Profile = null,
+    AcpApprovalMode? ApprovalMode = null,
+    bool CheckUpdates = false,
+    bool NoCheckUpdates = false,
     IReadOnlyList<string>? Messages = null,
     IReadOnlyList<string>? FileArgs = null,
     IReadOnlyDictionary<string, object?>? UnknownFlags = null,
@@ -69,10 +75,10 @@ public sealed record CliArgs(
     bool HelpOnly = false,
     IReadOnlyList<CliDiagnostic>? Diagnostics = null)
 {
-    public IReadOnlyList<string> MessagesOrEmpty => Messages ?? [];
-    public IReadOnlyList<string> FileArgsOrEmpty => FileArgs ?? [];
     public IReadOnlyDictionary<string, object?> UnknownFlagsOrEmpty => UnknownFlags ?? new Dictionary<string, object?>();
     public IReadOnlyDictionary<string, object?> ExtensionFlagValuesOrEmpty => ExtensionFlagValues ?? new Dictionary<string, object?>();
+    public IReadOnlyList<string> MessagesOrEmpty => Messages ?? [];
+    public IReadOnlyList<string> FileArgsOrEmpty => FileArgs ?? [];
     public IReadOnlyList<CliDiagnostic> DiagnosticsOrEmpty => Diagnostics ?? [];
 }
 
@@ -97,7 +103,7 @@ Usage: pisharp [options] [prompt]
 Options:
   -h, --help                   Show help.
   -v, --version                Show version.
-      --mode <text|json|rpc|subagent-json> Select output mode.
+      --mode <text|json|rpc|subagent-json|acp> Select output mode.
       --provider <name>        Select provider (long-only).
       --model <model>          Select model/provider-model (long-only).
   -p, --print [prompt]         Run print mode.
@@ -107,6 +113,11 @@ Options:
   -e, --extension <path>       Load extension path.
       --no-resources           Disable resource-loaded extensions, skills, prompt templates, themes, and context files.
       --benchmark-startup      Print startup benchmark timings to stderr.
+      --profile <name>         Select a profile (relocates user state under ~/.pi/PiSharp/profiles/<name>).
+                               Precedence: --profile > PISHARP_PROFILE > PI_PROFILE > none.
+      --approval-mode <yolo|ask|read-only> ACP approval mode (default: ask).
+      --check-updates          Check for a newer PiSharp once (exit 0 completed / 1 could not complete).
+      --no-check-updates       Suppress the interactive startup update check for this run.
 
 Package Commands:
   install <source>             Install a package or native .dll extension globally.

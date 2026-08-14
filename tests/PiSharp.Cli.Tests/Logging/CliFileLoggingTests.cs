@@ -21,7 +21,7 @@ public sealed class CliFileLoggingTests
         var encodedCwd = "--repo-project--";
         var sessionPath = Path.Combine(home, ".pi", "agent", "sessions", encodedCwd, "2026-06-04T10-20-30-000_session-1.jsonl");
 
-        var result = CliFileLogging.GetSessionLogFilePath(home, sessionPath);
+        var result = CliFileLogging.GetSessionLogFilePath(Path.Combine(home, ".pi", "PiSharp"), sessionPath);
 
         Assert.Equal(Path.Combine(home, ".pi", "PiSharp", "logs", encodedCwd, "2026-06-04T10-20-30-000_session-1.log"), result);
     }
@@ -153,7 +153,7 @@ public sealed class CliFileLoggingTests
         File.WriteAllText(Path.Combine(repo, ".pi", "PiSharp", "settings.json"),
             $@"{{ ""logging"": {{ ""file"": ""{projectLog.Replace("\\", "\\\\")}"", ""level"": ""Error"", ""maxFiles"": 5 }} }}");
 
-        var options = CliFileLogging.ResolveOptions(repo, home, new CliFileLoggingOverrides(null, null, null));
+        var options = CliFileLogging.ResolveOptions(repo, home, overrides: new CliFileLoggingOverrides(null, null, null));
 
         Assert.NotNull(options);
         Assert.Equal(projectLog, options.FilePath);

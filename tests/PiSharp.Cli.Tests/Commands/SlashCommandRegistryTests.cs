@@ -22,16 +22,16 @@ public sealed class SlashCommandRegistryTests
 {
     [Fact]
     public void BuiltInInventoryMatchesTypeScriptContract()
-        => Assert.Equal(["settings", "model", "models", "scoped-models", "export", "import", "share", "copy", "name", "session", "changelog", "hotkeys", "fork", "clone", "tree", "login", "logout", "new", "compact", "reload", "resume", "quit"], BuiltInSlashCommands.Names);
+        => Assert.Equal(["settings", "model", "models", "scoped-models", "export", "import", "copy", "name", "session", "changelog", "hotkeys", "fork", "clone", "tree", "login", "logout", "new", "compact", "reload", "resume", "quit"], BuiltInSlashCommands.Names);
 
     [Fact]
     public void BuiltInCatalogFlattensCommandAliasesIntoNames()
-        => Assert.Equal(["settings", "model", "models", "scoped-models", "export", "import", "share", "copy", "name", "session", "changelog", "hotkeys", "fork", "clone", "tree", "login", "logout", "new", "compact", "reload", "resume", "quit"], BuiltInSlashCommandCatalog.Names.ToArray());
+        => Assert.Equal(["settings", "model", "models", "scoped-models", "export", "import", "copy", "name", "session", "changelog", "hotkeys", "fork", "clone", "tree", "login", "logout", "new", "compact", "reload", "resume", "quit"], BuiltInSlashCommandCatalog.Names.ToArray());
 
     [Fact]
     public void BuiltInCatalogGroupsAliasesByLogicalCommand()
     {
-        Assert.Equal(19, BuiltInSlashCommandCatalog.Commands.Length);
+        Assert.Equal(18, BuiltInSlashCommandCatalog.Commands.Length);
         Assert.Contains(BuiltInSlashCommandCatalog.Commands, command => command.Names.SequenceEqual(["model", "models"]));
         Assert.Contains(BuiltInSlashCommandCatalog.Commands, command => command.Names.SequenceEqual(["resume", "session"]));
         Assert.Contains(BuiltInSlashCommandCatalog.Commands, command => command.Names.SequenceEqual(["fork", "clone"]));
@@ -757,39 +757,12 @@ public sealed class SlashCommandRegistryTests
     }
 
     [Fact]
-    public async Task ShareCommandWithoutPathShowsUsage()
+    public void ShareIsNoLongerABuiltInCommand()
     {
-        var runtime = await ModeTestRuntime.CreateAsync();
-        var context = new SlashCommandContext("share", runtime, (_, _, _) => Task.FromResult<string?>(null), (_, _) => Task.FromResult<string?>(null), (_, _) => Task.CompletedTask);
-
-        var result = await BuiltInSlashCommands.CreateRegistry().ExecuteAsync("/share", context, CancellationToken.None);
-
-        Assert.True(result.Handled);
-        Assert.True(result.IsError);
-        Assert.Contains("Usage", result.Message);
-    }
-
-    [Fact]
-    public async Task ShareCommandCopiesSessionFile()
-    {
-        var runtime = await ModeTestRuntime.CreateAsync();
-        await runtime.Session.AppendMessageAsync(AgentMessages.User("hello"), CancellationToken.None);
-        var context = new SlashCommandContext("share", runtime, (_, _, _) => Task.FromResult<string?>(null), (_, _) => Task.FromResult<string?>(null), (_, _) => Task.CompletedTask);
-
-        var targetPath = Path.Combine(Path.GetTempPath(), $"pisharp-test-share-{Guid.NewGuid():N}.jsonl");
-        try
-        {
-            var result = await BuiltInSlashCommands.CreateRegistry().ExecuteAsync($"/share {targetPath}", context, CancellationToken.None);
-
-            Assert.True(result.Handled);
-            Assert.False(result.IsError);
-            Assert.Contains(targetPath, result.Message);
-            Assert.True(File.Exists(targetPath));
-        }
-        finally
-        {
-            if (File.Exists(targetPath)) File.Delete(targetPath);
-        }
+        // C1 (P24 git integrations): the built-in /share (a local File.Copy) was removed;
+        // the pisharp-git plugin now owns /share and tests its behavior there.
+        Assert.DoesNotContain(BuiltInSlashCommandCatalog.Names, name => name == "share");
+        Assert.DoesNotContain(BuiltInSlashCommands.CreateRegistry().Commands, command => command.Name == "share");
     }
 
     [Fact]

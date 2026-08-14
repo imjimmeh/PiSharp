@@ -6,4 +6,5 @@ public sealed record PackageUpdateRequest(
     bool Extensions = false,
     string? ExtensionSource = null,
     bool Force = false,
-    bool Offline = false);
+    bool Offline = false,
+    string? AddSource = null);

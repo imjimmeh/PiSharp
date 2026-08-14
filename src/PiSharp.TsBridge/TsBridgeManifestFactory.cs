@@ -69,6 +69,19 @@ public static class TsBridgeRuntimeActions
     public const string AgentSessionSetModel = "agent_session_set_model";
     public const string AgentSessionSetThinkingLevel = "agent_session_set_thinking_level";
     public const string AgentSessionDispose = "agent_session_dispose";
+    public const string SettingsGet = "settings_get";
+    public const string SettingsGetCore = "settings_get_core";
+    public const string SettingsSet = "settings_set";
+    public const string SettingsRemove = "settings_remove";
+    public const string StateGet = "state_get";
+    public const string StateSet = "state_set";
+    public const string StateRemove = "state_remove";
+    public const string StateGetAll = "state_get_all";
+    public const string StateListKeys = "state_list_keys";
+    public const string StateClear = "state_clear";
+    public const string StateGetSchemaVersion = "state_get_schema_version";
+    public const string StateSetSchemaVersion = "state_set_schema_version";
+    public const string StateRegisterMigration = "state_register_migration";
 }
 
 public static class TsBridgeManifestFactory
@@ -192,6 +205,19 @@ public static class TsBridgeManifestFactory
                 [nameof(TsBridgeRuntimeActions.SetThinkingLevel)] = TsBridgeRuntimeActions.SetThinkingLevel,
                 [nameof(TsBridgeRuntimeActions.ReloadExtensions)] = TsBridgeRuntimeActions.ReloadExtensions,
                 [nameof(TsBridgeRuntimeActions.EmitEvent)] = TsBridgeRuntimeActions.EmitEvent,
+                [nameof(TsBridgeRuntimeActions.SettingsGet)] = TsBridgeRuntimeActions.SettingsGet,
+                [nameof(TsBridgeRuntimeActions.SettingsGetCore)] = TsBridgeRuntimeActions.SettingsGetCore,
+                [nameof(TsBridgeRuntimeActions.SettingsSet)] = TsBridgeRuntimeActions.SettingsSet,
+                [nameof(TsBridgeRuntimeActions.SettingsRemove)] = TsBridgeRuntimeActions.SettingsRemove,
+                [nameof(TsBridgeRuntimeActions.StateGet)] = TsBridgeRuntimeActions.StateGet,
+                [nameof(TsBridgeRuntimeActions.StateSet)] = TsBridgeRuntimeActions.StateSet,
+                [nameof(TsBridgeRuntimeActions.StateRemove)] = TsBridgeRuntimeActions.StateRemove,
+                [nameof(TsBridgeRuntimeActions.StateGetAll)] = TsBridgeRuntimeActions.StateGetAll,
+                [nameof(TsBridgeRuntimeActions.StateListKeys)] = TsBridgeRuntimeActions.StateListKeys,
+                [nameof(TsBridgeRuntimeActions.StateClear)] = TsBridgeRuntimeActions.StateClear,
+                [nameof(TsBridgeRuntimeActions.StateGetSchemaVersion)] = TsBridgeRuntimeActions.StateGetSchemaVersion,
+                [nameof(TsBridgeRuntimeActions.StateSetSchemaVersion)] = TsBridgeRuntimeActions.StateSetSchemaVersion,
+                [nameof(TsBridgeRuntimeActions.StateRegisterMigration)] = TsBridgeRuntimeActions.StateRegisterMigration,
                 [nameof(TsBridgeRuntimeActions.ListResources)] = TsBridgeRuntimeActions.ListResources,
                 [nameof(TsBridgeRuntimeActions.ReadResource)] = TsBridgeRuntimeActions.ReadResource,
                 [nameof(TsBridgeRuntimeActions.CompleteSimple)] = TsBridgeRuntimeActions.CompleteSimple,
@@ -253,6 +279,19 @@ public static class TsBridgeManifestFactory
             Snapshot("ctx.sessionManager", "getSessionDir", "function", snapshotField: "session.sessionDir"),
             Snapshot("ctx.sessionManager", "isPersisted", "function", snapshotField: "session.isPersisted"),
             Runtime("pi", "exec", "function", TsBridgeRuntimeActions.Exec),
+            Runtime("pi.settings", "get", "function", TsBridgeRuntimeActions.SettingsGet),
+            Runtime("pi.settings", "getCore", "function", TsBridgeRuntimeActions.SettingsGetCore),
+            Runtime("pi.settings", "set", "function", TsBridgeRuntimeActions.SettingsSet),
+            Runtime("pi.settings", "remove", "function", TsBridgeRuntimeActions.SettingsRemove),
+            Implemented("pi.settings", "onChange", "function"),
+            Runtime("pi.state", "get", "function", TsBridgeRuntimeActions.StateGet),
+            Runtime("pi.state", "set", "function", TsBridgeRuntimeActions.StateSet),
+            Runtime("pi.state", "remove", "function", TsBridgeRuntimeActions.StateRemove),
+            Runtime("pi.state", "getAll", "function", TsBridgeRuntimeActions.StateGetAll),
+            Runtime("pi.state", "listKeys", "function", TsBridgeRuntimeActions.StateListKeys),
+            Runtime("pi.state", "clear", "function", TsBridgeRuntimeActions.StateClear),
+            Runtime("pi.state", "getSchemaVersion", "function", TsBridgeRuntimeActions.StateGetSchemaVersion),
+            Runtime("pi.state", "setSchemaVersion", "function", TsBridgeRuntimeActions.StateSetSchemaVersion),
             Snapshot("ctx", "modelRegistry", "property", snapshotField: "modelRegistry"),
             Snapshot("ctx", "model", "property", snapshotField: "model"),
             Runtime("ctx", "isIdle", "function", TsBridgeRuntimeActions.IsIdle),
@@ -314,7 +353,8 @@ public static class TsBridgeManifestFactory
             new("before_prompt_render", "Prompt document payload", "Extension context", true, true, false, TsBridgeApiMemberStatuses.Implemented),
             new("tool_call", "Tool call payload", "Extension context", true, true, false, TsBridgeApiMemberStatuses.Implemented),
             new("tool_result", "Tool result payload", "Extension context", false, true, true, TsBridgeApiMemberStatuses.Implemented),
-            new("input_transform", "Input transform payload", "Extension context", true, true, true, TsBridgeApiMemberStatuses.Implemented)
+            new("input_transform", "Input transform payload", "Extension context", true, true, true, TsBridgeApiMemberStatuses.Implemented),
+            new("settings_changed", "ExtensionSettingsChange payload", "Extension context", false, false, false, TsBridgeApiMemberStatuses.Implemented)
         };
 
         return new TsBridgeApiSurfaceManifest(members, snapshotFields, events);

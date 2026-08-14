@@ -68,6 +68,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.8m, Output: 3.2m, CacheRead: 0.2m))),
 
+        new("amazon-bedrock", "anthropic.claude-fable-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "anthropic.claude-fable-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Fable 5",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 10m, Output: 50m, CacheRead: 1m, CacheWrite: 12.5m))),
+
         new("amazon-bedrock", "anthropic.claude-haiku-4-5-20251001-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -188,6 +208,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
+        new("amazon-bedrock", "anthropic.claude-opus-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "anthropic.claude-opus-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Opus 5",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
         new("amazon-bedrock", "anthropic.claude-sonnet-4-5-20250929-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -227,6 +267,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+
+        new("amazon-bedrock", "anthropic.claude-sonnet-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "anthropic.claude-sonnet-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Sonnet 5",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("amazon-bedrock", "au.anthropic.claude-haiku-4-5-20251001-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -288,6 +348,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
+        new("amazon-bedrock", "au.anthropic.claude-opus-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "au.anthropic.claude-opus-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Opus 5 (AU)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
         new("amazon-bedrock", "au.anthropic.claude-sonnet-4-5-20250929-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "au.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -327,6 +407,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3.3m, Output: 16.5m, CacheRead: 0.33m, CacheWrite: 4.125m))),
+
+        new("amazon-bedrock", "au.anthropic.claude-sonnet-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "au.anthropic.claude-sonnet-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Sonnet 5 (AU)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("amazon-bedrock", "deepseek.r1-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -426,7 +526,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1m, Output: 5m, CacheRead: 0.1m, CacheWrite: 1.25m))),
+            Cost: new ModelCost(Input: 1.1m, Output: 5.5m, CacheRead: 0.11m, CacheWrite: 1.375m))),
 
         new("amazon-bedrock", "eu.anthropic.claude-opus-4-5-20251101-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -446,7 +546,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+            Cost: new ModelCost(Input: 5.5m, Output: 27.5m, CacheRead: 0.55m, CacheWrite: 6.875m))),
 
         new("amazon-bedrock", "eu.anthropic.claude-opus-4-6-v1", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -508,6 +608,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5.5m, Output: 27.5m, CacheRead: 0.55m, CacheWrite: 6.875m))),
 
+        new("amazon-bedrock", "eu.anthropic.claude-opus-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "eu.anthropic.claude-opus-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Opus 5 (EU)",
+            BaseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5.5m, Output: 27.5m, CacheRead: 0.55m, CacheWrite: 6.875m))),
+
         new("amazon-bedrock", "eu.anthropic.claude-sonnet-4-5-20250929-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -547,6 +667,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3.3m, Output: 16.5m, CacheRead: 0.33m, CacheWrite: 4.125m))),
+
+        new("amazon-bedrock", "eu.anthropic.claude-sonnet-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "eu.anthropic.claude-sonnet-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Sonnet 5 (EU)",
+            BaseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2.2m, Output: 11m, CacheRead: 0.22m, CacheWrite: 2.75m))),
 
         new("amazon-bedrock", "global.anthropic.claude-fable-5", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -668,6 +808,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
+        new("amazon-bedrock", "global.anthropic.claude-opus-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "global.anthropic.claude-opus-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Opus 5 (Global)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
         new("amazon-bedrock", "global.anthropic.claude-sonnet-4-5-20250929-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -708,6 +868,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
 
+        new("amazon-bedrock", "global.anthropic.claude-sonnet-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "global.anthropic.claude-sonnet-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Sonnet 5 (Global)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
+
         new("amazon-bedrock", "google.gemma-3-27b-it", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "google.gemma-3-27b-it",
@@ -731,6 +911,26 @@ public static class BuiltInModels
             MaxTokens: 4096,
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.04m, Output: 0.08m))),
+
+        new("amazon-bedrock", "jp.anthropic.claude-haiku-4-5-20251001-v1:0", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Haiku 4.5 (JP)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 64000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1m, Output: 5m, CacheRead: 0.1m, CacheWrite: 1.25m))),
 
         new("amazon-bedrock", "jp.anthropic.claude-opus-4-7", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -757,6 +957,26 @@ public static class BuiltInModels
             Id: "jp.anthropic.claude-opus-4-8",
             Api: "bedrock-converse-stream",
             Name: "Claude Opus 4.8 (JP)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("amazon-bedrock", "jp.anthropic.claude-opus-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "jp.anthropic.claude-opus-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Opus 5 (JP)",
             BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
             Reasoning: true,
             ContextWindow: 1000000,
@@ -811,6 +1031,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+
+        new("amazon-bedrock", "jp.anthropic.claude-sonnet-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "jp.anthropic.claude-sonnet-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Sonnet 5 (JP)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("amazon-bedrock", "meta.llama3-1-70b-instruct-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -1192,6 +1432,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5.5m, Output: 33m, CacheRead: 0.55m))),
 
+        new("amazon-bedrock", "openai.gpt-5.6-luna", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "openai.gpt-5.6-luna",
+            Api: "bedrock-converse-stream",
+            Name: "GPT-5.6 Luna",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.22m, Output: 1.32m, CacheRead: 0.022m, CacheWrite: 0.275m))),
+
+        new("amazon-bedrock", "openai.gpt-5.6-sol", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "openai.gpt-5.6-sol",
+            Api: "bedrock-converse-stream",
+            Name: "GPT-5.6 Sol",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5.5m, Output: 33m, CacheRead: 0.55m, CacheWrite: 6.875m))),
+
+        new("amazon-bedrock", "openai.gpt-5.6-terra", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "openai.gpt-5.6-terra",
+            Api: "bedrock-converse-stream",
+            Name: "GPT-5.6 Terra",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2.2m, Output: 13.2m, CacheRead: 0.22m, CacheWrite: 2.75m))),
+
         new("amazon-bedrock", "openai.gpt-oss-120b", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "openai.gpt-oss-120b",
@@ -1536,6 +1836,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
+        new("amazon-bedrock", "us.anthropic.claude-opus-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "us.anthropic.claude-opus-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Opus 5 (US)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
         new("amazon-bedrock", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -1575,6 +1895,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+
+        new("amazon-bedrock", "us.anthropic.claude-sonnet-5", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "us.anthropic.claude-sonnet-5",
+            Api: "bedrock-converse-stream",
+            Name: "Claude Sonnet 5 (US)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("amazon-bedrock", "us.deepseek.r1-v1:0", new ModelDescriptor(
             Provider: "amazon-bedrock",
@@ -1660,6 +2000,26 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.6m, Output: 6m))),
 
+        new("amazon-bedrock", "xai.grok-4.3", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "xai.grok-4.3",
+            Api: "bedrock-converse-stream",
+            Name: "Grok 4.3",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.25m, Output: 2.5m, CacheRead: 0.2m))),
+
         new("amazon-bedrock", "zai.glm-4.7", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "zai.glm-4.7",
@@ -1722,110 +2082,6 @@ public static class BuiltInModels
 
         // anthropic
 
-        new("anthropic", "claude-3-5-haiku-20241022", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-5-haiku-20241022",
-            Api: "anthropic-messages",
-            Name: "Claude Haiku 3.5",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.8m, Output: 4m, CacheRead: 0.08m, CacheWrite: 1m))),
-
-        new("anthropic", "claude-3-5-haiku-latest", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-5-haiku-latest",
-            Api: "anthropic-messages",
-            Name: "Claude Haiku 3.5 (latest)",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.8m, Output: 4m, CacheRead: 0.08m, CacheWrite: 1m))),
-
-        new("anthropic", "claude-3-5-sonnet-20240620", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-5-sonnet-20240620",
-            Api: "anthropic-messages",
-            Name: "Claude Sonnet 3.5",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
-
-        new("anthropic", "claude-3-5-sonnet-20241022", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-5-sonnet-20241022",
-            Api: "anthropic-messages",
-            Name: "Claude Sonnet 3.5 v2",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
-
-        new("anthropic", "claude-3-7-sonnet-20250219", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-7-sonnet-20250219",
-            Api: "anthropic-messages",
-            Name: "Claude Sonnet 3.7",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 64000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
-
-        new("anthropic", "claude-3-haiku-20240307", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-haiku-20240307",
-            Api: "anthropic-messages",
-            Name: "Claude Haiku 3",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 4096,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.25m, Output: 1.25m, CacheRead: 0.03m, CacheWrite: 0.3m))),
-
-        new("anthropic", "claude-3-opus-20240229", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-opus-20240229",
-            Api: "anthropic-messages",
-            Name: "Claude Opus 3",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 4096,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
-
-        new("anthropic", "claude-3-sonnet-20240229", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-3-sonnet-20240229",
-            Api: "anthropic-messages",
-            Name: "Claude Sonnet 3",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 4096,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 0.3m))),
-
         new("anthropic", "claude-fable-5", new ModelDescriptor(
             Provider: "anthropic",
             Id: "claude-fable-5",
@@ -1885,86 +2141,6 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1m, Output: 5m, CacheRead: 0.1m, CacheWrite: 1.25m))),
-
-        new("anthropic", "claude-opus-4-0", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-opus-4-0",
-            Api: "anthropic-messages",
-            Name: "Claude Opus 4 (latest)",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 32000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
-
-        new("anthropic", "claude-opus-4-1", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-opus-4-1",
-            Api: "anthropic-messages",
-            Name: "Claude Opus 4.1 (latest)",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 32000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
-
-        new("anthropic", "claude-opus-4-1-20250805", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-opus-4-1-20250805",
-            Api: "anthropic-messages",
-            Name: "Claude Opus 4.1",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 32000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
-
-        new("anthropic", "claude-opus-4-20250514", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-opus-4-20250514",
-            Api: "anthropic-messages",
-            Name: "Claude Opus 4",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 32000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
 
         new("anthropic", "claude-opus-4-5", new ModelDescriptor(
             Provider: "anthropic",
@@ -2066,15 +2242,15 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
-        new("anthropic", "claude-sonnet-4-0", new ModelDescriptor(
+        new("anthropic", "claude-opus-5", new ModelDescriptor(
             Provider: "anthropic",
-            Id: "claude-sonnet-4-0",
+            Id: "claude-opus-5",
             Api: "anthropic-messages",
-            Name: "Claude Sonnet 4 (latest)",
+            Name: "Claude Opus 5",
             BaseUrl: "https://api.anthropic.com",
             Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 64000,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -2084,27 +2260,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
-
-        new("anthropic", "claude-sonnet-4-20250514", new ModelDescriptor(
-            Provider: "anthropic",
-            Id: "claude-sonnet-4-20250514",
-            Api: "anthropic-messages",
-            Name: "Claude Sonnet 4",
-            BaseUrl: "https://api.anthropic.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 64000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
         new("anthropic", "claude-sonnet-4-5", new ModelDescriptor(
             Provider: "anthropic",
@@ -2113,7 +2269,7 @@ public static class BuiltInModels
             Name: "Claude Sonnet 4.5 (latest)",
             BaseUrl: "https://api.anthropic.com",
             Reasoning: true,
-            ContextWindow: 200000,
+            ContextWindow: 1000000,
             MaxTokens: 64000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -2133,7 +2289,7 @@ public static class BuiltInModels
             Name: "Claude Sonnet 4.5",
             BaseUrl: "https://api.anthropic.com",
             Reasoning: true,
-            ContextWindow: 200000,
+            ContextWindow: 1000000,
             MaxTokens: 64000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -2154,7 +2310,7 @@ public static class BuiltInModels
             BaseUrl: "https://api.anthropic.com",
             Reasoning: true,
             ContextWindow: 1000000,
-            MaxTokens: 64000,
+            MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -2166,7 +2322,47 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
 
+        new("anthropic", "claude-sonnet-5", new ModelDescriptor(
+            Provider: "anthropic",
+            Id: "claude-sonnet-5",
+            Api: "anthropic-messages",
+            Name: "Claude Sonnet 5",
+            BaseUrl: "https://api.anthropic.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
+
         // cerebras
+
+        new("cerebras", "gemma-4-31b", new ModelDescriptor(
+            Provider: "cerebras",
+            Id: "gemma-4-31b",
+            Api: "openai-completions",
+            Name: "Gemma 4 31B IT",
+            BaseUrl: "https://api.cerebras.ai/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 40960,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.99m, Output: 1.49m))),
 
         new("cerebras", "gpt-oss-120b", new ModelDescriptor(
             Provider: "cerebras",
@@ -2176,7 +2372,7 @@ public static class BuiltInModels
             BaseUrl: "https://api.cerebras.ai/v1",
             Reasoning: true,
             ContextWindow: 131072,
-            MaxTokens: 32768,
+            MaxTokens: 40960,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -2186,19 +2382,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.25m, Output: 0.69m))),
-
-        new("cerebras", "llama3.1-8b", new ModelDescriptor(
-            Provider: "cerebras",
-            Id: "llama3.1-8b",
-            Api: "openai-completions",
-            Name: "Llama 3.1 8B",
-            BaseUrl: "https://api.cerebras.ai/v1",
-            Reasoning: false,
-            ContextWindow: 32000,
-            MaxTokens: 8000,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.1m))),
+            Cost: new ModelCost(Input: 0.35m, Output: 0.75m))),
 
         new("cerebras", "zai-glm-4.7", new ModelDescriptor(
             Provider: "cerebras",
@@ -2206,85 +2390,21 @@ public static class BuiltInModels
             Api: "openai-completions",
             Name: "Z.AI GLM-4.7",
             BaseUrl: "https://api.cerebras.ai/v1",
-            Reasoning: false,
+            Reasoning: true,
             ContextWindow: 131072,
-            MaxTokens: 40000,
+            MaxTokens: 40960,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
             Input: ["text"],
-            Cost: new ModelCost(Input: 2.25m, Output: 2.75m))),
+            Cost: new ModelCost(Input: 2.25m, Output: 2.75m, CacheRead: 2.25m))),
 
         // cloudflare-ai-gateway
-
-        new("cloudflare-ai-gateway", "anthropic/claude-3-5-haiku", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-3-5-haiku",
-            Api: "openai-completions",
-            Name: "Claude Haiku 3.5 (latest)",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.8m, Output: 4m, CacheRead: 0.08m, CacheWrite: 1m))),
-
-        new("cloudflare-ai-gateway", "anthropic/claude-3-haiku", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-3-haiku",
-            Api: "openai-completions",
-            Name: "Claude Haiku 3",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 4096,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.25m, Output: 1.25m, CacheRead: 0.03m, CacheWrite: 0.3m))),
-
-        new("cloudflare-ai-gateway", "anthropic/claude-3-opus", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-3-opus",
-            Api: "openai-completions",
-            Name: "Claude Opus 3",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 4096,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
-
-        new("cloudflare-ai-gateway", "anthropic/claude-3-sonnet", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-3-sonnet",
-            Api: "openai-completions",
-            Name: "Claude Sonnet 3",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 4096,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 0.3m))),
-
-        new("cloudflare-ai-gateway", "anthropic/claude-3.5-haiku", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-3.5-haiku",
-            Api: "openai-completions",
-            Name: "Claude Haiku 3.5 (latest)",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.8m, Output: 4m, CacheRead: 0.08m, CacheWrite: 1m))),
-
-        new("cloudflare-ai-gateway", "anthropic/claude-3.5-sonnet", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-3.5-sonnet",
-            Api: "openai-completions",
-            Name: "Claude Sonnet 3.5 v2",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
 
         new("cloudflare-ai-gateway", "anthropic/claude-fable-5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -2326,46 +2446,6 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1m, Output: 5m, CacheRead: 0.1m, CacheWrite: 1.25m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-opus-4", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-opus-4",
-            Api: "openai-completions",
-            Name: "Claude Opus 4 (latest)",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 32000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
-
-        new("cloudflare-ai-gateway", "anthropic/claude-opus-4-1", new ModelDescriptor(
-            Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-opus-4-1",
-            Api: "openai-completions",
-            Name: "Claude Opus 4.1 (latest)",
-            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 32000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
-
         new("cloudflare-ai-gateway", "anthropic/claude-opus-4-5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
             Id: "anthropic/claude-opus-4-5",
@@ -2390,7 +2470,7 @@ public static class BuiltInModels
             Provider: "cloudflare-ai-gateway",
             Id: "anthropic/claude-opus-4-6",
             Api: "openai-completions",
-            Name: "Claude Opus 4.6 (latest)",
+            Name: "Claude Opus 4.6",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
             ContextWindow: 1000000,
@@ -2446,15 +2526,15 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-sonnet-4", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-opus-5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-sonnet-4",
+            Id: "anthropic/claude-opus-5",
             Api: "openai-completions",
-            Name: "Claude Sonnet 4 (latest)",
+            Name: "Claude Opus 5",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 64000,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -2464,7 +2544,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
         new("cloudflare-ai-gateway", "anthropic/claude-sonnet-4-5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -2473,7 +2553,7 @@ public static class BuiltInModels
             Name: "Claude Sonnet 4.5 (latest)",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
-            ContextWindow: 200000,
+            ContextWindow: 1000000,
             MaxTokens: 64000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -2494,7 +2574,7 @@ public static class BuiltInModels
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
             ContextWindow: 1000000,
-            MaxTokens: 64000,
+            MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -2505,6 +2585,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+
+        new("cloudflare-ai-gateway", "anthropic/claude-sonnet-5", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "anthropic/claude-sonnet-5",
+            Api: "openai-completions",
+            Name: "Claude Sonnet 5",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("cloudflare-ai-gateway", "openai/gpt-4", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -2530,6 +2630,42 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 10m, Output: 30m))),
 
+        new("cloudflare-ai-gateway", "openai/gpt-4.1", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-4.1",
+            Api: "openai-completions",
+            Name: "GPT-4.1",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 1047576,
+            MaxTokens: 32768,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 8m, CacheRead: 0.5m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-4.1-mini", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-4.1-mini",
+            Api: "openai-completions",
+            Name: "GPT-4.1 mini",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 1047576,
+            MaxTokens: 32768,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.4m, Output: 1.6m, CacheRead: 0.1m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-4.1-nano", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-4.1-nano",
+            Api: "openai-completions",
+            Name: "GPT-4.1 nano",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 1047576,
+            MaxTokens: 32768,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.025m))),
+
         new("cloudflare-ai-gateway", "openai/gpt-4o", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
             Id: "openai/gpt-4o",
@@ -2552,13 +2688,13 @@ public static class BuiltInModels
             ContextWindow: 128000,
             MaxTokens: 16384,
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.15m, Output: 0.6m, CacheRead: 0.08m))),
+            Cost: new ModelCost(Input: 0.15m, Output: 0.6m, CacheRead: 0.075m))),
 
-        new("cloudflare-ai-gateway", "openai/gpt-5.1", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "openai/gpt-5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "openai/gpt-5.1",
+            Id: "openai/gpt-5",
             Api: "openai-completions",
-            Name: "GPT-5.1",
+            Name: "GPT-5",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
             ContextWindow: 400000,
@@ -2572,13 +2708,73 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.13m))),
+            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
 
-        new("cloudflare-ai-gateway", "openai/gpt-5.1-codex", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "openai/gpt-5-mini", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "openai/gpt-5.1-codex",
+            Id: "openai/gpt-5-mini",
             Api: "openai-completions",
-            Name: "GPT-5.1 Codex",
+            Name: "GPT-5 Mini",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.25m, Output: 2m, CacheRead: 0.025m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5-nano", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5-nano",
+            Api: "openai-completions",
+            Name: "GPT-5 Nano",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.05m, Output: 0.4m, CacheRead: 0.005m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5-pro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5-pro",
+            Api: "openai-completions",
+            Name: "GPT-5 Pro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 272000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 15m, Output: 120m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.1", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.1",
+            Api: "openai-completions",
+            Name: "GPT-5.1",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
             ContextWindow: 400000,
@@ -2614,11 +2810,63 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.75m, Output: 14m, CacheRead: 0.175m))),
 
-        new("cloudflare-ai-gateway", "openai/gpt-5.2-codex", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "openai/gpt-5.2-chat-latest", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "openai/gpt-5.2-codex",
+            Id: "openai/gpt-5.2-chat-latest",
             Api: "openai-completions",
-            Name: "GPT-5.2 Codex",
+            Name: "GPT-5.2 Chat",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 128000,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.75m, Output: 14m, CacheRead: 0.175m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.2-pro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.2-pro",
+            Api: "openai-completions",
+            Name: "GPT-5.2 Pro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 21m, Output: 168m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.3-chat-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.3-chat-latest",
+            Api: "openai-completions",
+            Name: "GPT-5.3 Chat (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 128000,
+            MaxTokens: 16384,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.75m, Output: 14m, CacheRead: 0.175m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.3-codex", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.3-codex",
+            Api: "openai-completions",
+            Name: "GPT-5.3 Codex",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
             ContextWindow: 400000,
@@ -2634,15 +2882,15 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.75m, Output: 14m, CacheRead: 0.175m))),
 
-        new("cloudflare-ai-gateway", "openai/gpt-5.3-codex", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "openai/gpt-5.3-codex-spark", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "openai/gpt-5.3-codex",
+            Id: "openai/gpt-5.3-codex-spark",
             Api: "openai-completions",
-            Name: "GPT-5.3 Codex",
+            Name: "GPT-5.3 Codex Spark",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
-            ContextWindow: 400000,
-            MaxTokens: 128000,
+            ContextWindow: 128000,
+            MaxTokens: 32000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -2674,6 +2922,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m))),
 
+        new("cloudflare-ai-gateway", "openai/gpt-5.4-mini", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.4-mini",
+            Api: "openai-completions",
+            Name: "GPT-5.4 mini",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.75m, Output: 4.5m, CacheRead: 0.075m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.4-nano", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.4-nano",
+            Api: "openai-completions",
+            Name: "GPT-5.4 nano",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.2m, Output: 1.25m, CacheRead: 0.02m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.4-pro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.4-pro",
+            Api: "openai-completions",
+            Name: "GPT-5.4 Pro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 30m, Output: 180m))),
+
         new("cloudflare-ai-gateway", "openai/gpt-5.5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
             Id: "openai/gpt-5.5",
@@ -2694,6 +3002,106 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m))),
 
+        new("cloudflare-ai-gateway", "openai/gpt-5.5-pro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.5-pro",
+            Api: "openai-completions",
+            Name: "GPT-5.5 Pro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 30m, Output: 180m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.6", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.6",
+            Api: "openai-completions",
+            Name: "GPT-5.6",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.6-luna", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.6-luna",
+            Api: "openai-completions",
+            Name: "GPT-5.6 Luna",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.2m, Output: 1.2m, CacheRead: 0.02m, CacheWrite: 0.25m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.6-sol", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.6-sol",
+            Api: "openai-completions",
+            Name: "GPT-5.6 Sol",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("cloudflare-ai-gateway", "openai/gpt-5.6-terra", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/gpt-5.6-terra",
+            Api: "openai-completions",
+            Name: "GPT-5.6 Terra",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m, CacheWrite: 2.5m))),
+
         new("cloudflare-ai-gateway", "openai/o1", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
             Id: "openai/o1",
@@ -2713,6 +3121,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 15m, Output: 60m, CacheRead: 7.5m))),
+
+        new("cloudflare-ai-gateway", "openai/o1-pro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "openai/o1-pro",
+            Api: "openai-completions",
+            Name: "o1-pro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 150m, Output: 600m))),
 
         new("cloudflare-ai-gateway", "openai/o3", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -2792,17 +3220,17 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.1m, Output: 4.4m, CacheRead: 0.28m))),
+            Cost: new ModelCost(Input: 1.1m, Output: 4.4m, CacheRead: 0.275m))),
 
-        new("cloudflare-ai-gateway", "workers-ai/@cf/moonshotai/kimi-k2.5", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "workers-ai/@cf/google/gemma-4-26b-a4b-it", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "workers-ai/@cf/moonshotai/kimi-k2.5",
+            Id: "workers-ai/@cf/google/gemma-4-26b-a4b-it",
             Api: "openai-completions",
-            Name: "Kimi K2.5",
+            Name: "Gemma 4 26B A4B IT",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
             ContextWindow: 256000,
-            MaxTokens: 256000,
+            MaxTokens: 16384,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -2812,7 +3240,55 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.6m, Output: 3m, CacheRead: 0.1m))),
+            Cost: new ModelCost(Input: 0.1m, Output: 0.3m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/ibm-granite/granite-4.0-h-micro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/ibm-granite/granite-4.0-h-micro",
+            Api: "openai-completions",
+            Name: "Granite 4.0 H Micro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 131000,
+            MaxTokens: 131000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.017m, Output: 0.112m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+            Api: "openai-completions",
+            Name: "Llama 3.3 70B Instruct fp8 Fast",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 24000,
+            MaxTokens: 24000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.293m, Output: 2.253m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct",
+            Api: "openai-completions",
+            Name: "Llama 4 Scout 17B 16E Instruct",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 131000,
+            MaxTokens: 16384,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.27m, Output: 0.85m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/mistralai/mistral-small-3.1-24b-instruct", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/mistralai/mistral-small-3.1-24b-instruct",
+            Api: "openai-completions",
+            Name: "Mistral Small 3.1 24B Instruct",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 128000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.351m, Output: 0.555m))),
 
         new("cloudflare-ai-gateway", "workers-ai/@cf/moonshotai/kimi-k2.6", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -2821,7 +3297,7 @@ public static class BuiltInModels
             Name: "Kimi K2.6",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
             Reasoning: true,
-            ContextWindow: 256000,
+            ContextWindow: 262144,
             MaxTokens: 256000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -2833,6 +3309,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/moonshotai/kimi-k2.7-code", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/moonshotai/kimi-k2.7-code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
 
         new("cloudflare-ai-gateway", "workers-ai/@cf/nvidia/nemotron-3-120b-a12b", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -2854,6 +3350,66 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.5m, Output: 1.5m))),
 
+        new("cloudflare-ai-gateway", "workers-ai/@cf/openai/gpt-oss-120b", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/openai/gpt-oss-120b",
+            Api: "openai-completions",
+            Name: "GPT OSS 120B",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 128000,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.35m, Output: 0.75m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/openai/gpt-oss-20b", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/openai/gpt-oss-20b",
+            Api: "openai-completions",
+            Name: "GPT OSS 20B",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 128000,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.2m, Output: 0.3m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/qwen/qwen3-30b-a3b-fp8", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/qwen/qwen3-30b-a3b-fp8",
+            Api: "openai-completions",
+            Name: "Qwen3 30B A3b fp8",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 32768,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.0509m, Output: 0.335m))),
+
         new("cloudflare-ai-gateway", "workers-ai/@cf/zai-org/glm-4.7-flash", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
             Id: "workers-ai/@cf/zai-org/glm-4.7-flash",
@@ -2872,7 +3428,27 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.06m, Output: 0.4m))),
+            Cost: new ModelCost(Input: 0.0605m, Output: 0.4m))),
+
+        new("cloudflare-ai-gateway", "workers-ai/@cf/zai-org/glm-5.2", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "workers-ai/@cf/zai-org/glm-5.2",
+            Api: "openai-completions",
+            Name: "Glm 5.2",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 256000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
 
         // cloudflare-workers-ai
 
@@ -2963,6 +3539,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
+
+        new("cloudflare-workers-ai", "@cf/moonshotai/kimi-k2.7-code", new ModelDescriptor(
+            Provider: "cloudflare-workers-ai",
+            Id: "@cf/moonshotai/kimi-k2.7-code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
 
         new("cloudflare-workers-ai", "@cf/nvidia/nemotron-3-120b-a12b", new ModelDescriptor(
             Provider: "cloudflare-workers-ai",
@@ -3064,6 +3660,26 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.0605m, Output: 0.4m))),
 
+        new("cloudflare-workers-ai", "@cf/zai-org/glm-5.2", new ModelDescriptor(
+            Provider: "cloudflare-workers-ai",
+            Id: "@cf/zai-org/glm-5.2",
+            Api: "openai-completions",
+            Name: "Glm 5.2",
+            BaseUrl: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 256000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+
         // deepseek
 
         new("deepseek", "deepseek-chat", new ModelDescriptor(
@@ -3158,7 +3774,27 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.03m))),
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.028m))),
+
+        new("fireworks", "accounts/fireworks/models/deepseek-v4-flash-0731", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/models/deepseek-v4-flash-0731",
+            Api: "anthropic-messages",
+            Name: "DeepSeek V4 Flash 0731",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.028m))),
 
         new("fireworks", "accounts/fireworks/models/deepseek-v4-pro", new ModelDescriptor(
             Provider: "fireworks",
@@ -3180,14 +3816,34 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.74m, Output: 3.48m, CacheRead: 0.145m))),
 
-        new("fireworks", "accounts/fireworks/models/glm-5p1", new ModelDescriptor(
+        new("fireworks", "accounts/fireworks/models/deepseek-v4-pro-0813", new ModelDescriptor(
             Provider: "fireworks",
-            Id: "accounts/fireworks/models/glm-5p1",
+            Id: "accounts/fireworks/models/deepseek-v4-pro-0813",
             Api: "anthropic-messages",
-            Name: "GLM 5.1",
+            Name: "DeepSeek V4 Pro 0813",
             BaseUrl: "https://api.fireworks.ai/inference",
             Reasoning: true,
-            ContextWindow: 202800,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.32m, Output: 3.96m, CacheRead: 0.044m))),
+
+        new("fireworks", "accounts/fireworks/models/glm-5p2", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/models/glm-5p2",
+            Api: "anthropic-messages",
+            Name: "GLM 5.2",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 1048575,
             MaxTokens: 131072,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -3198,7 +3854,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.14m))),
 
         new("fireworks", "accounts/fireworks/models/gpt-oss-120b", new ModelDescriptor(
             Provider: "fireworks",
@@ -3240,15 +3896,15 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.07m, Output: 0.3m, CacheRead: 0.035m))),
 
-        new("fireworks", "accounts/fireworks/models/kimi-k2p5", new ModelDescriptor(
+        new("fireworks", "accounts/fireworks/models/inkling", new ModelDescriptor(
             Provider: "fireworks",
-            Id: "accounts/fireworks/models/kimi-k2p5",
+            Id: "accounts/fireworks/models/inkling",
             Api: "anthropic-messages",
-            Name: "Kimi K2.5",
+            Name: "Inkling",
             BaseUrl: "https://api.fireworks.ai/inference",
             Reasoning: true,
-            ContextWindow: 256000,
-            MaxTokens: 256000,
+            ContextWindow: 1048576,
+            MaxTokens: 1048576,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -3258,7 +3914,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.6m, Output: 3m, CacheRead: 0.1m))),
+            Cost: new ModelCost(Input: 1m, Output: 4.05m, CacheRead: 0.17m))),
 
         new("fireworks", "accounts/fireworks/models/kimi-k2p6", new ModelDescriptor(
             Provider: "fireworks",
@@ -3280,15 +3936,15 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
 
-        new("fireworks", "accounts/fireworks/models/minimax-m2p5", new ModelDescriptor(
+        new("fireworks", "accounts/fireworks/models/kimi-k2p7-code", new ModelDescriptor(
             Provider: "fireworks",
-            Id: "accounts/fireworks/models/minimax-m2p5",
+            Id: "accounts/fireworks/models/kimi-k2p7-code",
             Api: "anthropic-messages",
-            Name: "MiniMax-M2.5",
+            Name: "Kimi K2.7 Code",
             BaseUrl: "https://api.fireworks.ai/inference",
             Reasoning: true,
-            ContextWindow: 196608,
-            MaxTokens: 196608,
+            ContextWindow: 262000,
+            MaxTokens: 262000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -3297,8 +3953,28 @@ public static class BuiltInModels
                 ["high"] = 16384,
                 ["xhigh"] = 32000,
             },
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.03m))),
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
+
+        new("fireworks", "accounts/fireworks/models/kimi-k3", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/models/kimi-k3",
+            Api: "anthropic-messages",
+            Name: "Kimi K3",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
 
         new("fireworks", "accounts/fireworks/models/minimax-m2p7", new ModelDescriptor(
             Provider: "fireworks",
@@ -3320,11 +3996,91 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
-        new("fireworks", "accounts/fireworks/models/qwen3p6-plus", new ModelDescriptor(
+        new("fireworks", "accounts/fireworks/models/minimax-m3", new ModelDescriptor(
             Provider: "fireworks",
-            Id: "accounts/fireworks/models/qwen3p6-plus",
+            Id: "accounts/fireworks/models/minimax-m3",
             Api: "anthropic-messages",
-            Name: "Qwen 3.6 Plus",
+            Name: "MiniMax-M3",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 512000,
+            MaxTokens: 512000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
+
+        new("fireworks", "accounts/fireworks/models/muse-glimmer-30b", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/models/muse-glimmer-30b",
+            Api: "anthropic-messages",
+            Name: "Muse Glimmer 30B",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.35m, Output: 1.5m, CacheRead: 0.04m))),
+
+        new("fireworks", "accounts/fireworks/models/nemotron-3-ultra-nvfp4", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/models/nemotron-3-ultra-nvfp4",
+            Api: "anthropic-messages",
+            Name: "Nemotron 3 Ultra 550B A55B",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.6m, Output: 2.4m, CacheRead: 0.119m))),
+
+        new("fireworks", "accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b",
+            Api: "anthropic-messages",
+            Name: "Nemotron 3.5 Lightning 30B A3B",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.05m, Output: 0.2m, CacheRead: 0.01m))),
+
+        new("fireworks", "accounts/fireworks/models/qwen3p7-plus", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/models/qwen3p7-plus",
+            Api: "anthropic-messages",
+            Name: "Qwen 3.7 Plus",
             BaseUrl: "https://api.fireworks.ai/inference",
             Reasoning: true,
             ContextWindow: 262144,
@@ -3338,16 +4094,16 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.5m, Output: 3m, CacheRead: 0.1m))),
+            Cost: new ModelCost(Input: 0.4m, Output: 1.6m, CacheRead: 0.08m))),
 
-        new("fireworks", "accounts/fireworks/routers/glm-5p1-fast", new ModelDescriptor(
+        new("fireworks", "accounts/fireworks/models/qwen3p8-max", new ModelDescriptor(
             Provider: "fireworks",
-            Id: "accounts/fireworks/routers/glm-5p1-fast",
+            Id: "accounts/fireworks/models/qwen3p8-max",
             Api: "anthropic-messages",
-            Name: "GLM 5.1 Fast",
+            Name: "Qwen3.8 Max",
             BaseUrl: "https://api.fireworks.ai/inference",
             Reasoning: true,
-            ContextWindow: 202800,
+            ContextWindow: 262144,
             MaxTokens: 131072,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -3358,7 +4114,27 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 2.8m, Output: 8.8m, CacheRead: 0.52m))),
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.25m))),
+
+        new("fireworks", "accounts/fireworks/routers/glm-5p2-fast", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/routers/glm-5p2-fast",
+            Api: "anthropic-messages",
+            Name: "GLM 5.2 Fast",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 1048575,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.1m, Output: 6.6m, CacheRead: 0.21m))),
 
         new("fireworks", "accounts/fireworks/routers/kimi-k2p6-fast", new ModelDescriptor(
             Provider: "fireworks",
@@ -3400,14 +4176,72 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 2m, Output: 8m, CacheRead: 0.3m))),
 
+        new("fireworks", "accounts/fireworks/routers/kimi-k2p7-code-fast", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/routers/kimi-k2p7-code-fast",
+            Api: "anthropic-messages",
+            Name: "Kimi K2.7 Code Fast",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 262000,
+            MaxTokens: 262000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.9m, Output: 8m, CacheRead: 0.38m))),
+
+        new("fireworks", "accounts/fireworks/routers/kimi-k3-fast", new ModelDescriptor(
+            Provider: "fireworks",
+            Id: "accounts/fireworks/routers/kimi-k3-fast",
+            Api: "anthropic-messages",
+            Name: "Kimi K3 Fast",
+            BaseUrl: "https://api.fireworks.ai/inference",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 4.5m, Output: 22.5m, CacheRead: 0.45m))),
+
         // github-copilot
+
+        new("github-copilot", "claude-fable-5", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "claude-fable-5",
+            Api: "github-copilot-chat",
+            Name: "Claude Fable 5",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 10m, Output: 50m, CacheRead: 1m, CacheWrite: 12.5m))),
 
         new("github-copilot", "claude-haiku-4.5", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-haiku-4.5",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Haiku 4.5 (latest)",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
             MaxTokens: 64000,
@@ -3425,9 +4259,8 @@ public static class BuiltInModels
         new("github-copilot", "claude-opus-4.5", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-opus-4.5",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Opus 4.5 (latest)",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
             MaxTokens: 32000,
@@ -3445,9 +4278,8 @@ public static class BuiltInModels
         new("github-copilot", "claude-opus-4.6", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-opus-4.6",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Opus 4.6",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
             MaxTokens: 32000,
@@ -3465,9 +4297,8 @@ public static class BuiltInModels
         new("github-copilot", "claude-opus-4.7", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-opus-4.7",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Opus 4.7",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
             MaxTokens: 32000,
@@ -3485,11 +4316,29 @@ public static class BuiltInModels
         new("github-copilot", "claude-opus-4.8", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-opus-4.8",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Opus 4.8",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
+            MaxTokens: 64000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("github-copilot", "claude-opus-5", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "claude-opus-5",
+            Api: "github-copilot-chat",
+            Name: "Claude Opus 5",
+            Reasoning: true,
+            ContextWindow: 1000000,
             MaxTokens: 64000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -3505,9 +4354,8 @@ public static class BuiltInModels
         new("github-copilot", "claude-sonnet-4", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-sonnet-4",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Sonnet 4 (latest)",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 216000,
             MaxTokens: 16000,
@@ -3525,9 +4373,8 @@ public static class BuiltInModels
         new("github-copilot", "claude-sonnet-4.5", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-sonnet-4.5",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Sonnet 4.5 (latest)",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
             MaxTokens: 32000,
@@ -3545,9 +4392,8 @@ public static class BuiltInModels
         new("github-copilot", "claude-sonnet-4.6", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "claude-sonnet-4.6",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Claude Sonnet 4.6",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
             MaxTokens: 32000,
@@ -3562,15 +4408,14 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
 
-        new("github-copilot", "gemini-2.5-pro", new ModelDescriptor(
+        new("github-copilot", "claude-sonnet-5", new ModelDescriptor(
             Provider: "github-copilot",
-            Id: "gemini-2.5-pro",
-            Api: "openai-completions",
-            Name: "Gemini 2.5 Pro",
-            BaseUrl: "https://api.githubcopilot.com",
+            Id: "claude-sonnet-5",
+            Api: "github-copilot-chat",
+            Name: "Claude Sonnet 5",
             Reasoning: true,
-            ContextWindow: 128000,
-            MaxTokens: 64000,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -3580,36 +4425,15 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
-
-        new("github-copilot", "gemini-3-flash-preview", new ModelDescriptor(
-            Provider: "github-copilot",
-            Id: "gemini-3-flash-preview",
-            Api: "openai-completions",
-            Name: "Gemini 3 Flash Preview",
-            BaseUrl: "https://api.githubcopilot.com",
-            Reasoning: true,
-            ContextWindow: 128000,
-            MaxTokens: 64000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.5m, Output: 3m, CacheRead: 0.05m))),
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("github-copilot", "gemini-3.1-pro-preview", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gemini-3.1-pro-preview",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Gemini 3.1 Pro Preview",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
-            ContextWindow: 200000,
+            ContextWindow: 1000000,
             MaxTokens: 64000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -3625,9 +4449,8 @@ public static class BuiltInModels
         new("github-copilot", "gemini-3.5-flash", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gemini-3.5-flash",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "Gemini 3.5 Flash",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 200000,
             MaxTokens: 64000,
@@ -3642,12 +4465,49 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
 
+        new("github-copilot", "gemini-3.6-flash", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "gemini-3.6-flash",
+            Api: "github-copilot-chat",
+            Name: "Gemini 3.6 Flash",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 64000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m))),
+
+        new("github-copilot", "gemini-3.7-flash", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "gemini-3.7-flash",
+            Api: "github-copilot-chat",
+            Name: "Gemini 3.7 Flash",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 64000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.75m, Output: 3.75m, CacheRead: 0.075m))),
+
         new("github-copilot", "gpt-4.1", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-4.1",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-4.1",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: false,
             ContextWindow: 128000,
             MaxTokens: 16384,
@@ -3657,9 +4517,8 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5-mini", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5-mini",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5 Mini",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 264000,
             MaxTokens: 64000,
@@ -3677,9 +4536,8 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5.2", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5.2",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5.2",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 400000,
             MaxTokens: 128000,
@@ -3697,9 +4555,8 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5.2-codex", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5.2-codex",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5.2 Codex",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 400000,
             MaxTokens: 128000,
@@ -3717,9 +4574,8 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5.3-codex", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5.3-codex",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5.3 Codex",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 400000,
             MaxTokens: 128000,
@@ -3737,11 +4593,10 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5.4", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5.4",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5.4",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
-            ContextWindow: 400000,
+            ContextWindow: 1050000,
             MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -3757,9 +4612,8 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5.4-mini", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5.4-mini",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5.4 mini",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 400000,
             MaxTokens: 128000,
@@ -3777,9 +4631,8 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5.4-nano", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5.4-nano",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5.4 nano",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
             ContextWindow: 400000,
             MaxTokens: 128000,
@@ -3797,11 +4650,10 @@ public static class BuiltInModels
         new("github-copilot", "gpt-5.5", new ModelDescriptor(
             Provider: "github-copilot",
             Id: "gpt-5.5",
-            Api: "openai-completions",
+            Api: "github-copilot-chat",
             Name: "GPT-5.5",
-            BaseUrl: "https://api.githubcopilot.com",
             Reasoning: true,
-            ContextWindow: 400000,
+            ContextWindow: 1050000,
             MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -3814,14 +4666,13 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m))),
 
-        new("github-copilot", "raptor-mini", new ModelDescriptor(
+        new("github-copilot", "gpt-5.6-luna", new ModelDescriptor(
             Provider: "github-copilot",
-            Id: "raptor-mini",
-            Api: "openai-completions",
-            Name: "Raptor mini",
-            BaseUrl: "https://api.githubcopilot.com",
+            Id: "gpt-5.6-luna",
+            Api: "github-copilot-chat",
+            Name: "GPT-5.6 Luna",
             Reasoning: true,
-            ContextWindow: 400000,
+            ContextWindow: 1050000,
             MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -3832,33 +4683,202 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.25m, Output: 2m, CacheRead: 0.025m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 1.2m, CacheRead: 0.02m))),
+
+        new("github-copilot", "gpt-5.6-sol", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "gpt-5.6-sol",
+            Api: "github-copilot-chat",
+            Name: "GPT-5.6 Sol",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("github-copilot", "gpt-5.6-terra", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "gpt-5.6-terra",
+            Api: "github-copilot-chat",
+            Name: "GPT-5.6 Terra",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m))),
+
+        new("github-copilot", "grok-4.5", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "grok-4.5",
+            Api: "github-copilot-chat",
+            Name: "Grok 4.5",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
+
+        new("github-copilot", "kimi-k2.7-code", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "kimi-k2.7-code",
+            Api: "github-copilot-chat",
+            Name: "Kimi K2.7 Code",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 32000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
+
+        new("github-copilot", "kimi-k3", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "kimi-k3",
+            Api: "github-copilot-chat",
+            Name: "Kimi K3",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
+
+        new("github-copilot", "mai-code-1-flash-picker", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "mai-code-1-flash-picker",
+            Api: "github-copilot-chat",
+            Name: "MAI-Code-1-Flash",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.75m, Output: 4.5m, CacheRead: 0.075m))),
+
+        new("github-copilot", "mai-code-1.1-flash", new ModelDescriptor(
+            Provider: "github-copilot",
+            Id: "mai-code-1.1-flash",
+            Api: "github-copilot-chat",
+            Name: "MAI-Code-1.1-Flash",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.2m, Output: 1.2m, CacheRead: 0.02m))),
 
         // google
 
-        new("google", "gemini-2.0-flash", new ModelDescriptor(
+        new("google", "deep-research-max-preview-04-2026", new ModelDescriptor(
             Provider: "google",
-            Id: "gemini-2.0-flash",
+            Id: "deep-research-max-preview-04-2026",
             Api: "google-generative-ai",
-            Name: "Gemini 2.0 Flash",
+            Name: "Deep Research Max Preview (Apr-21-2026)",
             BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-            Reasoning: false,
-            ContextWindow: 1048576,
-            MaxTokens: 8192,
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.025m))),
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m))),
 
-        new("google", "gemini-2.0-flash-lite", new ModelDescriptor(
+        new("google", "deep-research-preview-04-2026", new ModelDescriptor(
             Provider: "google",
-            Id: "gemini-2.0-flash-lite",
+            Id: "deep-research-preview-04-2026",
             Api: "google-generative-ai",
-            Name: "Gemini 2.0 Flash-Lite",
+            Name: "Deep Research Preview (Apr-21-2026)",
             BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-            Reasoning: false,
-            ContextWindow: 1048576,
-            MaxTokens: 8192,
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.075m, Output: 0.3m))),
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m))),
+
+        new("google", "gemini-2.5-computer-use-preview-10-2025", new ModelDescriptor(
+            Provider: "google",
+            Id: "gemini-2.5-computer-use-preview-10-2025",
+            Api: "google-generative-ai",
+            Name: "Gemini 2.5 Computer Use Preview 10-2025",
+            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.25m, Output: 10m))),
 
         new("google", "gemini-2.5-flash", new ModelDescriptor(
             Provider: "google",
@@ -3940,26 +4960,6 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.5m, Output: 3m, CacheRead: 0.05m))),
 
-        new("google", "gemini-3-pro-preview", new ModelDescriptor(
-            Provider: "google",
-            Id: "gemini-3-pro-preview",
-            Api: "google-generative-ai",
-            Name: "Gemini 3 Pro Preview",
-            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-            Reasoning: true,
-            ContextWindow: 1048576,
-            MaxTokens: 65536,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m))),
-
         new("google", "gemini-3.1-flash-lite", new ModelDescriptor(
             Provider: "google",
             Id: "gemini-3.1-flash-lite",
@@ -3980,6 +4980,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m))),
 
+        new("google", "gemini-3.1-flash-lite-image", new ModelDescriptor(
+            Provider: "google",
+            Id: "gemini-3.1-flash-lite-image",
+            Api: "google-generative-ai",
+            Name: "Nano Banana 2 Lite",
+            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            Reasoning: true,
+            ContextWindow: 65536,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.25m, Output: 30m))),
+
         new("google", "gemini-3.1-flash-lite-preview", new ModelDescriptor(
             Provider: "google",
             Id: "gemini-3.1-flash-lite-preview",
@@ -3999,6 +5019,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m))),
+
+        new("google", "gemini-3.1-flash-live-preview", new ModelDescriptor(
+            Provider: "google",
+            Id: "gemini-3.1-flash-live-preview",
+            Api: "google-generative-ai",
+            Name: "Gemini 3.1 Flash Live Preview",
+            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.75m, Output: 4.5m))),
 
         new("google", "gemini-3.1-pro-preview", new ModelDescriptor(
             Provider: "google",
@@ -4060,6 +5100,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
 
+        new("google", "gemini-3.5-flash-lite", new ModelDescriptor(
+            Provider: "google",
+            Id: "gemini-3.5-flash-lite",
+            Api: "google-generative-ai",
+            Name: "Gemini 3.5 Flash Lite",
+            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m))),
+
+        new("google", "gemini-3.6-flash", new ModelDescriptor(
+            Provider: "google",
+            Id: "gemini-3.6-flash",
+            Api: "google-generative-ai",
+            Name: "Gemini 3.6 Flash",
+            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m))),
+
+        new("google", "gemini-3.7-flash", new ModelDescriptor(
+            Provider: "google",
+            Id: "gemini-3.7-flash",
+            Api: "google-generative-ai",
+            Name: "Gemini 3.7 Flash",
+            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.75m, Output: 3.75m, CacheRead: 0.075m))),
+
         new("google", "gemini-flash-latest", new ModelDescriptor(
             Provider: "google",
             Id: "gemini-flash-latest",
@@ -4078,7 +5178,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.075m))),
+            Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
 
         new("google", "gemini-flash-lite-latest", new ModelDescriptor(
             Provider: "google",
@@ -4098,7 +5198,27 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.025m))),
+            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m))),
+
+        new("google", "gemini-robotics-er-1.6-preview", new ModelDescriptor(
+            Provider: "google",
+            Id: "gemini-robotics-er-1.6-preview",
+            Api: "google-generative-ai",
+            Name: "Gemini Robotics-ER 1.6 Preview",
+            BaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1m, Output: 5m))),
 
         new("google", "gemma-4-26b-a4b-it", new ModelDescriptor(
             Provider: "google",
@@ -4141,18 +5261,6 @@ public static class BuiltInModels
             Cost: new ModelCost(Input: 0m, Output: 0m))),
 
         // google-vertex
-
-        new("google-vertex", "claude-3-5-haiku@20241022", new ModelDescriptor(
-            Provider: "google-vertex",
-            Id: "claude-3-5-haiku@20241022",
-            Api: "google-vertex",
-            Name: "Claude Haiku 3.5",
-            BaseUrl: "https://aiplatform.googleapis.com",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.8m, Output: 4m, CacheRead: 0.08m, CacheWrite: 1m))),
 
         new("google-vertex", "claude-haiku-4-5@20251001", new ModelDescriptor(
             Provider: "google-vertex",
@@ -4294,6 +5402,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
 
+        new("google-vertex", "claude-opus-5@default", new ModelDescriptor(
+            Provider: "google-vertex",
+            Id: "claude-opus-5@default",
+            Api: "google-vertex",
+            Name: "Claude Opus 5",
+            BaseUrl: "https://aiplatform.googleapis.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
         new("google-vertex", "claude-sonnet-4-5@20250929", new ModelDescriptor(
             Provider: "google-vertex",
             Id: "claude-sonnet-4-5@20250929",
@@ -4353,6 +5481,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+
+        new("google-vertex", "claude-sonnet-5@default", new ModelDescriptor(
+            Provider: "google-vertex",
+            Id: "claude-sonnet-5@default",
+            Api: "google-vertex",
+            Name: "Claude Sonnet 5",
+            BaseUrl: "https://aiplatform.googleapis.com",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("google-vertex", "deepseek-ai/deepseek-v3.1-maas", new ModelDescriptor(
             Provider: "google-vertex",
@@ -4574,6 +5722,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
 
+        new("google-vertex", "gemini-3.5-flash-lite", new ModelDescriptor(
+            Provider: "google-vertex",
+            Id: "gemini-3.5-flash-lite",
+            Api: "google-vertex",
+            Name: "Gemini 3.5 Flash Lite",
+            BaseUrl: "https://aiplatform.googleapis.com",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m))),
+
+        new("google-vertex", "gemini-3.6-flash", new ModelDescriptor(
+            Provider: "google-vertex",
+            Id: "gemini-3.6-flash",
+            Api: "google-vertex",
+            Name: "Gemini 3.6 Flash",
+            BaseUrl: "https://aiplatform.googleapis.com",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m))),
+
+        new("google-vertex", "gemini-3.7-flash", new ModelDescriptor(
+            Provider: "google-vertex",
+            Id: "gemini-3.7-flash",
+            Api: "google-vertex",
+            Name: "Gemini 3.7 Flash",
+            BaseUrl: "https://aiplatform.googleapis.com",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.75m, Output: 3.75m, CacheRead: 0.075m))),
+
         new("google-vertex", "gemini-flash-latest", new ModelDescriptor(
             Provider: "google-vertex",
             Id: "gemini-flash-latest",
@@ -4592,7 +5800,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.075m, CacheWrite: 0.383m))),
+            Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
 
         new("google-vertex", "gemini-flash-lite-latest", new ModelDescriptor(
             Provider: "google-vertex",
@@ -4612,7 +5820,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.025m))),
+            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m))),
 
         new("google-vertex", "meta/llama-3.3-70b-instruct-maas", new ModelDescriptor(
             Provider: "google-vertex",
@@ -4784,18 +5992,6 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.59m, Output: 0.79m))),
 
-        new("groq", "meta-llama/llama-4-scout-17b-16e-instruct", new ModelDescriptor(
-            Provider: "groq",
-            Id: "meta-llama/llama-4-scout-17b-16e-instruct",
-            Api: "openai-completions",
-            Name: "Llama 4 Scout 17B 16E",
-            BaseUrl: "https://api.groq.com/openai/v1",
-            Reasoning: false,
-            ContextWindow: 131072,
-            MaxTokens: 8192,
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.11m, Output: 0.34m))),
-
         new("groq", "openai/gpt-oss-120b", new ModelDescriptor(
             Provider: "groq",
             Id: "openai/gpt-oss-120b",
@@ -4854,17 +6050,39 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.075m, Output: 0.3m, CacheRead: 0.037m))),
+            Cost: new ModelCost(Input: 0.075m, Output: 0.3m))),
 
-        new("groq", "qwen/qwen3-32b", new ModelDescriptor(
+        new("groq", "qwen/qwen3.6-27b", new ModelDescriptor(
             Provider: "groq",
-            Id: "qwen/qwen3-32b",
+            Id: "qwen/qwen3.6-27b",
             Api: "openai-completions",
-            Name: "Qwen3-32B",
+            Name: "Qwen3.6 27B",
             BaseUrl: "https://api.groq.com/openai/v1",
             Reasoning: true,
             ContextWindow: 131072,
-            MaxTokens: 40960,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.6m, Output: 3m, CacheRead: 0.3m))),
+
+        // huggingface
+
+        new("huggingface", "MiniMaxAI/MiniMax-M2", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "MiniMaxAI/MiniMax-M2",
+            Api: "openai-completions",
+            Name: "MiniMax-M2",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 204800,
+            MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -4874,9 +6092,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.29m, Output: 0.59m))),
-
-        // huggingface
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m))),
 
         new("huggingface", "MiniMaxAI/MiniMax-M2.1", new ModelDescriptor(
             Provider: "huggingface",
@@ -4938,6 +6154,70 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
+        new("huggingface", "MiniMaxAI/MiniMax-M3", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "MiniMaxAI/MiniMax-M3",
+            Api: "openai-completions",
+            Name: "MiniMax-M3",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 524288,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m))),
+
+        new("huggingface", "Qwen/Qwen2.5-Coder-32B-Instruct", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen2.5-Coder-32B-Instruct",
+            Api: "openai-completions",
+            Name: "Qwen2.5-Coder-32B-Instruct",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 131072,
+            MaxTokens: 8192,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.06m, Output: 0.2m))),
+
+        new("huggingface", "Qwen/Qwen3-235B-A22B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3-235B-A22B",
+            Api: "openai-completions",
+            Name: "Qwen3 235B-A22B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 40960,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.2m, Output: 0.8m))),
+
+        new("huggingface", "Qwen/Qwen3-235B-A22B-Instruct-2507", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3-235B-A22B-Instruct-2507",
+            Api: "openai-completions",
+            Name: "Qwen3 235B-A22B Instruct 2507",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 262144,
+            MaxTokens: 16384,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.855m, Output: 2.565m))),
+
         new("huggingface", "Qwen/Qwen3-235B-A22B-Thinking-2507", new ModelDescriptor(
             Provider: "huggingface",
             Id: "Qwen/Qwen3-235B-A22B-Thinking-2507",
@@ -4957,6 +6237,58 @@ public static class BuiltInModels
             },
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 3m))),
+
+        new("huggingface", "Qwen/Qwen3-30B-A3B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3-30B-A3B",
+            Api: "openai-completions",
+            Name: "Qwen3 30B A3B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 40960,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.12m, Output: 0.5m))),
+
+        new("huggingface", "Qwen/Qwen3-32B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3-32B",
+            Api: "openai-completions",
+            Name: "Qwen3 32B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.29m, Output: 0.59m))),
+
+        new("huggingface", "Qwen/Qwen3-Coder-30B-A3B-Instruct", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+            Api: "openai-completions",
+            Name: "Qwen3-Coder 30B-A3B Instruct",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.07m, Output: 0.26m))),
 
         new("huggingface", "Qwen/Qwen3-Coder-480B-A35B-Instruct", new ModelDescriptor(
             Provider: "huggingface",
@@ -5006,6 +6338,66 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 2m))),
 
+        new("huggingface", "Qwen/Qwen3.5-122B-A10B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3.5-122B-A10B",
+            Api: "openai-completions",
+            Name: "Qwen3.5 122B-A10B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.4m, Output: 3.2m))),
+
+        new("huggingface", "Qwen/Qwen3.5-27B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3.5-27B",
+            Api: "openai-completions",
+            Name: "Qwen3.5 27B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 2.4m))),
+
+        new("huggingface", "Qwen/Qwen3.5-35B-A3B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3.5-35B-A3B",
+            Api: "openai-completions",
+            Name: "Qwen3.5 35B-A3B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.25m, Output: 2m))),
+
         new("huggingface", "Qwen/Qwen3.5-397B-A17B", new ModelDescriptor(
             Provider: "huggingface",
             Id: "Qwen/Qwen3.5-397B-A17B",
@@ -5025,6 +6417,66 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.6m, Output: 3.6m))),
+
+        new("huggingface", "Qwen/Qwen3.5-9B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3.5-9B",
+            Api: "openai-completions",
+            Name: "Qwen3.5 9B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.17m, Output: 0.25m))),
+
+        new("huggingface", "Qwen/Qwen3.6-27B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3.6-27B",
+            Api: "openai-completions",
+            Name: "Qwen3.6 27B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.47m, Output: 3.19m))),
+
+        new("huggingface", "Qwen/Qwen3.6-35B-A3B", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3.6-35B-A3B",
+            Api: "openai-completions",
+            Name: "Qwen3.6 35B-A3B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.15m, Output: 0.95m))),
 
         new("huggingface", "XiaomiMiMo/MiMo-V2-Flash", new ModelDescriptor(
             Provider: "huggingface",
@@ -5046,6 +6498,66 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.1m, Output: 0.3m))),
 
+        new("huggingface", "XiaomiMiMo/MiMo-V2.5", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "XiaomiMiMo/MiMo-V2.5",
+            Api: "openai-completions",
+            Name: "MiMo-V2.5",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.4m, Output: 2m))),
+
+        new("huggingface", "XiaomiMiMo/MiMo-V2.5-Pro", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "XiaomiMiMo/MiMo-V2.5-Pro",
+            Api: "openai-completions",
+            Name: "MiMo-V2.5-Pro",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 3m))),
+
+        new("huggingface", "deepseek-ai/DeepSeek-R1", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "deepseek-ai/DeepSeek-R1",
+            Api: "openai-completions",
+            Name: "DeepSeek-R1",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 64000,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.7m, Output: 2.5m))),
+
         new("huggingface", "deepseek-ai/DeepSeek-R1-0528", new ModelDescriptor(
             Provider: "huggingface",
             Id: "deepseek-ai/DeepSeek-R1-0528",
@@ -5065,6 +6577,50 @@ public static class BuiltInModels
             },
             Input: ["text"],
             Cost: new ModelCost(Input: 3m, Output: 5m))),
+
+        new("huggingface", "deepseek-ai/DeepSeek-V3", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "deepseek-ai/DeepSeek-V3",
+            Api: "openai-completions",
+            Name: "DeepSeek-V3",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 64000,
+            MaxTokens: 8192,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.4m, Output: 1.3m))),
+
+        new("huggingface", "deepseek-ai/DeepSeek-V3-0324", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "deepseek-ai/DeepSeek-V3-0324",
+            Api: "openai-completions",
+            Name: "DeepSeek V3 0324",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 163840,
+            MaxTokens: 163840,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.27m, Output: 1.12m))),
+
+        new("huggingface", "deepseek-ai/DeepSeek-V3.1", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "deepseek-ai/DeepSeek-V3.1",
+            Api: "openai-completions",
+            Name: "DeepSeek-V3.1",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 8192,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.27m, Output: 1m))),
 
         new("huggingface", "deepseek-ai/DeepSeek-V3.2", new ModelDescriptor(
             Provider: "huggingface",
@@ -5086,6 +6642,46 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.28m, Output: 0.4m))),
 
+        new("huggingface", "deepseek-ai/DeepSeek-V4-Flash", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "deepseek-ai/DeepSeek-V4-Flash",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Flash",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m))),
+
+        new("huggingface", "deepseek-ai/DeepSeek-V4-Flash-0731", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "deepseek-ai/DeepSeek-V4-Flash-0731",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Flash 0731",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m))),
+
         new("huggingface", "deepseek-ai/DeepSeek-V4-Pro", new ModelDescriptor(
             Provider: "huggingface",
             Id: "deepseek-ai/DeepSeek-V4-Pro",
@@ -5105,6 +6701,70 @@ public static class BuiltInModels
             },
             Input: ["text"],
             Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
+
+        new("huggingface", "google/gemma-4-26B-A4B-it", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "google/gemma-4-26B-A4B-it",
+            Api: "openai-completions",
+            Name: "Gemma 4 26B A4B IT",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.13m, Output: 0.4m))),
+
+        new("huggingface", "google/gemma-4-31B-it", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "google/gemma-4-31B-it",
+            Api: "openai-completions",
+            Name: "Gemma 4 31B IT",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.4m))),
+
+        new("huggingface", "meta-llama/Llama-3.1-8B-Instruct", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "meta-llama/Llama-3.1-8B-Instruct",
+            Api: "openai-completions",
+            Name: "Llama-3.1-8B-Instruct",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 131072,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.06m, Output: 0.06m))),
+
+        new("huggingface", "meta-llama/Llama-3.3-70B-Instruct", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "meta-llama/Llama-3.3-70B-Instruct",
+            Api: "openai-completions",
+            Name: "Llama-3.3-70B-Instruct",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 131072,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.59m, Output: 0.79m))),
 
         new("huggingface", "moonshotai/Kimi-K2-Instruct", new ModelDescriptor(
             Provider: "huggingface",
@@ -5190,6 +6850,266 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
 
+        new("huggingface", "moonshotai/Kimi-K2.7-Code", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "moonshotai/Kimi-K2.7-Code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m))),
+
+        new("huggingface", "moonshotai/Kimi-K3", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "moonshotai/Kimi-K3",
+            Api: "openai-completions",
+            Name: "Kimi K3",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m))),
+
+        new("huggingface", "openai/gpt-oss-120b", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "openai/gpt-oss-120b",
+            Api: "openai-completions",
+            Name: "GPT OSS 120B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.25m, Output: 0.69m))),
+
+        new("huggingface", "openai/gpt-oss-20b", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "openai/gpt-oss-20b",
+            Api: "openai-completions",
+            Name: "GPT OSS 20B",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.5m))),
+
+        new("huggingface", "stepfun-ai/Step-3.5-Flash", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "stepfun-ai/Step-3.5-Flash",
+            Api: "openai-completions",
+            Name: "Step 3.5 Flash",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 256000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.3m))),
+
+        new("huggingface", "stepfun-ai/Step-3.7-Flash", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "stepfun-ai/Step-3.7-Flash",
+            Api: "openai-completions",
+            Name: "Step 3.7 Flash",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 256000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.2m, Output: 1.15m))),
+
+        new("huggingface", "tencent/Hy3", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "tencent/Hy3",
+            Api: "openai-completions",
+            Name: "Hy3",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 64000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.58m))),
+
+        new("huggingface", "thinkingmachines/Inkling", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "thinkingmachines/Inkling",
+            Api: "openai-completions",
+            Name: "Inkling",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 1048576,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1m, Output: 4.05m))),
+
+        new("huggingface", "thinkingmachines/Inkling-Small", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "thinkingmachines/Inkling-Small",
+            Api: "openai-completions",
+            Name: "Inkling Small",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 524288,
+            MaxTokens: 1048576,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.5m, Output: 1.2m))),
+
+        new("huggingface", "zai-org/GLM-4.5", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "zai-org/GLM-4.5",
+            Api: "openai-completions",
+            Name: "GLM-4.5",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 98304,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.6m, Output: 2.2m))),
+
+        new("huggingface", "zai-org/GLM-4.5-Air", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "zai-org/GLM-4.5-Air",
+            Api: "openai-completions",
+            Name: "GLM-4.5-Air",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 98304,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.13m, Output: 0.85m))),
+
+        new("huggingface", "zai-org/GLM-4.5V", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "zai-org/GLM-4.5V",
+            Api: "openai-completions",
+            Name: "GLM-4.5V",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 65536,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.6m, Output: 1.8m))),
+
+        new("huggingface", "zai-org/GLM-4.6", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "zai-org/GLM-4.6",
+            Api: "openai-completions",
+            Name: "GLM-4.6",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 204800,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.55m, Output: 2.2m))),
+
         new("huggingface", "zai-org/GLM-4.7", new ModelDescriptor(
             Provider: "huggingface",
             Id: "zai-org/GLM-4.7",
@@ -5270,57 +7190,15 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1m, Output: 3.2m, CacheRead: 0.2m))),
 
-        // kimi-coding
-
-        new("kimi-coding", "k2p5", new ModelDescriptor(
-            Provider: "kimi-coding",
-            Id: "k2p5",
+        new("huggingface", "zai-org/GLM-5.2", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "zai-org/GLM-5.2",
             Api: "openai-completions",
-            Name: "Kimi K2.5",
-            BaseUrl: "https://api.moonshot.ai/v1",
+            Name: "GLM-5.2",
+            BaseUrl: "https://router.huggingface.co/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 32768,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
-        new("kimi-coding", "k2p6", new ModelDescriptor(
-            Provider: "kimi-coding",
-            Id: "k2p6",
-            Api: "openai-completions",
-            Name: "Kimi K2.6",
-            BaseUrl: "https://api.moonshot.ai/v1",
-            Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 32768,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
-        new("kimi-coding", "kimi-k2-thinking", new ModelDescriptor(
-            Provider: "kimi-coding",
-            Id: "kimi-k2-thinking",
-            Api: "openai-completions",
-            Name: "Kimi K2 Thinking",
-            BaseUrl: "https://api.moonshot.ai/v1",
-            Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 32768,
+            MaxTokens: 131072,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -5330,6 +7208,88 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m))),
+
+        // kimi-coding
+
+        new("kimi-coding", "k3", new ModelDescriptor(
+            Provider: "kimi-coding",
+            Id: "k3",
+            Api: "openai-completions",
+            Name: "Kimi K3",
+            BaseUrl: "https://api.moonshot.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("kimi-coding", "k3-256k", new ModelDescriptor(
+            Provider: "kimi-coding",
+            Id: "k3-256k",
+            Api: "openai-completions",
+            Name: "Kimi K3-256K",
+            BaseUrl: "https://api.moonshot.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("kimi-coding", "kimi-for-coding", new ModelDescriptor(
+            Provider: "kimi-coding",
+            Id: "kimi-for-coding",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://api.moonshot.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("kimi-coding", "kimi-for-coding-highspeed", new ModelDescriptor(
+            Provider: "kimi-coding",
+            Id: "kimi-for-coding-highspeed",
+            Api: "openai-completions",
+            Name: "Kimi For Coding HighSpeed",
+            BaseUrl: "https://api.moonshot.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
             Cost: new ModelCost(Input: 0m, Output: 0m))),
 
         // minimax
@@ -5372,7 +7332,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.3m, Output: 1.2m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.03m, CacheWrite: 0.375m))),
 
         new("minimax", "MiniMax-M2.5", new ModelDescriptor(
             Provider: "minimax",
@@ -5461,7 +7421,7 @@ public static class BuiltInModels
             Name: "MiniMax-M3",
             BaseUrl: "https://api.minimax.io/v1",
             Reasoning: true,
-            ContextWindow: 512000,
+            ContextWindow: 1000000,
             MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -5472,7 +7432,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.6m, Output: 2.4m, CacheRead: 0.12m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
         // minimax-cn
 
@@ -5514,7 +7474,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.3m, Output: 1.2m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.03m, CacheWrite: 0.375m))),
 
         new("minimax-cn", "MiniMax-M2.5", new ModelDescriptor(
             Provider: "minimax-cn",
@@ -5603,7 +7563,7 @@ public static class BuiltInModels
             Name: "MiniMax-M3",
             BaseUrl: "https://api.minimaxi.com/v1",
             Reasoning: true,
-            ContextWindow: 512000,
+            ContextWindow: 1000000,
             MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -5614,7 +7574,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.6m, Output: 2.4m, CacheRead: 0.12m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
         // mistral
 
@@ -5864,11 +7824,19 @@ public static class BuiltInModels
             Api: "mistral-conversations",
             Name: "Mistral Medium (latest)",
             BaseUrl: "https://api.mistral.ai",
-            Reasoning: false,
+            Reasoning: true,
             ContextWindow: 262144,
             MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.4m, Output: 2m))),
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m))),
 
         new("mistral", "mistral-nemo", new ModelDescriptor(
             Provider: "mistral",
@@ -6006,6 +7974,18 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 2m, Output: 6m))),
 
+        new("mistral", "voxtral-small-latest", new ModelDescriptor(
+            Provider: "mistral",
+            Id: "voxtral-small-latest",
+            Api: "mistral-conversations",
+            Name: "Voxtral Small (latest)",
+            BaseUrl: "https://api.mistral.ai",
+            Reasoning: false,
+            ContextWindow: 32000,
+            MaxTokens: 32000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.3m))),
+
         // moonshotai
 
         new("moonshotai", "kimi-k2-0711-preview", new ModelDescriptor(
@@ -6124,6 +8104,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
 
+        new("moonshotai", "kimi-k2.7-code", new ModelDescriptor(
+            Provider: "moonshotai",
+            Id: "kimi-k2.7-code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://api.moonshot.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
+
+        new("moonshotai", "kimi-k2.7-code-highspeed", new ModelDescriptor(
+            Provider: "moonshotai",
+            Id: "kimi-k2.7-code-highspeed",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code HighSpeed",
+            BaseUrl: "https://api.moonshot.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.9m, Output: 8m, CacheRead: 0.38m))),
+
+        new("moonshotai", "kimi-k3", new ModelDescriptor(
+            Provider: "moonshotai",
+            Id: "kimi-k3",
+            Api: "openai-completions",
+            Name: "Kimi K3",
+            BaseUrl: "https://api.moonshot.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
+
         // moonshotai-cn
 
         new("moonshotai-cn", "kimi-k2-0711-preview", new ModelDescriptor(
@@ -6241,6 +8281,66 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
+
+        new("moonshotai-cn", "kimi-k2.7-code", new ModelDescriptor(
+            Provider: "moonshotai-cn",
+            Id: "kimi-k2.7-code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://api.moonshot.cn/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
+
+        new("moonshotai-cn", "kimi-k2.7-code-highspeed", new ModelDescriptor(
+            Provider: "moonshotai-cn",
+            Id: "kimi-k2.7-code-highspeed",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code HighSpeed",
+            BaseUrl: "https://api.moonshot.cn/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.9m, Output: 8m, CacheRead: 0.38m))),
+
+        new("moonshotai-cn", "kimi-k3", new ModelDescriptor(
+            Provider: "moonshotai-cn",
+            Id: "kimi-k3",
+            Api: "openai-completions",
+            Name: "Kimi K3",
+            BaseUrl: "https://api.moonshot.cn/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
 
         // openai
 
@@ -6384,26 +8484,6 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
 
-        new("openai", "gpt-5-codex", new ModelDescriptor(
-            Provider: "openai",
-            Id: "gpt-5-codex",
-            Api: "openai-responses",
-            Name: "GPT-5-Codex",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 400000,
-            MaxTokens: 128000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
-
         new("openai", "gpt-5-mini", new ModelDescriptor(
             Provider: "openai",
             Id: "gpt-5-mini",
@@ -6484,86 +8564,6 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
 
-        new("openai", "gpt-5.1-chat-latest", new ModelDescriptor(
-            Provider: "openai",
-            Id: "gpt-5.1-chat-latest",
-            Api: "openai-responses",
-            Name: "GPT-5.1 Chat",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 128000,
-            MaxTokens: 16384,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
-
-        new("openai", "gpt-5.1-codex", new ModelDescriptor(
-            Provider: "openai",
-            Id: "gpt-5.1-codex",
-            Api: "openai-responses",
-            Name: "GPT-5.1 Codex",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 400000,
-            MaxTokens: 128000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
-
-        new("openai", "gpt-5.1-codex-max", new ModelDescriptor(
-            Provider: "openai",
-            Id: "gpt-5.1-codex-max",
-            Api: "openai-responses",
-            Name: "GPT-5.1 Codex Max",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 400000,
-            MaxTokens: 128000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
-
-        new("openai", "gpt-5.1-codex-mini", new ModelDescriptor(
-            Provider: "openai",
-            Id: "gpt-5.1-codex-mini",
-            Api: "openai-responses",
-            Name: "GPT-5.1 Codex mini",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 400000,
-            MaxTokens: 128000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.25m, Output: 2m, CacheRead: 0.025m))),
-
         new("openai", "gpt-5.2", new ModelDescriptor(
             Provider: "openai",
             Id: "gpt-5.2",
@@ -6593,26 +8593,6 @@ public static class BuiltInModels
             Reasoning: true,
             ContextWindow: 128000,
             MaxTokens: 16384,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 1.75m, Output: 14m, CacheRead: 0.175m))),
-
-        new("openai", "gpt-5.2-codex", new ModelDescriptor(
-            Provider: "openai",
-            Id: "gpt-5.2-codex",
-            Api: "openai-responses",
-            Name: "GPT-5.2 Codex",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 400000,
-            MaxTokens: 128000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -6816,6 +8796,106 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 30m, Output: 180m))),
 
+        new("openai", "gpt-5.6", new ModelDescriptor(
+            Provider: "openai",
+            Id: "gpt-5.6",
+            Api: "openai-responses",
+            Name: "GPT-5.6",
+            BaseUrl: "https://api.openai.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("openai", "gpt-5.6-luna", new ModelDescriptor(
+            Provider: "openai",
+            Id: "gpt-5.6-luna",
+            Api: "openai-responses",
+            Name: "GPT-5.6 Luna",
+            BaseUrl: "https://api.openai.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.2m, Output: 1.2m, CacheRead: 0.02m, CacheWrite: 0.25m))),
+
+        new("openai", "gpt-5.6-sol", new ModelDescriptor(
+            Provider: "openai",
+            Id: "gpt-5.6-sol",
+            Api: "openai-responses",
+            Name: "GPT-5.6 Sol",
+            BaseUrl: "https://api.openai.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("openai", "gpt-5.6-terra", new ModelDescriptor(
+            Provider: "openai",
+            Id: "gpt-5.6-terra",
+            Api: "openai-responses",
+            Name: "GPT-5.6 Terra",
+            BaseUrl: "https://api.openai.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m, CacheWrite: 2.5m))),
+
+        new("openai", "gpt-realtime-2.1", new ModelDescriptor(
+            Provider: "openai",
+            Id: "gpt-realtime-2.1",
+            Api: "openai-responses",
+            Name: "GPT-Realtime-2.1",
+            BaseUrl: "https://api.openai.com",
+            Reasoning: true,
+            ContextWindow: 128000,
+            MaxTokens: 32000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 4m, Output: 24m, CacheRead: 0.4m))),
+
         new("openai", "o1", new ModelDescriptor(
             Provider: "openai",
             Id: "o1",
@@ -6876,26 +8956,6 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 2m, Output: 8m, CacheRead: 0.5m))),
 
-        new("openai", "o3-deep-research", new ModelDescriptor(
-            Provider: "openai",
-            Id: "o3-deep-research",
-            Api: "openai-responses",
-            Name: "o3-deep-research",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 100000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 10m, Output: 40m, CacheRead: 2.5m))),
-
         new("openai", "o3-mini", new ModelDescriptor(
             Provider: "openai",
             Id: "o3-mini",
@@ -6955,26 +9015,6 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.1m, Output: 4.4m, CacheRead: 0.275m))),
-
-        new("openai", "o4-mini-deep-research", new ModelDescriptor(
-            Provider: "openai",
-            Id: "o4-mini-deep-research",
-            Api: "openai-responses",
-            Name: "o4-mini-deep-research",
-            BaseUrl: "https://api.openai.com",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 100000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 2m, Output: 8m, CacheRead: 0.5m))),
 
         // openai-codex
 
@@ -7272,6 +9312,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
+        new("opencode", "claude-opus-5", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "claude-opus-5",
+            Api: "openai-completions",
+            Name: "Claude Opus 5",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
         new("opencode", "claude-sonnet-4", new ModelDescriptor(
             Provider: "opencode",
             Id: "claude-sonnet-4",
@@ -7331,6 +9391,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+
+        new("opencode", "claude-sonnet-5", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "claude-sonnet-5",
+            Api: "openai-completions",
+            Name: "Claude Sonnet 5",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("opencode", "deepseek-v4-flash", new ModelDescriptor(
             Provider: "opencode",
@@ -7472,6 +9552,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
 
+        new("opencode", "gemini-3.5-flash-lite", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "gemini-3.5-flash-lite",
+            Api: "openai-completions",
+            Name: "Gemini 3.5 Flash Lite",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m))),
+
+        new("opencode", "gemini-3.6-flash", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "gemini-3.6-flash",
+            Api: "openai-completions",
+            Name: "Gemini 3.6 Flash",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m))),
+
+        new("opencode", "gemini-3.7-flash", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "gemini-3.7-flash",
+            Api: "openai-completions",
+            Name: "Gemini 3.7 Flash",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m))),
+
         new("opencode", "glm-4.6", new ModelDescriptor(
             Provider: "opencode",
             Id: "glm-4.6",
@@ -7580,6 +9720,26 @@ public static class BuiltInModels
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+
+        new("opencode", "glm-5.2", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "glm-5.2",
+            Api: "openai-completions",
+            Name: "GLM-5.2",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
             MaxTokens: 131072,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -7932,6 +10092,106 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 30m, Output: 180m, CacheRead: 30m))),
 
+        new("opencode", "gpt-5.6-luna", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "gpt-5.6-luna",
+            Api: "openai-completions",
+            Name: "GPT-5.6 Luna",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.2m, Output: 1.2m, CacheRead: 0.02m, CacheWrite: 0.25m))),
+
+        new("opencode", "gpt-5.6-sol", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "gpt-5.6-sol",
+            Api: "openai-completions",
+            Name: "GPT-5.6 Sol",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("opencode", "gpt-5.6-terra", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "gpt-5.6-terra",
+            Api: "openai-completions",
+            Name: "GPT-5.6 Terra",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m, CacheWrite: 3.125m))),
+
+        new("opencode", "grok-4.5", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "grok-4.5",
+            Api: "openai-completions",
+            Name: "Grok 4.5",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 500000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
+
+        new("opencode", "grok-4.6", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "grok-4.6",
+            Api: "openai-completions",
+            Name: "Grok 4.6",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 500000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
+
         new("opencode", "grok-build-0.1", new ModelDescriptor(
             Provider: "opencode",
             Id: "grok-build-0.1",
@@ -7961,6 +10221,26 @@ public static class BuiltInModels
             Reasoning: true,
             ContextWindow: 256000,
             MaxTokens: 256000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("opencode", "hy3-free", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "hy3-free",
+            Api: "openai-completions",
+            Name: "Hy3 Free",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 190000,
+            MaxTokens: 64000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -8084,6 +10364,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
 
+        new("opencode", "kimi-k2.7-code", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "kimi-k2.7-code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
+
+        new("opencode", "kimi-k3", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "kimi-k3",
+            Api: "openai-completions",
+            Name: "Kimi K3",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
+
+        new("opencode", "laguna-s-2.1-free", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "laguna-s-2.1-free",
+            Api: "openai-completions",
+            Name: "Laguna S 2.1 Free",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 32000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
         new("opencode", "ling-2.6-flash-free", new ModelDescriptor(
             Provider: "opencode",
             Id: "ling-2.6-flash-free",
@@ -8093,6 +10433,66 @@ public static class BuiltInModels
             Reasoning: false,
             ContextWindow: 262100,
             MaxTokens: 32800,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("opencode", "ling-3.0-flash-free", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "ling-3.0-flash-free",
+            Api: "openai-completions",
+            Name: "Ling-3.0-flash Free",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("opencode", "ling-3.0-tiny-free", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "ling-3.0-tiny-free",
+            Api: "openai-completions",
+            Name: "Ling-3.0-tiny Free",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("opencode", "longcat-2.0-free", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "longcat-2.0-free",
+            Api: "openai-completions",
+            Name: "LongCat-2.0 Free",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
             Input: ["text"],
             Cost: new ModelCost(Input: 0m, Output: 0m))),
 
@@ -8180,7 +10580,7 @@ public static class BuiltInModels
             Provider: "opencode",
             Id: "minimax-m2.1",
             Api: "openai-completions",
-            Name: "MiniMax M2.1",
+            Name: "MiniMax-M2.1",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
@@ -8200,7 +10600,7 @@ public static class BuiltInModels
             Provider: "opencode",
             Id: "minimax-m2.1-free",
             Api: "openai-completions",
-            Name: "MiniMax M2.1 Free",
+            Name: "MiniMax-M2.1 Free",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
@@ -8220,7 +10620,7 @@ public static class BuiltInModels
             Provider: "opencode",
             Id: "minimax-m2.5",
             Api: "openai-completions",
-            Name: "MiniMax M2.5",
+            Name: "MiniMax-M2.5",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
@@ -8240,7 +10640,7 @@ public static class BuiltInModels
             Provider: "opencode",
             Id: "minimax-m2.5-free",
             Api: "openai-completions",
-            Name: "MiniMax M2.5 Free",
+            Name: "MiniMax-M2.5 Free",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
@@ -8260,7 +10660,7 @@ public static class BuiltInModels
             Provider: "opencode",
             Id: "minimax-m2.7",
             Api: "openai-completions",
-            Name: "MiniMax M2.7",
+            Name: "MiniMax-M2.7",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
@@ -8276,11 +10676,31 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
+        new("opencode", "minimax-m3", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "minimax-m3",
+            Api: "openai-completions",
+            Name: "MiniMax-M3",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 512000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
+
         new("opencode", "minimax-m3-free", new ModelDescriptor(
             Provider: "opencode",
             Id: "minimax-m3-free",
             Api: "openai-completions",
-            Name: "MiniMax M3 Free",
+            Name: "MiniMax-M3 Free",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 200000,
@@ -8295,6 +10715,26 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("opencode", "muse-spark-1.2", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "muse-spark-1.2",
+            Api: "openai-completions",
+            Name: "Muse Spark 1.2",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.25m, Output: 4.25m, CacheRead: 0.15m))),
 
         new("opencode", "nemotron-3-super-free", new ModelDescriptor(
             Provider: "opencode",
@@ -8325,6 +10765,26 @@ public static class BuiltInModels
             Reasoning: true,
             ContextWindow: 1000000,
             MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("opencode", "nemotron-3.5-lightning-free", new ModelDescriptor(
+            Provider: "opencode",
+            Id: "nemotron-3.5-lightning-free",
+            Api: "openai-completions",
+            Name: "Nemotron 3.5 Lightning Free",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -8466,7 +10926,7 @@ public static class BuiltInModels
             Provider: "opencode-go",
             Id: "deepseek-v4-flash",
             Api: "openai-completions",
-            Name: "DeepSeek V4 Flash",
+            Name: "DeepSeek V4 Flash (2x usage)",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 1000000,
@@ -8480,13 +10940,13 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
+            Cost: new ModelCost(Input: 0.07m, Output: 0.14m, CacheRead: 0.0014m))),
 
         new("opencode-go", "deepseek-v4-pro", new ModelDescriptor(
             Provider: "opencode-go",
             Id: "deepseek-v4-pro",
             Api: "openai-completions",
-            Name: "DeepSeek V4 Pro",
+            Name: "DeepSeek V4 Pro (New)",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 1000000,
@@ -8500,7 +10960,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.74m, Output: 3.48m, CacheRead: 0.0145m))),
+            Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
 
         new("opencode-go", "glm-5", new ModelDescriptor(
             Provider: "opencode-go",
@@ -8542,6 +11002,106 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
 
+        new("opencode-go", "glm-5.2", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "glm-5.2",
+            Api: "openai-completions",
+            Name: "GLM-5.2",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+
+        new("opencode-go", "glm-5.3", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "glm-5.3",
+            Api: "openai-completions",
+            Name: "GLM-5.3",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+
+        new("opencode-go", "gpt-5.6-luna", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "gpt-5.6-luna",
+            Api: "openai-completions",
+            Name: "GPT-5.6 Luna (2x usage)",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.6m, CacheRead: 0.01m, CacheWrite: 0.125m))),
+
+        new("opencode-go", "grok-4.5", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "grok-4.5",
+            Api: "openai-completions",
+            Name: "Grok 4.5",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 500000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
+
+        new("opencode-go", "hy3", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "hy3",
+            Api: "openai-completions",
+            Name: "Hy3",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 64000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.58m, CacheRead: 0.035m))),
+
         new("opencode-go", "kimi-k2.5", new ModelDescriptor(
             Provider: "opencode-go",
             Id: "kimi-k2.5",
@@ -8581,6 +11141,46 @@ public static class BuiltInModels
             },
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
+
+        new("opencode-go", "kimi-k2.7-code", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "kimi-k2.7-code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
+
+        new("opencode-go", "kimi-k3", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "kimi-k3",
+            Api: "openai-completions",
+            Name: "Kimi K3",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
 
         new("opencode-go", "mimo-v2-omni", new ModelDescriptor(
             Provider: "opencode-go",
@@ -8660,13 +11260,13 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.74m, Output: 3.48m, CacheRead: 0.0145m))),
+            Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
 
         new("opencode-go", "minimax-m2.5", new ModelDescriptor(
             Provider: "opencode-go",
             Id: "minimax-m2.5",
             Api: "openai-completions",
-            Name: "MiniMax M2.5",
+            Name: "MiniMax-M2.5",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
@@ -8686,7 +11286,7 @@ public static class BuiltInModels
             Provider: "opencode-go",
             Id: "minimax-m2.7",
             Api: "openai-completions",
-            Name: "MiniMax M2.7",
+            Name: "MiniMax-M2.7",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
             ContextWindow: 204800,
@@ -8706,10 +11306,10 @@ public static class BuiltInModels
             Provider: "opencode-go",
             Id: "minimax-m3",
             Api: "openai-completions",
-            Name: "MiniMax M3",
+            Name: "MiniMax-M3",
             BaseUrl: "https://api.opencode.ai/v1",
             Reasoning: true,
-            ContextWindow: 512000,
+            ContextWindow: 1000000,
             MaxTokens: 131072,
             ThinkingLevelMap: new Dictionary<string, int>
             {
@@ -8802,6 +11402,26 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 0.4m, Output: 1.6m, CacheRead: 0.04m, CacheWrite: 0.5m))),
 
+        new("opencode-go", "qwen3.8-max", new ModelDescriptor(
+            Provider: "opencode-go",
+            Id: "qwen3.8-max",
+            Api: "openai-completions",
+            Name: "Qwen3.8 Max",
+            BaseUrl: "https://api.opencode.ai/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.25m, CacheWrite: 2.5m))),
+
         // openrouter
 
         new("openrouter", "ai21/jamba-large-1.7", new ModelDescriptor(
@@ -8815,6 +11435,42 @@ public static class BuiltInModels
             MaxTokens: 4096,
             Input: ["text"],
             Cost: new ModelCost(Input: 2m, Output: 8m))),
+
+        new("openrouter", "aion-labs/aion-2.0", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "aion-labs/aion-2.0",
+            Api: "openai-completions",
+            Name: "AionLabs: Aion-2.0",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.8m, Output: 1.6m, CacheRead: 0.2m))),
+
+        new("openrouter", "aion-labs/aion-3.0", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "aion-labs/aion-3.0",
+            Api: "openai-completions",
+            Name: "AionLabs: Aion-3.0",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 3m, Output: 6m, CacheRead: 0.75m))),
+
+        new("openrouter", "aion-labs/aion-3.0-mini", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "aion-labs/aion-3.0-mini",
+            Api: "openai-completions",
+            Name: "AionLabs: Aion-3.0-Mini",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.7m, Output: 1.4m, CacheRead: 0.18m))),
 
         new("openrouter", "amazon/nova-2-lite-v1", new ModelDescriptor(
             Provider: "openrouter",
@@ -8888,18 +11544,6 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.25m, Output: 1.25m, CacheRead: 0.03m, CacheWrite: 0.3m))),
 
-        new("openrouter", "anthropic/claude-3.5-haiku", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "anthropic/claude-3.5-haiku",
-            Api: "openai-completions",
-            Name: "Anthropic: Claude 3.5 Haiku",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 200000,
-            MaxTokens: 8192,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.8m, Output: 4m, CacheRead: 0.08m, CacheWrite: 1m))),
-
         new("openrouter", "anthropic/claude-fable-5", new ModelDescriptor(
             Provider: "openrouter",
             Id: "anthropic/claude-fable-5",
@@ -8912,6 +11556,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 10m, Output: 50m, CacheRead: 1m, CacheWrite: 12.5m))),
 
+        new("openrouter", "anthropic/claude-fable-5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-fable-5:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Fable 5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
         new("openrouter", "anthropic/claude-haiku-4.5", new ModelDescriptor(
             Provider: "openrouter",
             Id: "anthropic/claude-haiku-4.5",
@@ -8923,6 +11579,18 @@ public static class BuiltInModels
             MaxTokens: 64000,
             Input: ["text"],
             Cost: new ModelCost(Input: 1m, Output: 5m, CacheRead: 0.1m, CacheWrite: 1.25m))),
+
+        new("openrouter", "anthropic/claude-haiku-4.5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-haiku-4.5:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Haiku 4.5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 64000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.5m, Output: 2.5m, CacheRead: 0.05m, CacheWrite: 0.625m))),
 
         new("openrouter", "anthropic/claude-opus-4", new ModelDescriptor(
             Provider: "openrouter",
@@ -8948,6 +11616,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 15m, Output: 75m, CacheRead: 1.5m, CacheWrite: 18.75m))),
 
+        new("openrouter", "anthropic/claude-opus-4.1:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-opus-4.1:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Opus 4.1 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 32000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 7.5m, Output: 37.5m, CacheRead: 0.75m, CacheWrite: 9.375m))),
+
         new("openrouter", "anthropic/claude-opus-4.5", new ModelDescriptor(
             Provider: "openrouter",
             Id: "anthropic/claude-opus-4.5",
@@ -8959,6 +11639,18 @@ public static class BuiltInModels
             MaxTokens: 64000,
             Input: ["text"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("openrouter", "anthropic/claude-opus-4.5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-opus-4.5:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Opus 4.5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 64000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.5m, Output: 12.5m, CacheRead: 0.25m, CacheWrite: 3.125m))),
 
         new("openrouter", "anthropic/claude-opus-4.6", new ModelDescriptor(
             Provider: "openrouter",
@@ -8972,17 +11664,17 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
-        new("openrouter", "anthropic/claude-opus-4.6-fast", new ModelDescriptor(
+        new("openrouter", "anthropic/claude-opus-4.6:batch", new ModelDescriptor(
             Provider: "openrouter",
-            Id: "anthropic/claude-opus-4.6-fast",
+            Id: "anthropic/claude-opus-4.6:batch",
             Api: "openai-completions",
-            Name: "Anthropic: Claude Opus 4.6 (Fast)",
+            Name: "Anthropic: Claude Opus 4.6 (batch)",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1000000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 30m, Output: 150m, CacheRead: 3m, CacheWrite: 37.5m))),
+            Cost: new ModelCost(Input: 2.5m, Output: 12.5m, CacheRead: 0.25m, CacheWrite: 3.125m))),
 
         new("openrouter", "anthropic/claude-opus-4.7", new ModelDescriptor(
             Provider: "openrouter",
@@ -9008,6 +11700,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 30m, Output: 150m, CacheRead: 3m, CacheWrite: 37.5m))),
 
+        new("openrouter", "anthropic/claude-opus-4.7:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-opus-4.7:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Opus 4.7 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.5m, Output: 12.5m, CacheRead: 0.25m, CacheWrite: 3.125m))),
+
         new("openrouter", "anthropic/claude-opus-4.8", new ModelDescriptor(
             Provider: "openrouter",
             Id: "anthropic/claude-opus-4.8",
@@ -9031,6 +11735,54 @@ public static class BuiltInModels
             MaxTokens: 128000,
             Input: ["text"],
             Cost: new ModelCost(Input: 10m, Output: 50m, CacheRead: 1m, CacheWrite: 12.5m))),
+
+        new("openrouter", "anthropic/claude-opus-4.8:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-opus-4.8:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Opus 4.8 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.5m, Output: 12.5m, CacheRead: 0.25m, CacheWrite: 3.125m))),
+
+        new("openrouter", "anthropic/claude-opus-5", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-opus-5",
+            Api: "openai-completions",
+            Name: "Claude Opus 5",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("openrouter", "anthropic/claude-opus-5-fast", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-opus-5-fast",
+            Api: "openai-completions",
+            Name: "Claude Opus 5 (Fast)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 10m, Output: 50m, CacheRead: 1m, CacheWrite: 12.5m))),
+
+        new("openrouter", "anthropic/claude-opus-5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-opus-5:batch",
+            Api: "openai-completions",
+            Name: "Claude Opus 5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.5m, Output: 12.5m, CacheRead: 0.25m, CacheWrite: 3.125m))),
 
         new("openrouter", "anthropic/claude-sonnet-4", new ModelDescriptor(
             Provider: "openrouter",
@@ -9056,6 +11808,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
 
+        new("openrouter", "anthropic/claude-sonnet-4.5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-sonnet-4.5:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Sonnet 4.5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 64000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m, CacheWrite: 1.875m))),
+
         new("openrouter", "anthropic/claude-sonnet-4.6", new ModelDescriptor(
             Provider: "openrouter",
             Id: "anthropic/claude-sonnet-4.6",
@@ -9068,6 +11832,42 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
 
+        new("openrouter", "anthropic/claude-sonnet-4.6:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-sonnet-4.6:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Sonnet 4.6 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m, CacheWrite: 1.875m))),
+
+        new("openrouter", "anthropic/claude-sonnet-5", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-sonnet-5",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Sonnet 5",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
+
+        new("openrouter", "anthropic/claude-sonnet-5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "anthropic/claude-sonnet-5:batch",
+            Api: "openai-completions",
+            Name: "Anthropic: Claude Sonnet 5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 5m, CacheRead: 0.1m, CacheWrite: 1.25m))),
+
         new("openrouter", "arcee-ai/trinity-large-thinking", new ModelDescriptor(
             Provider: "openrouter",
             Id: "arcee-ai/trinity-large-thinking",
@@ -9079,18 +11879,6 @@ public static class BuiltInModels
             MaxTokens: 262144,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.22m, Output: 0.85m, CacheRead: 0.06m))),
-
-        new("openrouter", "arcee-ai/trinity-mini", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "arcee-ai/trinity-mini",
-            Api: "openai-completions",
-            Name: "Arcee AI: Trinity Mini",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: true,
-            ContextWindow: 131072,
-            MaxTokens: 131072,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.045m, Output: 0.15m))),
 
         new("openrouter", "arcee-ai/virtuoso-large", new ModelDescriptor(
             Provider: "openrouter",
@@ -9127,6 +11915,30 @@ public static class BuiltInModels
             MaxTokens: 32768,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.075m, Output: 0.3m))),
+
+        new("openrouter", "bytedance-seed/seed-2-1-turbo", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "bytedance-seed/seed-2-1-turbo",
+            Api: "openai-completions",
+            Name: "ByteDance Seed: Seed 2.1 Turbo",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.5m, Output: 2.5m))),
+
+        new("openrouter", "bytedance-seed/seed-2.0-code", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "bytedance-seed/seed-2.0-code",
+            Api: "openai-completions",
+            Name: "ByteDance Seed: Seed-2.0-Code",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 131072,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.5m, Output: 3m))),
 
         new("openrouter", "bytedance-seed/seed-2.0-lite", new ModelDescriptor(
             Provider: "openrouter",
@@ -9176,6 +11988,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 2.5m, Output: 10m))),
 
+        new("openrouter", "cohere/north-mini-code:free", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "cohere/north-mini-code:free",
+            Api: "openai-completions",
+            Name: "Cohere: North Mini Code (free)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 64000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
         new("openrouter", "deepseek/deepseek-chat", new ModelDescriptor(
             Provider: "openrouter",
             Id: "deepseek/deepseek-chat",
@@ -9183,10 +12007,10 @@ public static class BuiltInModels
             Name: "DeepSeek: DeepSeek V3",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 131072,
+            ContextWindow: 163840,
             MaxTokens: 16000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.2002m, Output: 0.8001m))),
+            Cost: new ModelCost(Input: 0.2574m, Output: 1.0287m))),
 
         new("openrouter", "deepseek/deepseek-chat-v3-0324", new ModelDescriptor(
             Provider: "openrouter",
@@ -9195,10 +12019,10 @@ public static class BuiltInModels
             Name: "DeepSeek: DeepSeek V3 0324",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 131072,
-            MaxTokens: 16384,
+            ContextWindow: 163840,
+            MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.2m, Output: 0.77m, CacheRead: 0.135m))),
+            Cost: new ModelCost(Input: 0.27m, Output: 1.12m, CacheRead: 0.135m))),
 
         new("openrouter", "deepseek/deepseek-chat-v3.1", new ModelDescriptor(
             Provider: "openrouter",
@@ -9210,7 +12034,7 @@ public static class BuiltInModels
             ContextWindow: 163840,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.21m, Output: 0.79m, CacheRead: 0.13m))),
+            Cost: new ModelCost(Input: 0.25m, Output: 0.95m, CacheRead: 0.13m))),
 
         new("openrouter", "deepseek/deepseek-r1", new ModelDescriptor(
             Provider: "openrouter",
@@ -9219,7 +12043,7 @@ public static class BuiltInModels
             Name: "DeepSeek: R1",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 163840,
+            ContextWindow: 64000,
             MaxTokens: 16000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.7m, Output: 2.5m))),
@@ -9255,10 +12079,10 @@ public static class BuiltInModels
             Name: "DeepSeek: DeepSeek V3.2",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 131072,
-            MaxTokens: 64000,
+            ContextWindow: 163840,
+            MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.2288m, Output: 0.3432m))),
+            Cost: new ModelCost(Input: 0.269m, Output: 0.4m, CacheRead: 0.1345m))),
 
         new("openrouter", "deepseek/deepseek-v3.2-exp", new ModelDescriptor(
             Provider: "openrouter",
@@ -9276,13 +12100,25 @@ public static class BuiltInModels
             Provider: "openrouter",
             Id: "deepseek/deepseek-v4-flash",
             Api: "openai-completions",
-            Name: "DeepSeek: DeepSeek V4 Flash",
+            Name: "DeepSeek: DeepSeek V4 Flash 0423",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 131072,
+            MaxTokens: 393216,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.0983m, Output: 0.1966m, CacheRead: 0.0197m))),
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.028m))),
+
+        new("openrouter", "deepseek/deepseek-v4-flash-0731", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "deepseek/deepseek-v4-flash-0731",
+            Api: "openai-completions",
+            Name: "DeepSeek: DeepSeek V4 Flash 0731",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 393216,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.028m))),
 
         new("openrouter", "deepseek/deepseek-v4-pro", new ModelDescriptor(
             Provider: "openrouter",
@@ -9292,21 +12128,21 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
+            MaxTokens: 393216,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.168m, Output: 2.336m, CacheRead: 0.09855m))),
+
+        new("openrouter", "deepseek/deepseek-v4-pro-0813", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "deepseek/deepseek-v4-pro-0813",
+            Api: "openai-completions",
+            Name: "DeepSeek: DeepSeek V4 Pro 0813",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
             MaxTokens: 384000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
-
-        new("openrouter", "essentialai/rnj-1-instruct", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "essentialai/rnj-1-instruct",
-            Api: "openai-completions",
-            Name: "EssentialAI: Rnj 1 Instruct",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 32768,
-            MaxTokens: 4096,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.15m, Output: 0.15m))),
 
         new("openrouter", "google/gemini-2.5-flash", new ModelDescriptor(
             Provider: "openrouter",
@@ -9318,7 +12154,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 65535,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m, CacheWrite: 0.0833333333333333m))),
 
         new("openrouter", "google/gemini-2.5-flash-lite", new ModelDescriptor(
             Provider: "openrouter",
@@ -9330,19 +12166,31 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 65535,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.01m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.01m, CacheWrite: 0.0833333333333333m))),
 
-        new("openrouter", "google/gemini-2.5-flash-lite-preview-09-2025", new ModelDescriptor(
+        new("openrouter", "google/gemini-2.5-flash-lite:batch", new ModelDescriptor(
             Provider: "openrouter",
-            Id: "google/gemini-2.5-flash-lite-preview-09-2025",
+            Id: "google/gemini-2.5-flash-lite:batch",
             Api: "openai-completions",
-            Name: "Google: Gemini 2.5 Flash Lite Preview 09-2025",
+            Name: "Google: Gemini 2.5 Flash Lite (batch)",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
             MaxTokens: 65535,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.01m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 0.05m, Output: 0.2m, CacheRead: 0.01m))),
+
+        new("openrouter", "google/gemini-2.5-flash:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-2.5-flash:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 2.5 Flash (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65535,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.15m, Output: 1.25m, CacheRead: 0.03m))),
 
         new("openrouter", "google/gemini-2.5-pro", new ModelDescriptor(
             Provider: "openrouter",
@@ -9380,6 +12228,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m, CacheWrite: 0.375m))),
 
+        new("openrouter", "google/gemini-2.5-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-2.5-pro:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 2.5 Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.625m, Output: 5m, CacheRead: 0.125m))),
+
         new("openrouter", "google/gemini-3-flash-preview", new ModelDescriptor(
             Provider: "openrouter",
             Id: "google/gemini-3-flash-preview",
@@ -9390,7 +12250,31 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.5m, Output: 3m, CacheRead: 0.05m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 0.5m, Output: 3m, CacheRead: 0.05m, CacheWrite: 0.0833333333333333m))),
+
+        new("openrouter", "google/gemini-3-flash-preview:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3-flash-preview:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3 Flash Preview (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.25m, Output: 1.5m))),
+
+        new("openrouter", "google/gemini-3-pro-image", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3-pro-image",
+            Api: "openai-completions",
+            Name: "Google: Nano Banana Pro (Gemini 3 Pro Image)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m, CacheWrite: 0.375m))),
 
         new("openrouter", "google/gemini-3.1-flash-lite", new ModelDescriptor(
             Provider: "openrouter",
@@ -9402,7 +12286,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m, CacheWrite: 0.0833333333333333m))),
 
         new("openrouter", "google/gemini-3.1-flash-lite-preview", new ModelDescriptor(
             Provider: "openrouter",
@@ -9414,7 +12298,19 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m, CacheWrite: 0.0833333333333333m))),
+
+        new("openrouter", "google/gemini-3.1-flash-lite:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.1-flash-lite:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.1 Flash Lite (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.125m, Output: 0.75m, CacheRead: 0.0125m))),
 
         new("openrouter", "google/gemini-3.1-pro-preview", new ModelDescriptor(
             Provider: "openrouter",
@@ -9435,10 +12331,22 @@ public static class BuiltInModels
             Name: "Google: Gemini 3.1 Pro Preview Custom Tools",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 1048756,
+            ContextWindow: 1048576,
             MaxTokens: 65536,
             Input: ["text"],
             Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m, CacheWrite: 0.375m))),
+
+        new("openrouter", "google/gemini-3.1-pro-preview:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.1-pro-preview:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.1 Pro Preview (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 6m))),
 
         new("openrouter", "google/gemini-3.5-flash", new ModelDescriptor(
             Provider: "openrouter",
@@ -9450,7 +12358,91 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m, CacheWrite: 0.0833333333333333m))),
+
+        new("openrouter", "google/gemini-3.5-flash-lite", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.5-flash-lite",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.5 Flash Lite",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m, CacheWrite: 0.0833333333333333m))),
+
+        new("openrouter", "google/gemini-3.5-flash-lite:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.5-flash-lite:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.5 Flash Lite (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.15m, Output: 1.25m, CacheRead: 0.015m))),
+
+        new("openrouter", "google/gemini-3.5-flash:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.5-flash:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.5 Flash (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.75m, Output: 4.5m, CacheRead: 0.075m))),
+
+        new("openrouter", "google/gemini-3.6-flash", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.6-flash",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.6 Flash",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.75m, Output: 3.75m, CacheRead: 0.075m, CacheWrite: 0.0416666666666667m))),
+
+        new("openrouter", "google/gemini-3.6-flash:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.6-flash:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.6 Flash (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.375m, Output: 1.875m, CacheRead: 0.0375m, CacheWrite: 0.0416666666666667m))),
+
+        new("openrouter", "google/gemini-3.7-flash", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.7-flash",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.7 Flash",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.375m, Output: 1.875m, CacheRead: 0.0375m, CacheWrite: 0.0208333333333333m))),
+
+        new("openrouter", "google/gemini-3.7-flash:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "google/gemini-3.7-flash:batch",
+            Api: "openai-completions",
+            Name: "Google: Gemini 3.7 Flash (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1875m, Output: 0.9375m, CacheRead: 0.01875m, CacheWrite: 0.0208333333333333m))),
 
         new("openrouter", "google/gemma-3-12b-it", new ModelDescriptor(
             Provider: "openrouter",
@@ -9471,10 +12463,10 @@ public static class BuiltInModels
             Name: "Google: Gemma 3 27B",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 131072,
-            MaxTokens: 16384,
+            ContextWindow: 262144,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.08m, Output: 0.16m))),
+            Cost: new ModelCost(Input: 0.08m, Output: 0.45m, CacheRead: 0.04m))),
 
         new("openrouter", "google/gemma-4-26b-a4b-it", new ModelDescriptor(
             Provider: "openrouter",
@@ -9484,9 +12476,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 4096,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.06m, Output: 0.33m))),
+            Cost: new ModelCost(Input: 0.12m, Output: 0.4m, CacheRead: 0.05m))),
 
         new("openrouter", "google/gemma-4-26b-a4b-it:free", new ModelDescriptor(
             Provider: "openrouter",
@@ -9508,9 +12500,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 8192,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.12m, Output: 0.36m, CacheRead: 0.09m))),
+            Cost: new ModelCost(Input: 0.1m, Output: 0.34m, CacheRead: 0.1m))),
 
         new("openrouter", "google/gemma-4-31b-it:free", new ModelDescriptor(
             Provider: "openrouter",
@@ -9572,6 +12564,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.01m, Output: 0.03m, CacheRead: 0.002m))),
 
+        new("openrouter", "inclusionai/ling-3.0-flash", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "inclusionai/ling-3.0-flash",
+            Api: "openai-completions",
+            Name: "Ling-3.0-flash",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.021m, Output: 0.063m, CacheRead: 0.0042m))),
+
         new("openrouter", "inclusionai/ring-2.6-1t", new ModelDescriptor(
             Provider: "openrouter",
             Id: "inclusionai/ring-2.6-1t",
@@ -9584,6 +12588,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.075m, Output: 0.625m, CacheRead: 0.015m))),
 
+        new("openrouter", "kwaipilot/kat-coder-air-v2.5", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "kwaipilot/kat-coder-air-v2.5",
+            Api: "openai-completions",
+            Name: "Kwaipilot: KAT-Coder-Air V2.5",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 256000,
+            MaxTokens: 80000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.15m, Output: 0.6m, CacheRead: 0.03m))),
+
         new("openrouter", "kwaipilot/kat-coder-pro-v2", new ModelDescriptor(
             Provider: "openrouter",
             Id: "kwaipilot/kat-coder-pro-v2",
@@ -9591,10 +12607,46 @@ public static class BuiltInModels
             Name: "Kwaipilot: KAT-Coder-Pro V2",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 256000,
+            ContextWindow: 262144,
             MaxTokens: 80000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
+
+        new("openrouter", "kwaipilot/kat-coder-pro-v2.5", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "kwaipilot/kat-coder-pro-v2.5",
+            Api: "openai-completions",
+            Name: "Kwaipilot: KAT-Coder-Pro V2.5",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 256000,
+            MaxTokens: 80000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.74m, Output: 2.96m, CacheRead: 0.15m))),
+
+        new("openrouter", "liquid/lfm-2.5-2.6b:free", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "liquid/lfm-2.5-2.6b:free",
+            Api: "openai-completions",
+            Name: "LiquidAI: LFM2.5-2.6B (free)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 128000,
+            MaxTokens: 8192,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("openrouter", "meituan/longcat-2.0", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "meituan/longcat-2.0",
+            Api: "openai-completions",
+            Name: "Meituan: LongCat 2.0",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048756,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.006m))),
 
         new("openrouter", "meta-llama/llama-3.1-70b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -9616,9 +12668,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 131072,
-            MaxTokens: 16384,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.02m, Output: 0.03m))),
+            Cost: new ModelCost(Input: 0.05m, Output: 0.08m, CacheRead: 0.025m))),
 
         new("openrouter", "meta-llama/llama-3.3-70b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -9632,18 +12684,6 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.1m, Output: 0.32m))),
 
-        new("openrouter", "meta-llama/llama-3.3-70b-instruct:free", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "meta-llama/llama-3.3-70b-instruct:free",
-            Api: "openai-completions",
-            Name: "Meta: Llama 3.3 70B Instruct (free)",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 131072,
-            MaxTokens: 4096,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
         new("openrouter", "meta-llama/llama-4-maverick", new ModelDescriptor(
             Provider: "openrouter",
             Id: "meta-llama/llama-4-maverick",
@@ -9654,7 +12694,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.15m, Output: 0.6m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 0.8m))),
 
         new("openrouter", "meta-llama/llama-4-scout", new ModelDescriptor(
             Provider: "openrouter",
@@ -9663,10 +12703,46 @@ public static class BuiltInModels
             Name: "Meta: Llama 4 Scout",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 10000000,
+            ContextWindow: 1310720,
             MaxTokens: 16384,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.1m, Output: 0.3m))),
+
+        new("openrouter", "meta/muse-glimmer-30b", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "meta/muse-glimmer-30b",
+            Api: "openai-completions",
+            Name: "Meta: Muse Glimmer 30B",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.35m, Output: 1.5m, CacheRead: 0.04m))),
+
+        new("openrouter", "meta/muse-spark-1.1", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "meta/muse-spark-1.1",
+            Api: "openai-completions",
+            Name: "Meta: Muse Spark 1.1",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.25m, Output: 4.25m, CacheRead: 0.15m))),
+
+        new("openrouter", "meta/muse-spark-1.2", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "meta/muse-spark-1.2",
+            Api: "openai-completions",
+            Name: "Meta: Muse Spark 1.2",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.25m, Output: 4.25m, CacheRead: 0.15m))),
 
         new("openrouter", "minimax/minimax-m1", new ModelDescriptor(
             Provider: "openrouter",
@@ -9678,7 +12754,7 @@ public static class BuiltInModels
             ContextWindow: 1000000,
             MaxTokens: 40000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.4m, Output: 2.2m))),
+            Cost: new ModelCost(Input: 0.55m, Output: 2.2m))),
 
         new("openrouter", "minimax/minimax-m2", new ModelDescriptor(
             Provider: "openrouter",
@@ -9688,9 +12764,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 204800,
-            MaxTokens: 196608,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.255m, Output: 1m, CacheRead: 0.03m))),
+            Cost: new ModelCost(Input: 0.255m, Output: 1.02m))),
 
         new("openrouter", "minimax/minimax-m2.1", new ModelDescriptor(
             Provider: "openrouter",
@@ -9700,9 +12776,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 204800,
-            MaxTokens: 196608,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.29m, Output: 0.95m, CacheRead: 0.03m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.03m))),
 
         new("openrouter", "minimax/minimax-m2.5", new ModelDescriptor(
             Provider: "openrouter",
@@ -9714,7 +12790,7 @@ public static class BuiltInModels
             ContextWindow: 204800,
             MaxTokens: 196608,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.15m, Output: 0.9m, CacheRead: 0.05m))),
+            Cost: new ModelCost(Input: 0.22m, Output: 0.9m, CacheRead: 0.05m))),
 
         new("openrouter", "minimax/minimax-m2.7", new ModelDescriptor(
             Provider: "openrouter",
@@ -9726,7 +12802,7 @@ public static class BuiltInModels
             ContextWindow: 204800,
             MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.27m, Output: 1.08m, CacheRead: 0.054m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
         new("openrouter", "minimax/minimax-m3", new ModelDescriptor(
             Provider: "openrouter",
@@ -9740,6 +12816,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
+        new("openrouter", "minimax/minimax-m3:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "minimax/minimax-m3:batch",
+            Api: "openai-completions",
+            Name: "MiniMax: MiniMax M3 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 524288,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.15m, Output: 0.6m, CacheRead: 0.03m))),
+
         new("openrouter", "mistralai/codestral-2508", new ModelDescriptor(
             Provider: "openrouter",
             Id: "mistralai/codestral-2508",
@@ -9751,18 +12839,6 @@ public static class BuiltInModels
             MaxTokens: 4096,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 0.9m, CacheRead: 0.03m))),
-
-        new("openrouter", "mistralai/devstral-2512", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "mistralai/devstral-2512",
-            Api: "openai-completions",
-            Name: "Mistral: Devstral 2 2512",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 262144,
-            MaxTokens: 4096,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.4m, Output: 2m, CacheRead: 0.04m))),
 
         new("openrouter", "mistralai/ministral-14b-2512", new ModelDescriptor(
             Provider: "openrouter",
@@ -9880,9 +12956,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 131072,
-            MaxTokens: 4096,
+            MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.02m, Output: 0.03m))),
+            Cost: new ModelCost(Input: 0.019m, Output: 0.03m))),
 
         new("openrouter", "mistralai/mistral-saba", new ModelDescriptor(
             Provider: "openrouter",
@@ -9915,10 +12991,10 @@ public static class BuiltInModels
             Name: "Mistral: Mistral Small 3.2 24B",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 128000,
+            ContextWindow: 256000,
             MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.075m, Output: 0.2m))),
+            Cost: new ModelCost(Input: 0.09375m, Output: 0.25m))),
 
         new("openrouter", "mistralai/mixtral-8x22b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -9952,7 +13028,7 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 131072,
-            MaxTokens: 32768,
+            MaxTokens: 100352,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.57m, Output: 2.3m))),
 
@@ -9964,7 +13040,7 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 262144,
-            MaxTokens: 262144,
+            MaxTokens: 100352,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.6m, Output: 2.5m))),
 
@@ -9976,9 +13052,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 262144,
+            MaxTokens: 100352,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.6m, Output: 2.5m))),
+            Cost: new ModelCost(Input: 0.6m, Output: 2.5m, CacheRead: 0.15m))),
 
         new("openrouter", "moonshotai/kimi-k2.5", new ModelDescriptor(
             Provider: "openrouter",
@@ -9990,7 +13066,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.4m, Output: 1.9m, CacheRead: 0.09m))),
+            Cost: new ModelCost(Input: 0.57m, Output: 2.85m, CacheRead: 0.095m))),
 
         new("openrouter", "moonshotai/kimi-k2.6", new ModelDescriptor(
             Provider: "openrouter",
@@ -10000,33 +13076,69 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 262142,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.68m, Output: 3.41m, CacheRead: 0.34m))),
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
 
-        new("openrouter", "nex-agi/nex-n2-pro:free", new ModelDescriptor(
+        new("openrouter", "moonshotai/kimi-k2.7-code", new ModelDescriptor(
             Provider: "openrouter",
-            Id: "nex-agi/nex-n2-pro:free",
+            Id: "moonshotai/kimi-k2.7-code",
             Api: "openai-completions",
-            Name: "Nex AGI: Nex-N2-Pro (free)",
+            Name: "MoonshotAI: Kimi K2.7 Code",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
             MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
+            Cost: new ModelCost(Input: 0.71m, Output: 3.5m, CacheRead: 0.15m))),
 
-        new("openrouter", "nvidia/llama-3.3-nemotron-super-49b-v1.5", new ModelDescriptor(
+        new("openrouter", "moonshotai/kimi-k2.7-code:batch", new ModelDescriptor(
             Provider: "openrouter",
-            Id: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            Id: "moonshotai/kimi-k2.7-code:batch",
             Api: "openai-completions",
-            Name: "NVIDIA: Llama 3.3 Nemotron Super 49B V1.5",
+            Name: "MoonshotAI: Kimi K2.7 Code (batch)",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 131072,
-            MaxTokens: 16384,
+            ContextWindow: 262144,
+            MaxTokens: 4096,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.4m, Output: 0.4m))),
+            Cost: new ModelCost(Input: 0.475m, Output: 2m, CacheRead: 0.095m))),
+
+        new("openrouter", "moonshotai/kimi-k3", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "moonshotai/kimi-k3",
+            Api: "openai-completions",
+            Name: "MoonshotAI: Kimi K3",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
+
+        new("openrouter", "nex-agi/nex-n2-mini", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "nex-agi/nex-n2-mini",
+            Api: "openai-completions",
+            Name: "Nex AGI: Nex-N2-Mini",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.025m, Output: 0.1m, CacheRead: 0.0025m))),
+
+        new("openrouter", "nex-agi/nex-n2-pro", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "nex-agi/nex-n2-pro",
+            Api: "openai-completions",
+            Name: "Nex AGI: Nex-N2-Pro",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.25m, Output: 1m, CacheRead: 0.025m))),
 
         new("openrouter", "nvidia/nemotron-3-nano-30b-a3b", new ModelDescriptor(
             Provider: "openrouter",
@@ -10038,7 +13150,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 228000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.05m, Output: 0.2m))),
+            Cost: new ModelCost(Input: 0.05m, Output: 0.2m, CacheRead: 0.025m))),
 
         new("openrouter", "nvidia/nemotron-3-nano-30b-a3b:free", new ModelDescriptor(
             Provider: "openrouter",
@@ -10072,9 +13184,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1000000,
-            MaxTokens: 4096,
+            MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.09m, Output: 0.45m))),
+            Cost: new ModelCost(Input: 0.085m, Output: 0.4m))),
 
         new("openrouter", "nvidia/nemotron-3-super-120b-a12b:free", new ModelDescriptor(
             Provider: "openrouter",
@@ -10083,7 +13195,7 @@ public static class BuiltInModels
             Name: "NVIDIA: Nemotron 3 Super (free)",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 1000000,
+            ContextWindow: 262144,
             MaxTokens: 262144,
             Input: ["text"],
             Cost: new ModelCost(Input: 0m, Output: 0m))),
@@ -10095,16 +13207,52 @@ public static class BuiltInModels
             Name: "NVIDIA: Nemotron 3 Ultra",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 1000000,
-            MaxTokens: 16384,
+            ContextWindow: 512288,
+            MaxTokens: 4096,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.5m, Output: 2.5m, CacheRead: 0.15m))),
+            Cost: new ModelCost(Input: 0.6m, Output: 3.6m, CacheRead: 0.2m))),
+
+        new("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "nvidia/nemotron-3-ultra-550b-a55b:batch",
+            Api: "openai-completions",
+            Name: "NVIDIA: Nemotron 3 Ultra (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 512288,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.3m, Output: 1.8m, CacheRead: 0.1m))),
 
         new("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free", new ModelDescriptor(
             Provider: "openrouter",
             Id: "nvidia/nemotron-3-ultra-550b-a55b:free",
             Api: "openai-completions",
             Name: "NVIDIA: Nemotron 3 Ultra (free)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("openrouter", "nvidia/nemotron-3.5-lightning", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "nvidia/nemotron-3.5-lightning",
+            Api: "openai-completions",
+            Name: "NVIDIA: Nemotron 3.5 Lightning",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.25m, CacheRead: 0.05m))),
+
+        new("openrouter", "nvidia/nemotron-3.5-lightning:free", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "nvidia/nemotron-3.5-lightning:free",
+            Api: "openai-completions",
+            Name: "NVIDIA: Nemotron 3.5 Lightning (free)",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1000000,
@@ -10172,6 +13320,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 3m, Output: 4m))),
 
+        new("openrouter", "openai/gpt-3.5-turbo:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-3.5-turbo:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-3.5 Turbo (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 16385,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.25m, Output: 0.75m))),
+
         new("openrouter", "openai/gpt-4", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-4",
@@ -10208,6 +13368,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 10m, Output: 30m))),
 
+        new("openrouter", "openai/gpt-4-turbo:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-4-turbo:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-4 Turbo (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 128000,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 5m, Output: 15m))),
+
         new("openrouter", "openai/gpt-4.1", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-4.1",
@@ -10216,7 +13388,7 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 1047576,
-            MaxTokens: 4096,
+            MaxTokens: 32768,
             Input: ["text"],
             Cost: new ModelCost(Input: 2m, Output: 8m, CacheRead: 0.5m))),
 
@@ -10232,6 +13404,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.4m, Output: 1.6m, CacheRead: 0.1m))),
 
+        new("openrouter", "openai/gpt-4.1-mini:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-4.1-mini:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-4.1 Mini (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 1047576,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.2m, Output: 0.8m, CacheRead: 0.05m))),
+
         new("openrouter", "openai/gpt-4.1-nano", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-4.1-nano",
@@ -10244,6 +13428,30 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.025m))),
 
+        new("openrouter", "openai/gpt-4.1-nano:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-4.1-nano:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-4.1 Nano (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 1047576,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.05m, Output: 0.2m, CacheRead: 0.0125m))),
+
+        new("openrouter", "openai/gpt-4.1:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-4.1:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-4.1 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 1047576,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 4m, CacheRead: 0.25m))),
+
         new("openrouter", "openai/gpt-4o", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-4o",
@@ -10254,7 +13462,7 @@ public static class BuiltInModels
             ContextWindow: 128000,
             MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 2.5m, Output: 10m))),
+            Cost: new ModelCost(Input: 2.5m, Output: 10m, CacheRead: 1.25m))),
 
         new("openrouter", "openai/gpt-4o-2024-05-13", new ModelDescriptor(
             Provider: "openrouter",
@@ -10316,6 +13524,30 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.15m, Output: 0.6m, CacheRead: 0.075m))),
 
+        new("openrouter", "openai/gpt-4o-mini:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-4o-mini:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-4o-mini (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 128000,
+            MaxTokens: 16384,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.075m, Output: 0.3m, CacheRead: 0.0375m))),
+
+        new("openrouter", "openai/gpt-4o:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-4o:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-4o (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 128000,
+            MaxTokens: 16384,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.25m, Output: 5m, CacheRead: 0.625m))),
+
         new("openrouter", "openai/gpt-5", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-5",
@@ -10328,17 +13560,17 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
 
-        new("openrouter", "openai/gpt-5-codex", new ModelDescriptor(
+        new("openrouter", "openai/gpt-5-codex:batch", new ModelDescriptor(
             Provider: "openrouter",
-            Id: "openai/gpt-5-codex",
+            Id: "openai/gpt-5-codex:batch",
             Api: "openai-completions",
-            Name: "OpenAI: GPT-5 Codex",
+            Name: "OpenAI: GPT-5 Codex (batch)",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 400000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
+            Cost: new ModelCost(Input: 0.625m, Output: 5m, CacheRead: 0.0625m))),
 
         new("openrouter", "openai/gpt-5-mini", new ModelDescriptor(
             Provider: "openrouter",
@@ -10352,6 +13584,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.25m, Output: 2m, CacheRead: 0.025m))),
 
+        new("openrouter", "openai/gpt-5-mini:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5-mini:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5 Mini (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.125m, Output: 1m, CacheRead: 0.0125m))),
+
         new("openrouter", "openai/gpt-5-nano", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-5-nano",
@@ -10360,9 +13604,21 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 400000,
-            MaxTokens: 4096,
+            MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.05m, Output: 0.4m, CacheRead: 0.01m))),
+            Cost: new ModelCost(Input: 0.05m, Output: 0.4m, CacheRead: 0.005m))),
+
+        new("openrouter", "openai/gpt-5-nano:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5-nano:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5 Nano (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.025m, Output: 0.2m, CacheRead: 0.0025m))),
 
         new("openrouter", "openai/gpt-5-pro", new ModelDescriptor(
             Provider: "openrouter",
@@ -10376,6 +13632,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 15m, Output: 120m))),
 
+        new("openrouter", "openai/gpt-5-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5-pro:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5 Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 7.5m, Output: 60m))),
+
         new("openrouter", "openai/gpt-5.1", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-5.1",
@@ -10386,19 +13654,7 @@ public static class BuiltInModels
             ContextWindow: 400000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.13m))),
-
-        new("openrouter", "openai/gpt-5.1-chat", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "openai/gpt-5.1-chat",
-            Api: "openai-completions",
-            Name: "OpenAI: GPT-5.1 Chat",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 128000,
-            MaxTokens: 32000,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.13m))),
+            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
 
         new("openrouter", "openai/gpt-5.1-codex", new ModelDescriptor(
             Provider: "openrouter",
@@ -10432,9 +13688,21 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 400000,
-            MaxTokens: 100000,
+            MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.25m, Output: 2m, CacheRead: 0.025m))),
+            Cost: new ModelCost(Input: 0.25m, Output: 2m, CacheRead: 0.03m))),
+
+        new("openrouter", "openai/gpt-5.1:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.1:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.1 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.625m, Output: 5m, CacheRead: 0.0625m))),
 
         new("openrouter", "openai/gpt-5.2", new ModelDescriptor(
             Provider: "openrouter",
@@ -10456,7 +13724,7 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 128000,
-            MaxTokens: 16384,
+            MaxTokens: 32000,
             Input: ["text"],
             Cost: new ModelCost(Input: 1.75m, Output: 14m, CacheRead: 0.175m))),
 
@@ -10484,17 +13752,29 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 21m, Output: 168m))),
 
-        new("openrouter", "openai/gpt-5.3-chat", new ModelDescriptor(
+        new("openrouter", "openai/gpt-5.2-pro:batch", new ModelDescriptor(
             Provider: "openrouter",
-            Id: "openai/gpt-5.3-chat",
+            Id: "openai/gpt-5.2-pro:batch",
             Api: "openai-completions",
-            Name: "OpenAI: GPT-5.3 Chat",
+            Name: "OpenAI: GPT-5.2 Pro (batch)",
             BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 128000,
-            MaxTokens: 16384,
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.75m, Output: 14m, CacheRead: 0.175m))),
+            Cost: new ModelCost(Input: 10.5m, Output: 84m))),
+
+        new("openrouter", "openai/gpt-5.2:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.2:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.2 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.875m, Output: 7m, CacheRead: 0.0875m))),
 
         new("openrouter", "openai/gpt-5.3-codex", new ModelDescriptor(
             Provider: "openrouter",
@@ -10532,6 +13812,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.75m, Output: 4.5m, CacheRead: 0.075m))),
 
+        new("openrouter", "openai/gpt-5.4-mini:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.4-mini:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.4 Mini (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.375m, Output: 2.25m, CacheRead: 0.0375m))),
+
         new("openrouter", "openai/gpt-5.4-nano", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-5.4-nano",
@@ -10544,6 +13836,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.2m, Output: 1.25m, CacheRead: 0.02m))),
 
+        new("openrouter", "openai/gpt-5.4-nano:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.4-nano:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.4 Nano (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.625m, CacheRead: 0.01m))),
+
         new("openrouter", "openai/gpt-5.4-pro", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/gpt-5.4-pro",
@@ -10555,6 +13859,30 @@ public static class BuiltInModels
             MaxTokens: 128000,
             Input: ["text"],
             Cost: new ModelCost(Input: 30m, Output: 180m))),
+
+        new("openrouter", "openai/gpt-5.4-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.4-pro:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.4 Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 15m, Output: 90m))),
+
+        new("openrouter", "openai/gpt-5.4:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.4:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.4 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.25m, Output: 7.5m, CacheRead: 0.125m))),
 
         new("openrouter", "openai/gpt-5.5", new ModelDescriptor(
             Provider: "openrouter",
@@ -10579,6 +13907,186 @@ public static class BuiltInModels
             MaxTokens: 128000,
             Input: ["text"],
             Cost: new ModelCost(Input: 30m, Output: 180m))),
+
+        new("openrouter", "openai/gpt-5.5-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.5-pro:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.5 Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 15m, Output: 90m))),
+
+        new("openrouter", "openai/gpt-5.5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.5:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m))),
+
+        new("openrouter", "openai/gpt-5.6-luna", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-luna",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Luna",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.6m, CacheRead: 0.01m, CacheWrite: 0.125m))),
+
+        new("openrouter", "openai/gpt-5.6-luna-pro", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-luna-pro",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Luna Pro",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.6m, CacheRead: 0.01m, CacheWrite: 0.125m))),
+
+        new("openrouter", "openai/gpt-5.6-luna-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-luna-pro:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Luna Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.6m, CacheRead: 0.01m))),
+
+        new("openrouter", "openai/gpt-5.6-luna:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-luna:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Luna (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.6m, CacheRead: 0.01m))),
+
+        new("openrouter", "openai/gpt-5.6-sol", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-sol",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Sol",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("openrouter", "openai/gpt-5.6-sol-pro", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-sol-pro",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Sol Pro",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+
+        new("openrouter", "openai/gpt-5.6-sol-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-sol-pro:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Sol Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m))),
+
+        new("openrouter", "openai/gpt-5.6-sol:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-sol:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Sol (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m))),
+
+        new("openrouter", "openai/gpt-5.6-terra", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-terra",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Terra",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 6m, CacheRead: 0.1m, CacheWrite: 1.25m))),
+
+        new("openrouter", "openai/gpt-5.6-terra-pro", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-terra-pro",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Terra Pro",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 6m, CacheRead: 0.1m, CacheWrite: 1.25m))),
+
+        new("openrouter", "openai/gpt-5.6-terra-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-terra-pro:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Terra Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 6m, CacheRead: 0.1m))),
+
+        new("openrouter", "openai/gpt-5.6-terra:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5.6-terra:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5.6 Terra (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 6m, CacheRead: 0.1m))),
+
+        new("openrouter", "openai/gpt-5:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/gpt-5:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: GPT-5 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 400000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.625m, Output: 5m, CacheRead: 0.0625m))),
 
         new("openrouter", "openai/gpt-audio", new ModelDescriptor(
             Provider: "openrouter",
@@ -10624,21 +14132,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 131072,
-            MaxTokens: 4096,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.039m, Output: 0.18m))),
-
-        new("openrouter", "openai/gpt-oss-120b:free", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "openai/gpt-oss-120b:free",
-            Api: "openai-completions",
-            Name: "OpenAI: gpt-oss-120b (free)",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: true,
-            ContextWindow: 131072,
             MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
+            Cost: new ModelCost(Input: 0.03m, Output: 0.17m, CacheRead: 0.03m))),
 
         new("openrouter", "openai/gpt-oss-20b", new ModelDescriptor(
             Provider: "openrouter",
@@ -10648,9 +14144,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 131072,
-            MaxTokens: 4096,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.029m, Output: 0.14m))),
+            Cost: new ModelCost(Input: 0.03m, Output: 0.13m, CacheRead: 0.03m))),
 
         new("openrouter", "openai/gpt-oss-20b:free", new ModelDescriptor(
             Provider: "openrouter",
@@ -10660,7 +14156,7 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 131072,
-            MaxTokens: 8192,
+            MaxTokens: 32768,
             Input: ["text"],
             Cost: new ModelCost(Input: 0m, Output: 0m))),
 
@@ -10674,7 +14170,7 @@ public static class BuiltInModels
             ContextWindow: 131072,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.075m, Output: 0.3m, CacheRead: 0.037m))),
+            Cost: new ModelCost(Input: 0.075m, Output: 0.3m, CacheRead: 0.0375m))),
 
         new("openrouter", "openai/o1", new ModelDescriptor(
             Provider: "openrouter",
@@ -10688,6 +14184,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 15m, Output: 60m, CacheRead: 7.5m))),
 
+        new("openrouter", "openai/o1:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/o1:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: o1 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 7.5m, Output: 30m, CacheRead: 3.75m))),
+
         new("openrouter", "openai/o3", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/o3",
@@ -10699,18 +14207,6 @@ public static class BuiltInModels
             MaxTokens: 100000,
             Input: ["text"],
             Cost: new ModelCost(Input: 2m, Output: 8m, CacheRead: 0.5m))),
-
-        new("openrouter", "openai/o3-deep-research", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "openai/o3-deep-research",
-            Api: "openai-completions",
-            Name: "OpenAI: o3 Deep Research",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 100000,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 10m, Output: 40m, CacheRead: 2.5m))),
 
         new("openrouter", "openai/o3-mini", new ModelDescriptor(
             Provider: "openrouter",
@@ -10736,6 +14232,30 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.1m, Output: 4.4m, CacheRead: 0.55m))),
 
+        new("openrouter", "openai/o3-mini-high:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/o3-mini-high:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: o3 Mini High (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.55m, Output: 2.2m, CacheRead: 0.275m))),
+
+        new("openrouter", "openai/o3-mini:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/o3-mini:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: o3 Mini (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.55m, Output: 2.2m, CacheRead: 0.275m))),
+
         new("openrouter", "openai/o3-pro", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/o3-pro",
@@ -10747,6 +14267,30 @@ public static class BuiltInModels
             MaxTokens: 100000,
             Input: ["text"],
             Cost: new ModelCost(Input: 20m, Output: 80m))),
+
+        new("openrouter", "openai/o3-pro:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/o3-pro:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: o3 Pro (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 10m, Output: 40m))),
+
+        new("openrouter", "openai/o3:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/o3:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: o3 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 4m, CacheRead: 0.25m))),
 
         new("openrouter", "openai/o4-mini", new ModelDescriptor(
             Provider: "openrouter",
@@ -10760,18 +14304,6 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.1m, Output: 4.4m, CacheRead: 0.275m))),
 
-        new("openrouter", "openai/o4-mini-deep-research", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "openai/o4-mini-deep-research",
-            Api: "openai-completions",
-            Name: "OpenAI: o4 Mini Deep Research",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: true,
-            ContextWindow: 200000,
-            MaxTokens: 100000,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 2m, Output: 8m, CacheRead: 0.5m))),
-
         new("openrouter", "openai/o4-mini-high", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openai/o4-mini-high",
@@ -10784,11 +14316,47 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.1m, Output: 4.4m, CacheRead: 0.275m))),
 
+        new("openrouter", "openai/o4-mini-high:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/o4-mini-high:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: o4 Mini High (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.55m, Output: 2.2m, CacheRead: 0.1375m))),
+
+        new("openrouter", "openai/o4-mini:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openai/o4-mini:batch",
+            Api: "openai-completions",
+            Name: "OpenAI: o4 Mini (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 200000,
+            MaxTokens: 100000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.55m, Output: 2.2m, CacheRead: 0.1375m))),
+
         new("openrouter", "openrouter/auto", new ModelDescriptor(
             Provider: "openrouter",
             Id: "openrouter/auto",
             Api: "openai-completions",
             Name: "Auto Router",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 2000000,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: -1000000m, Output: -1000000m))),
+
+        new("openrouter", "openrouter/auto-beta", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "openrouter/auto-beta",
+            Api: "openai-completions",
+            Name: "Auto Router (Beta)",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 2000000,
@@ -10808,53 +14376,53 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0m, Output: 0m))),
 
-        new("openrouter", "openrouter/owl-alpha", new ModelDescriptor(
+        new("openrouter", "poolside/laguna-s-2.1", new ModelDescriptor(
             Provider: "openrouter",
-            Id: "openrouter/owl-alpha",
+            Id: "poolside/laguna-s-2.1",
             Api: "openai-completions",
-            Name: "Owl Alpha",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 1048756,
-            MaxTokens: 262144,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
-        new("openrouter", "poolside/laguna-m.1:free", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "poolside/laguna-m.1:free",
-            Api: "openai-completions",
-            Name: "Poolside: Laguna M.1 (free)",
+            Name: "Poolside: Laguna S 2.1",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 32768,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
-        new("openrouter", "poolside/laguna-xs.2:free", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "poolside/laguna-xs.2:free",
-            Api: "openai-completions",
-            Name: "Poolside: Laguna XS.2 (free)",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 32768,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
-        new("openrouter", "prime-intellect/intellect-3", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "prime-intellect/intellect-3",
-            Api: "openai-completions",
-            Name: "Prime Intellect: INTELLECT-3",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: true,
-            ContextWindow: 131072,
+            ContextWindow: 1048576,
             MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.2m, Output: 1.1m))),
+            Cost: new ModelCost(Input: 0.09m, Output: 0.18m, CacheRead: 0.009m))),
+
+        new("openrouter", "poolside/laguna-s-2.1:free", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "poolside/laguna-s-2.1:free",
+            Api: "openai-completions",
+            Name: "Poolside: Laguna S 2.1 (free)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("openrouter", "poolside/laguna-xs-2.1", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "poolside/laguna-xs-2.1",
+            Api: "openai-completions",
+            Name: "Poolside: Laguna XS 2.1",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.06m, Output: 0.12m, CacheRead: 0.03m))),
+
+        new("openrouter", "poolside/laguna-xs-2.1:free", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "poolside/laguna-xs-2.1:free",
+            Api: "openai-completions",
+            Name: "Poolside: Laguna XS 2.1 (free)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
 
         new("openrouter", "qwen/qwen-2.5-72b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -10863,10 +14431,22 @@ public static class BuiltInModels
             Name: "Qwen2.5 72B Instruct",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 131072,
+            ContextWindow: 32768,
             MaxTokens: 16384,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.36m, Output: 0.4m))),
+
+        new("openrouter", "qwen/qwen-2.5-7b-instruct", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "qwen/qwen-2.5-7b-instruct",
+            Api: "openai-completions",
+            Name: "Qwen: Qwen2.5 7B Instruct",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: false,
+            ContextWindow: 32768,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.2m))),
 
         new("openrouter", "qwen/qwen-plus", new ModelDescriptor(
             Provider: "openrouter",
@@ -10902,7 +14482,7 @@ public static class BuiltInModels
             ContextWindow: 1000000,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.26m, Output: 0.78m, CacheWrite: 0.325m))),
+            Cost: new ModelCost(Input: 0.4m, Output: 1.2m, CacheWrite: 0.5m))),
 
         new("openrouter", "qwen/qwen3-14b", new ModelDescriptor(
             Provider: "openrouter",
@@ -10911,10 +14491,10 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 14B",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 131702,
-            MaxTokens: 40960,
+            ContextWindow: 131072,
+            MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.24m))),
+            Cost: new ModelCost(Input: 0.12m, Output: 0.24m))),
 
         new("openrouter", "qwen/qwen3-235b-a22b", new ModelDescriptor(
             Provider: "openrouter",
@@ -10938,7 +14518,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.09m, Output: 0.1m))),
+            Cost: new ModelCost(Input: 0.09m, Output: 0.55m))),
 
         new("openrouter", "qwen/qwen3-235b-a22b-thinking-2507", new ModelDescriptor(
             Provider: "openrouter",
@@ -10948,9 +14528,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 262144,
+            MaxTokens: 4096,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.1m, CacheRead: 0.1m))),
+            Cost: new ModelCost(Input: 0.23m, Output: 2.3m))),
 
         new("openrouter", "qwen/qwen3-30b-a3b", new ModelDescriptor(
             Provider: "openrouter",
@@ -10971,7 +14551,7 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 30B A3B Instruct 2507",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 131072,
+            ContextWindow: 262144,
             MaxTokens: 32000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.04815m, Output: 0.19305m))),
@@ -10983,10 +14563,10 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 30B A3B Thinking 2507",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 131072,
-            MaxTokens: 131072,
+            ContextWindow: 81920,
+            MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.08m, Output: 0.4m, CacheRead: 0.08m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 2.4m))),
 
         new("openrouter", "qwen/qwen3-32b", new ModelDescriptor(
             Provider: "openrouter",
@@ -11010,7 +14590,7 @@ public static class BuiltInModels
             ContextWindow: 131072,
             MaxTokens: 8192,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.05m, Output: 0.4m, CacheRead: 0.05m))),
+            Cost: new ModelCost(Input: 0.117m, Output: 0.455m))),
 
         new("openrouter", "qwen/qwen3-coder", new ModelDescriptor(
             Provider: "openrouter",
@@ -11019,10 +14599,10 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 Coder 480B A35B",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 1048576,
+            ContextWindow: 262144,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.22m, Output: 1.8m))),
+            Cost: new ModelCost(Input: 0.3m, Output: 1m, CacheRead: 0.1m))),
 
         new("openrouter", "qwen/qwen3-coder-30b-a3b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -11031,10 +14611,10 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 Coder 30B A3B Instruct",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 160000,
-            MaxTokens: 32768,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.07m, Output: 0.27m))),
+            Cost: new ModelCost(Input: 0.07m, Output: 0.28m))),
 
         new("openrouter", "qwen/qwen3-coder-flash", new ModelDescriptor(
             Provider: "openrouter",
@@ -11058,7 +14638,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.11m, Output: 0.8m, CacheRead: 0.07m))),
+            Cost: new ModelCost(Input: 0.12m, Output: 0.8m, CacheRead: 0.07m))),
 
         new("openrouter", "qwen/qwen3-coder-plus", new ModelDescriptor(
             Provider: "openrouter",
@@ -11072,18 +14652,6 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.65m, Output: 3.25m, CacheRead: 0.13m, CacheWrite: 0.8125m))),
 
-        new("openrouter", "qwen/qwen3-coder:free", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "qwen/qwen3-coder:free",
-            Api: "openai-completions",
-            Name: "Qwen: Qwen3 Coder 480B A35B (free)",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 1048576,
-            MaxTokens: 262000,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
         new("openrouter", "qwen/qwen3-max", new ModelDescriptor(
             Provider: "openrouter",
             Id: "qwen/qwen3-max",
@@ -11092,7 +14660,7 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 262144,
-            MaxTokens: 32768,
+            MaxTokens: 65536,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.78m, Output: 3.9m, CacheRead: 0.156m, CacheWrite: 0.975m))),
 
@@ -11104,7 +14672,7 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 32768,
+            MaxTokens: 65536,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.78m, Output: 3.9m))),
 
@@ -11116,21 +14684,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 262144,
-            MaxTokens: 16384,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.09m, Output: 1.1m))),
-
-        new("openrouter", "qwen/qwen3-next-80b-a3b-instruct:free", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "qwen/qwen3-next-80b-a3b-instruct:free",
-            Api: "openai-completions",
-            Name: "Qwen: Qwen3 Next 80B A3B Instruct (free)",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 262144,
-            MaxTokens: 4096,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
+            Cost: new ModelCost(Input: 0.1m, Output: 1.1m, CacheRead: 0.07m))),
 
         new("openrouter", "qwen/qwen3-next-80b-a3b-thinking", new ModelDescriptor(
             Provider: "openrouter",
@@ -11142,7 +14698,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.0975m, Output: 0.78m))),
+            Cost: new ModelCost(Input: 0.15m, Output: 1.2m))),
 
         new("openrouter", "qwen/qwen3-vl-235b-a22b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -11152,9 +14708,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 262144,
-            MaxTokens: 16384,
+            MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.2m, Output: 0.88m, CacheRead: 0.11m))),
+            Cost: new ModelCost(Input: 0.26m, Output: 1.04m))),
 
         new("openrouter", "qwen/qwen3-vl-235b-a22b-thinking", new ModelDescriptor(
             Provider: "openrouter",
@@ -11166,7 +14722,7 @@ public static class BuiltInModels
             ContextWindow: 131072,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.26m, Output: 2.6m))),
+            Cost: new ModelCost(Input: 0.4m, Output: 4m))),
 
         new("openrouter", "qwen/qwen3-vl-30b-a3b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -11187,10 +14743,10 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 VL 30B A3B Thinking",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 131072,
+            ContextWindow: 262144,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.13m, Output: 1.56m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 2.4m))),
 
         new("openrouter", "qwen/qwen3-vl-32b-instruct", new ModelDescriptor(
             Provider: "openrouter",
@@ -11199,7 +14755,7 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 VL 32B Instruct",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 262144,
+            ContextWindow: 131072,
             MaxTokens: 32768,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.104m, Output: 0.416m))),
@@ -11211,10 +14767,10 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 VL 8B Instruct",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 256000,
+            ContextWindow: 262144,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.08m, Output: 0.5m))),
+            Cost: new ModelCost(Input: 0.117m, Output: 0.455m))),
 
         new("openrouter", "qwen/qwen3-vl-8b-thinking", new ModelDescriptor(
             Provider: "openrouter",
@@ -11223,10 +14779,10 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3 VL 8B Thinking",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 256000,
+            ContextWindow: 131072,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.117m, Output: 1.365m))),
+            Cost: new ModelCost(Input: 0.18m, Output: 2.1m))),
 
         new("openrouter", "qwen/qwen3.5-122b-a10b", new ModelDescriptor(
             Provider: "openrouter",
@@ -11236,9 +14792,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 262144,
+            MaxTokens: 81920,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.26m, Output: 2.08m))),
+            Cost: new ModelCost(Input: 0.29m, Output: 2.4m))),
 
         new("openrouter", "qwen/qwen3.5-27b", new ModelDescriptor(
             Provider: "openrouter",
@@ -11260,9 +14816,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 262144,
+            MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.14m, Output: 1m, CacheRead: 0.05m))),
+            Cost: new ModelCost(Input: 0.225m, Output: 1.8m, CacheRead: 0.225m))),
 
         new("openrouter", "qwen/qwen3.5-397b-a17b", new ModelDescriptor(
             Provider: "openrouter",
@@ -11272,9 +14828,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 65536,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.39m, Output: 2.34m))),
+            Cost: new ModelCost(Input: 0.5m, Output: 3.6m, CacheRead: 0.3m))),
 
         new("openrouter", "qwen/qwen3.5-9b", new ModelDescriptor(
             Provider: "openrouter",
@@ -11332,9 +14888,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 131072,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.289m, Output: 2.4m))),
+            Cost: new ModelCost(Input: 0.6m, Output: 3.6m, CacheRead: 0.12m))),
 
         new("openrouter", "qwen/qwen3.6-35b-a3b", new ModelDescriptor(
             Provider: "openrouter",
@@ -11370,7 +14926,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.04m, Output: 6.24m, CacheWrite: 1.3m))),
+            Cost: new ModelCost(Input: 1.027m, Output: 6.162m, CacheWrite: 1.28375m))),
 
         new("openrouter", "qwen/qwen3.6-plus", new ModelDescriptor(
             Provider: "openrouter",
@@ -11384,6 +14940,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.325m, Output: 1.95m, CacheWrite: 0.40625m))),
 
+        new("openrouter", "qwen/qwen3.7-flash", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "qwen/qwen3.7-flash",
+            Api: "openai-completions",
+            Name: "Qwen: Qwen3.7 Flash",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.03m, Output: 0.13m, CacheRead: 0.006m, CacheWrite: 0.038m))),
+
         new("openrouter", "qwen/qwen3.7-max", new ModelDescriptor(
             Provider: "openrouter",
             Id: "qwen/qwen3.7-max",
@@ -11392,9 +14960,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1000000,
-            MaxTokens: 65536,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.25m, Output: 3.75m, CacheRead: 0.25m, CacheWrite: 1.5625m))),
+            Cost: new ModelCost(Input: 1.475m, Output: 4.425m, CacheRead: 0.295m, CacheWrite: 1.84375m))),
 
         new("openrouter", "qwen/qwen3.7-plus", new ModelDescriptor(
             Provider: "openrouter",
@@ -11404,9 +14972,33 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1000000,
-            MaxTokens: 65536,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.4m, Output: 1.6m, CacheRead: 0.08m, CacheWrite: 0.5m))),
+            Cost: new ModelCost(Input: 0.32m, Output: 1.28m, CacheRead: 0.064m, CacheWrite: 0.4m))),
+
+        new("openrouter", "qwen/qwen3.8-2.4t-a95b", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "qwen/qwen3.8-2.4t-a95b",
+            Api: "openai-completions",
+            Name: "Qwen: Qwen3.8 2.4T A95B",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1010000,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.25m))),
+
+        new("openrouter", "qwen/qwen3.8-max", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "qwen/qwen3.8-max",
+            Api: "openai-completions",
+            Name: "Qwen: Qwen3.8 Max",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 131072,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.25m, CacheWrite: 2.5m))),
 
         new("openrouter", "rekaai/reka-edge", new ModelDescriptor(
             Provider: "openrouter",
@@ -11432,6 +15024,30 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1m, Output: 3m))),
 
+        new("openrouter", "sakana/fugu-ultra", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "sakana/fugu-ultra",
+            Api: "openai-completions",
+            Name: "Sakana: Fugu Ultra",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m))),
+
+        new("openrouter", "sakana/sakana-namazu", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "sakana/sakana-namazu",
+            Api: "openai-completions",
+            Name: "Sakana: Sakana Namazu",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.15m))),
+
         new("openrouter", "sao10k/l3.1-euryale-70b", new ModelDescriptor(
             Provider: "openrouter",
             Id: "sao10k/l3.1-euryale-70b",
@@ -11452,9 +15068,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 262144,
-            MaxTokens: 16384,
+            MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.09m, Output: 0.3m, CacheRead: 0.02m))),
+            Cost: new ModelCost(Input: 0.1m, Output: 0.3m))),
 
         new("openrouter", "stepfun/step-3.7-flash", new ModelDescriptor(
             Provider: "openrouter",
@@ -11463,10 +15079,22 @@ public static class BuiltInModels
             Name: "StepFun: Step 3.7 Flash",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 256000,
+            ContextWindow: 262144,
             MaxTokens: 256000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.2m, Output: 1.15m, CacheRead: 0.04m))),
+
+        new("openrouter", "tencent/hy3", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "tencent/hy3",
+            Api: "openai-completions",
+            Name: "Tencent: Hy3",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.132m, Output: 0.528m, CacheRead: 0.033m))),
 
         new("openrouter", "tencent/hy3-preview", new ModelDescriptor(
             Provider: "openrouter",
@@ -11480,18 +15108,6 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.063m, Output: 0.21m, CacheRead: 0.021m))),
 
-        new("openrouter", "thedrummer/rocinante-12b", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "thedrummer/rocinante-12b",
-            Api: "openai-completions",
-            Name: "TheDrummer: Rocinante 12B",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: false,
-            ContextWindow: 32768,
-            MaxTokens: 32768,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.17m, Output: 0.43m))),
-
         new("openrouter", "thedrummer/unslopnemo-12b", new ModelDescriptor(
             Provider: "openrouter",
             Id: "thedrummer/unslopnemo-12b",
@@ -11499,10 +15115,46 @@ public static class BuiltInModels
             Name: "TheDrummer: UnslopNemo 12B",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
-            ContextWindow: 32768,
-            MaxTokens: 32768,
+            ContextWindow: 1024000,
+            MaxTokens: 1024000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.4m, Output: 0.4m))),
+
+        new("openrouter", "thinkingmachines/inkling", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "thinkingmachines/inkling",
+            Api: "openai-completions",
+            Name: "Thinking Machines: Inkling",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4.05m, CacheRead: 0.16m))),
+
+        new("openrouter", "thinkingmachines/inkling-small", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "thinkingmachines/inkling-small",
+            Api: "openai-completions",
+            Name: "Thinking Machines: Inkling Small",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 524288,
+            MaxTokens: 262144,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.45m, Output: 1.2m, CacheRead: 0.1m))),
+
+        new("openrouter", "thinkingmachines/inkling:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "thinkingmachines/inkling:batch",
+            Api: "openai-completions",
+            Name: "Thinking Machines: Inkling (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 524288,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.5m, Output: 2.025m, CacheRead: 0.085m))),
 
         new("openrouter", "upstage/solar-pro-3", new ModelDescriptor(
             Provider: "openrouter",
@@ -11511,16 +15163,28 @@ public static class BuiltInModels
             Name: "Upstage: Solar Pro 3",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 128000,
-            MaxTokens: 4096,
+            ContextWindow: 131072,
+            MaxTokens: 131072,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.15m, Output: 0.6m, CacheRead: 0.015m))),
+
+        new("openrouter", "upstage/solar-pro4", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "upstage/solar-pro4",
+            Api: "openai-completions",
+            Name: "Upstage: Solar Pro 4",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 524288,
+            MaxTokens: 131072,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.03m, Output: 0.12m, CacheRead: 0.006m))),
 
         new("openrouter", "x-ai/grok-4.20", new ModelDescriptor(
             Provider: "openrouter",
             Id: "x-ai/grok-4.20",
             Api: "openai-completions",
-            Name: "xAI: Grok 4.20",
+            Name: "SpaceXAI: Grok 4.20",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 2000000,
@@ -11532,7 +15196,7 @@ public static class BuiltInModels
             Provider: "openrouter",
             Id: "x-ai/grok-4.3",
             Api: "openai-completions",
-            Name: "xAI: Grok 4.3",
+            Name: "SpaceXAI: Grok 4.3",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1000000,
@@ -11540,29 +15204,41 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 1.25m, Output: 2.5m, CacheRead: 0.2m))),
 
+        new("openrouter", "x-ai/grok-4.5", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "x-ai/grok-4.5",
+            Api: "openai-completions",
+            Name: "SpaceXAI: Grok 4.5",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.3m))),
+
+        new("openrouter", "x-ai/grok-4.6", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "x-ai/grok-4.6",
+            Api: "openai-completions",
+            Name: "SpaceXAI: Grok 4.6",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
+
         new("openrouter", "x-ai/grok-build-0.1", new ModelDescriptor(
             Provider: "openrouter",
             Id: "x-ai/grok-build-0.1",
             Api: "openai-completions",
-            Name: "xAI: Grok Build 0.1",
+            Name: "SpaceXAI: Grok Build 0.1",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 256000,
             MaxTokens: 4096,
             Input: ["text"],
             Cost: new ModelCost(Input: 1m, Output: 2m, CacheRead: 0.2m))),
-
-        new("openrouter", "xiaomi/mimo-v2-flash", new ModelDescriptor(
-            Provider: "openrouter",
-            Id: "xiaomi/mimo-v2-flash",
-            Api: "openai-completions",
-            Name: "Xiaomi: MiMo-V2-Flash",
-            BaseUrl: "https://openrouter.ai/api/v1",
-            Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 65536,
-            Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.3m, CacheRead: 0.01m))),
 
         new("openrouter", "xiaomi/mimo-v2.5", new ModelDescriptor(
             Provider: "openrouter",
@@ -11571,7 +15247,7 @@ public static class BuiltInModels
             Name: "Xiaomi: MiMo-V2.5",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 1048576,
+            ContextWindow: 1050000,
             MaxTokens: 131072,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
@@ -11583,7 +15259,7 @@ public static class BuiltInModels
             Name: "Xiaomi: MiMo-V2.5-Pro",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 1048576,
+            ContextWindow: 1050000,
             MaxTokens: 131072,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.0036m))),
@@ -11608,9 +15284,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 131072,
-            MaxTokens: 131070,
+            MaxTokens: 98304,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.125m, Output: 0.85m, CacheRead: 0.06m))),
+            Cost: new ModelCost(Input: 0.13m, Output: 0.85m, CacheRead: 0.025m))),
 
         new("openrouter", "z-ai/glm-4.5v", new ModelDescriptor(
             Provider: "openrouter",
@@ -11631,10 +15307,10 @@ public static class BuiltInModels
             Name: "Z.ai: GLM 4.6",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 202752,
+            ContextWindow: 204800,
             MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.43m, Output: 1.74m, CacheRead: 0.08m))),
+            Cost: new ModelCost(Input: 0.5m, Output: 2m, CacheRead: 0.1m))),
 
         new("openrouter", "z-ai/glm-4.6v", new ModelDescriptor(
             Provider: "openrouter",
@@ -11655,7 +15331,7 @@ public static class BuiltInModels
             Name: "Z.ai: GLM 4.7",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 202752,
+            ContextWindow: 204800,
             MaxTokens: 131072,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.4m, Output: 1.75m, CacheRead: 0.08m))),
@@ -11679,10 +15355,10 @@ public static class BuiltInModels
             Name: "Z.ai: GLM 5",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 202752,
-            MaxTokens: 4096,
+            ContextWindow: 204800,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.6m, Output: 1.92m, CacheRead: 0.12m))),
+            Cost: new ModelCost(Input: 0.95m, Output: 2.55m, CacheRead: 0.2m))),
 
         new("openrouter", "z-ai/glm-5-turbo", new ModelDescriptor(
             Provider: "openrouter",
@@ -11691,7 +15367,7 @@ public static class BuiltInModels
             Name: "Z.ai: GLM 5 Turbo",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 262144,
+            ContextWindow: 202752,
             MaxTokens: 131072,
             Input: ["text"],
             Cost: new ModelCost(Input: 1.2m, Output: 4m, CacheRead: 0.24m))),
@@ -11703,10 +15379,46 @@ public static class BuiltInModels
             Name: "Z.ai: GLM 5.1",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 202752,
+            ContextWindow: 204800,
+            MaxTokens: 131072,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+
+        new("openrouter", "z-ai/glm-5.2", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "z-ai/glm-5.2",
+            Api: "openai-completions",
+            Name: "Z.ai: GLM 5.2",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
             MaxTokens: 4096,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.98m, Output: 3.08m, CacheRead: 0.182m))),
+            Cost: new ModelCost(Input: 0.63m, Output: 1.98m, CacheRead: 0.0945m))),
+
+        new("openrouter", "z-ai/glm-5.2:batch", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "z-ai/glm-5.2:batch",
+            Api: "openai-completions",
+            Name: "Z.ai: GLM 5.2 (batch)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 512000,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.7m, Output: 2.2m, CacheRead: 0.13m))),
+
+        new("openrouter", "z-ai/glm-5v-turbo", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "z-ai/glm-5v-turbo",
+            Api: "openai-completions",
+            Name: "Z.ai: GLM 5V Turbo",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 202752,
+            MaxTokens: 131072,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.2m, Output: 4m, CacheRead: 0.24m))),
 
         new("openrouter", "~anthropic/claude-fable-latest", new ModelDescriptor(
             Provider: "openrouter",
@@ -11754,7 +15466,19 @@ public static class BuiltInModels
             ContextWindow: 1000000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
+            Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
+
+        new("openrouter", "~deepseek/deepseek-v4-flash-latest", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "~deepseek/deepseek-v4-flash-latest",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Flash Latest",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.079996m, Output: 0.252m, CacheRead: 0.0252m))),
 
         new("openrouter", "~google/gemini-flash-latest", new ModelDescriptor(
             Provider: "openrouter",
@@ -11766,7 +15490,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 65536,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m, CacheWrite: 0.08333333333333334m))),
+            Cost: new ModelCost(Input: 0.375m, Output: 1.875m, CacheRead: 0.0375m, CacheWrite: 0.0208333333333333m))),
 
         new("openrouter", "~google/gemini-pro-latest", new ModelDescriptor(
             Provider: "openrouter",
@@ -11787,10 +15511,10 @@ public static class BuiltInModels
             Name: "MoonshotAI Kimi Latest",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 262142,
+            ContextWindow: 1048576,
+            MaxTokens: 1048576,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.68m, Output: 3.41m, CacheRead: 0.34m))),
+            Cost: new ModelCost(Input: 2.8m, Output: 14m, CacheRead: 0.29m))),
 
         new("openrouter", "~openai/gpt-latest", new ModelDescriptor(
             Provider: "openrouter",
@@ -11802,7 +15526,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m))),
+            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
         new("openrouter", "~openai/gpt-mini-latest", new ModelDescriptor(
             Provider: "openrouter",
@@ -11815,6 +15539,18 @@ public static class BuiltInModels
             MaxTokens: 128000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.75m, Output: 4.5m, CacheRead: 0.075m))),
+
+        new("openrouter", "~x-ai/grok-latest", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "~x-ai/grok-latest",
+            Api: "openai-completions",
+            Name: "xAI: Grok Latest",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
 
         // together
 
@@ -11858,15 +15594,15 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
 
-        new("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput", new ModelDescriptor(
+        new("together", "MiniMaxAI/MiniMax-M3", new ModelDescriptor(
             Provider: "together",
-            Id: "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+            Id: "MiniMaxAI/MiniMax-M3",
             Api: "openai-completions",
-            Name: "Qwen3 235B A22B Instruct 2507 FP8",
+            Name: "MiniMax-M3",
             BaseUrl: "https://api.together.xyz/v1",
             Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 262144,
+            ContextWindow: 524288,
+            MaxTokens: 250000,
             ThinkingLevelMap: new Dictionary<string, int>
             {
                 ["minimal"] = 1024,
@@ -11875,6 +15611,30 @@ public static class BuiltInModels
                 ["high"] = 16384,
                 ["xhigh"] = 32000,
             },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 1.2m, CacheRead: 0.06m))),
+
+        new("together", "Qwen/Qwen2.5-7B-Instruct-Turbo", new ModelDescriptor(
+            Provider: "together",
+            Id: "Qwen/Qwen2.5-7B-Instruct-Turbo",
+            Api: "openai-completions",
+            Name: "Qwen 2.5 7B Instruct Turbo",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: false,
+            ContextWindow: 32768,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.3m, Output: 0.3m))),
+
+        new("together", "Qwen/Qwen3-235B-A22B-Instruct-2507-tput", new ModelDescriptor(
+            Provider: "together",
+            Id: "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+            Api: "openai-completions",
+            Name: "Qwen3 235B A22B Instruct 2507 FP8",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: false,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.2m, Output: 0.6m))),
 
@@ -11896,17 +15656,9 @@ public static class BuiltInModels
             Api: "openai-completions",
             Name: "Qwen3 Coder Next FP8",
             BaseUrl: "https://api.together.xyz/v1",
-            Reasoning: true,
+            Reasoning: false,
             ContextWindow: 262144,
             MaxTokens: 262144,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
             Input: ["text"],
             Cost: new ModelCost(Input: 0.5m, Output: 1.2m))),
 
@@ -11928,7 +15680,27 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.6m, Output: 3.6m))),
+            Cost: new ModelCost(Input: 0.6m, Output: 3.6m, CacheRead: 0.35m))),
+
+        new("together", "Qwen/Qwen3.5-9B", new ModelDescriptor(
+            Provider: "together",
+            Id: "Qwen/Qwen3.5-9B",
+            Api: "openai-completions",
+            Name: "Qwen3.5 9B",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.17m, Output: 0.25m))),
 
         new("together", "Qwen/Qwen3.6-Plus", new ModelDescriptor(
             Provider: "together",
@@ -11956,19 +15728,11 @@ public static class BuiltInModels
             Api: "openai-completions",
             Name: "Qwen3.7 Max",
             BaseUrl: "https://api.together.xyz/v1",
-            Reasoning: true,
+            Reasoning: false,
             ContextWindow: 1000000,
             MaxTokens: 500000,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
             Input: ["text"],
-            Cost: new ModelCost(Input: 2.5m, Output: 7.5m))),
+            Cost: new ModelCost(Input: 1.25m, Output: 3.75m, CacheRead: 0.125m))),
 
         new("together", "deepseek-ai/DeepSeek-V3", new ModelDescriptor(
             Provider: "together",
@@ -11976,17 +15740,9 @@ public static class BuiltInModels
             Api: "openai-completions",
             Name: "DeepSeek-V3",
             BaseUrl: "https://api.together.xyz/v1",
-            Reasoning: true,
+            Reasoning: false,
             ContextWindow: 131072,
             MaxTokens: 131072,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
             Input: ["text"],
             Cost: new ModelCost(Input: 1.25m, Output: 1.25m))),
 
@@ -12010,6 +15766,26 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.6m, Output: 1.7m))),
 
+        new("together", "deepseek-ai/DeepSeek-V4-Flash-0731", new ModelDescriptor(
+            Provider: "together",
+            Id: "deepseek-ai/DeepSeek-V4-Flash-0731",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Flash 0731",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.03m))),
+
         new("together", "deepseek-ai/DeepSeek-V4-Pro", new ModelDescriptor(
             Provider: "together",
             Id: "deepseek-ai/DeepSeek-V4-Pro",
@@ -12028,7 +15804,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 2.1m, Output: 4.4m, CacheRead: 0.2m))),
+            Cost: new ModelCost(Input: 1.74m, Output: 3.48m, CacheRead: 0.2m))),
 
         new("together", "essentialai/Rnj-1-Instruct", new ModelDescriptor(
             Provider: "together",
@@ -12060,7 +15836,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.2m, Output: 0.5m))),
+            Cost: new ModelCost(Input: 0.39m, Output: 0.97m))),
 
         new("together", "meta-llama/Llama-3.3-70B-Instruct-Turbo", new ModelDescriptor(
             Provider: "together",
@@ -12072,7 +15848,7 @@ public static class BuiltInModels
             ContextWindow: 131072,
             MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.88m, Output: 0.88m))),
+            Cost: new ModelCost(Input: 1.04m, Output: 1.04m))),
 
         new("together", "moonshotai/Kimi-K2.5", new ModelDescriptor(
             Provider: "together",
@@ -12114,6 +15890,46 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.2m, Output: 4.5m, CacheRead: 0.2m))),
 
+        new("together", "moonshotai/Kimi-K2.7-Code", new ModelDescriptor(
+            Provider: "together",
+            Id: "moonshotai/Kimi-K2.7-Code",
+            Api: "openai-completions",
+            Name: "Kimi K2.7 Code",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.19m))),
+
+        new("together", "moonshotai/Kimi-K3", new ModelDescriptor(
+            Provider: "together",
+            Id: "moonshotai/Kimi-K3",
+            Api: "openai-completions",
+            Name: "Kimi K3",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m))),
+
         new("together", "nvidia/nemotron-3-ultra-550b-a55b", new ModelDescriptor(
             Provider: "together",
             Id: "nvidia/nemotron-3-ultra-550b-a55b",
@@ -12154,6 +15970,66 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.15m, Output: 0.6m))),
 
+        new("together", "openai/gpt-oss-20b", new ModelDescriptor(
+            Provider: "together",
+            Id: "openai/gpt-oss-20b",
+            Api: "openai-completions",
+            Name: "GPT OSS 20B",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.05m, Output: 0.2m))),
+
+        new("together", "thinkingmachines/Inkling", new ModelDescriptor(
+            Provider: "together",
+            Id: "thinkingmachines/Inkling",
+            Api: "openai-completions",
+            Name: "Inkling",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 524288,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1m, Output: 4.05m, CacheRead: 0.17m))),
+
+        new("together", "zai-org/GLM-5", new ModelDescriptor(
+            Provider: "together",
+            Id: "zai-org/GLM-5",
+            Api: "openai-completions",
+            Name: "GLM-5",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 202752,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1m, Output: 3.2m))),
+
         new("together", "zai-org/GLM-5.1", new ModelDescriptor(
             Provider: "together",
             Id: "zai-org/GLM-5.1",
@@ -12172,7 +16048,27 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.4m, Output: 4.4m))),
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+
+        new("together", "zai-org/GLM-5.2", new ModelDescriptor(
+            Provider: "together",
+            Id: "zai-org/GLM-5.2",
+            Api: "openai-completions",
+            Name: "GLM-5.2",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 512000,
+            MaxTokens: 164000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
 
         // xai
 
@@ -12228,6 +16124,46 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1.25m, Output: 2.5m, CacheRead: 0.2m))),
 
+        new("xai", "grok-4.5", new ModelDescriptor(
+            Provider: "xai",
+            Id: "grok-4.5",
+            Api: "openai-completions",
+            Name: "Grok 4.5",
+            BaseUrl: "https://api.x.ai/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 500000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.3m))),
+
+        new("xai", "grok-4.6", new ModelDescriptor(
+            Provider: "xai",
+            Id: "grok-4.6",
+            Api: "openai-completions",
+            Name: "Grok 4.6",
+            BaseUrl: "https://api.x.ai/v1",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 500000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
+
         new("xai", "grok-build-0.1", new ModelDescriptor(
             Provider: "xai",
             Id: "grok-build-0.1",
@@ -12268,7 +16204,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.3m, CacheRead: 0.01m))),
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
 
         new("xiaomi", "mimo-v2-omni", new ModelDescriptor(
             Provider: "xiaomi",
@@ -12288,7 +16224,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.4m, Output: 2m, CacheRead: 0.08m))),
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
 
         new("xiaomi", "mimo-v2-pro", new ModelDescriptor(
             Provider: "xiaomi",
@@ -12308,7 +16244,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 1m, Output: 3m, CacheRead: 0.2m))),
+            Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.0036m))),
 
         new("xiaomi", "mimo-v2.5", new ModelDescriptor(
             Provider: "xiaomi",
@@ -12328,7 +16264,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.4m, Output: 2m, CacheRead: 0.08m))),
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
 
         new("xiaomi", "mimo-v2.5-pro", new ModelDescriptor(
             Provider: "xiaomi",
@@ -12348,7 +16284,7 @@ public static class BuiltInModels
                 ["xhigh"] = 32000,
             },
             Input: ["text"],
-            Cost: new ModelCost(Input: 1m, Output: 3m, CacheRead: 0.2m))),
+            Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.0036m))),
 
         new("xiaomi", "mimo-v2.5-pro-ultraspeed", new ModelDescriptor(
             Provider: "xiaomi",
@@ -12371,26 +16307,6 @@ public static class BuiltInModels
             Cost: new ModelCost(Input: 1.305m, Output: 2.61m, CacheRead: 0.0108m))),
 
         // xiaomi-token-plan-ams
-
-        new("xiaomi-token-plan-ams", "mimo-v2-omni", new ModelDescriptor(
-            Provider: "xiaomi-token-plan-ams",
-            Id: "mimo-v2-omni",
-            Api: "openai-completions",
-            Name: "MiMo-V2-Omni",
-            BaseUrl: "https://token-plan-ams.xiaomimimo.com/v1",
-            Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 131072,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
 
         new("xiaomi-token-plan-ams", "mimo-v2-pro", new ModelDescriptor(
             Provider: "xiaomi-token-plan-ams",
@@ -12454,26 +16370,6 @@ public static class BuiltInModels
 
         // xiaomi-token-plan-cn
 
-        new("xiaomi-token-plan-cn", "mimo-v2-omni", new ModelDescriptor(
-            Provider: "xiaomi-token-plan-cn",
-            Id: "mimo-v2-omni",
-            Api: "openai-completions",
-            Name: "MiMo-V2-Omni",
-            BaseUrl: "https://token-plan-cn.xiaomimimo.com/v1",
-            Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 131072,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
-
         new("xiaomi-token-plan-cn", "mimo-v2-pro", new ModelDescriptor(
             Provider: "xiaomi-token-plan-cn",
             Id: "mimo-v2-pro",
@@ -12535,26 +16431,6 @@ public static class BuiltInModels
             Cost: new ModelCost(Input: 0m, Output: 0m))),
 
         // xiaomi-token-plan-sgp
-
-        new("xiaomi-token-plan-sgp", "mimo-v2-omni", new ModelDescriptor(
-            Provider: "xiaomi-token-plan-sgp",
-            Id: "mimo-v2-omni",
-            Api: "openai-completions",
-            Name: "MiMo-V2-Omni",
-            BaseUrl: "https://token-plan-sgp.xiaomimimo.com/v1",
-            Reasoning: true,
-            ContextWindow: 262144,
-            MaxTokens: 131072,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
 
         new("xiaomi-token-plan-sgp", "mimo-v2-pro", new ModelDescriptor(
             Provider: "xiaomi-token-plan-sgp",
@@ -12846,6 +16722,26 @@ public static class BuiltInModels
             BaseUrl: "https://api.z.ai/api/paas/v4",
             Reasoning: true,
             ContextWindow: 200000,
+            MaxTokens: 131072,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+
+        new("zai", "glm-5.2", new ModelDescriptor(
+            Provider: "zai",
+            Id: "glm-5.2",
+            Api: "openai-completions",
+            Name: "GLM-5.2",
+            BaseUrl: "https://api.z.ai/api/paas/v4",
+            Reasoning: true,
+            ContextWindow: 1000000,
             MaxTokens: 131072,
             ThinkingLevelMap: new Dictionary<string, int>
             {

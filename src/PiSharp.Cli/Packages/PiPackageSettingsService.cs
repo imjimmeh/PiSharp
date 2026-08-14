@@ -12,6 +12,7 @@ public sealed class PiPackageSettingsService
         _store = store;
         _snapshot = snapshot;
     }
+    public PiAgentPaths SnapshotPaths => _snapshot.Paths;
 
     public async Task InstallAsync(string source, bool local = false)
     {

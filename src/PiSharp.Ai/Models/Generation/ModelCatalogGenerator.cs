@@ -37,7 +37,7 @@ public static class ModelCatalogGenerator
         ["cerebras"] = new("cerebras", "openai-completions", "https://api.cerebras.ai/v1"),
         ["deepseek"] = new("deepseek", "openai-completions", "https://api.deepseek.com"),
         ["xai"] = new("xai", "openai-completions", "https://api.x.ai/v1"),
-        ["github-copilot"] = new("github-copilot", "openai-completions", "https://api.githubcopilot.com"),
+        ["github-copilot"] = new("github-copilot", "github-copilot-chat", null),
         ["minimax"] = new("minimax", "openai-completions", "https://api.minimax.io/v1"),
         ["minimax-cn"] = new("minimax-cn", "openai-completions", "https://api.minimaxi.com/v1"),
         ["moonshotai"] = new("moonshotai", "openai-completions", "https://api.moonshot.ai/v1"),

@@ -101,4 +101,54 @@ public sealed class CliParserTests
         Assert.Equal(PackageCommandKind.Config, result.PackageCommand!.Kind);
         Assert.True(result.Verbose);
     }
+    [Fact]
+    public void ParsesAcpMode()
+    {
+        var args = CliParser.Parse(["--mode", "acp"]);
+
+        Assert.Equal(CliMode.Acp, args.Mode);
+        Assert.Equal(AppMode.Acp, CliParser.SelectAppMode(args, stdinRedirected: false));
+    }
+
+    [Fact]
+    public void ParsesApprovalModes()
+    {
+        Assert.Equal(AcpApprovalMode.Yolo, CliParser.Parse(["--approval-mode", "yolo"]).ApprovalMode);
+        Assert.Equal(AcpApprovalMode.Ask, CliParser.Parse(["--approval-mode", "ask"]).ApprovalMode);
+        Assert.Equal(AcpApprovalMode.ReadOnly, CliParser.Parse(["--approval-mode", "read-only"]).ApprovalMode);
+    }
+
+    [Fact]
+    public void InvalidApprovalModeProducesDiagnostic()
+    {
+        var args = CliParser.Parse(["--approval-mode", "bogus"]);
+
+        Assert.Null(args.ApprovalMode);
+        Assert.Contains(args.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Warning && d.Message.Contains("bogus"));
+    }
+
+    [Fact]
+    public void ParsesProfileFlag()
+    {
+        var args = CliParser.Parse(["--profile", "work"]);
+
+        Assert.Equal("work", args.Profile);
+    }
+
+    [Fact]
+    public void ParsesCheckUpdatesFlags()
+    {
+        Assert.True(CliParser.Parse(["--check-updates"]).CheckUpdates);
+        Assert.True(CliParser.Parse(["--no-check-updates"]).NoCheckUpdates);
+    }
+
+    [Fact]
+    public void ParsesAddSourceOnUpdate()
+    {
+        var args = CliParser.Parse(["update", "pi", "--add-source", "https://feed.local/v3/index.json"]);
+
+        Assert.NotNull(args.PackageCommand);
+        Assert.True(args.PackageCommand.Self);
+        Assert.Equal("https://feed.local/v3/index.json", args.PackageCommand.AddSource);
+    }
 }

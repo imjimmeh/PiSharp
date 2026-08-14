@@ -89,6 +89,8 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
         public IExtensionToolApi Tools { get; } = new ToolApi(descriptor, registry, binding);
         public IExtensionSkillApi Skills { get; } = new SkillApi(descriptor, registry, binding);
         public IExtensionModelApi Model { get; } = binding.Model;
+        public IExtensionSettingsApi Settings { get; } = new ExtensionScopedSettings(descriptor, binding.RuntimeSettings);
+        public IExtensionStateApi State { get; } = new ExtensionScopedState(descriptor, binding.RuntimeState);
         public IExtensionEventBus Events { get; } = new ExtensionEventBus(registry, descriptor.EffectiveSourceId, binding.EmitEventAsync);
         public IExtensionPromptApi Prompt { get; } = new PromptApi(descriptor, registry);
 

@@ -71,6 +71,19 @@ export interface BridgeProtocol {
 			agentSessionSetModel: string;
 			agentSessionSetThinkingLevel: string;
 			agentSessionDispose: string;
+			settingsGet: string;
+			settingsGetCore: string;
+			settingsSet: string;
+			settingsRemove: string;
+			stateGet: string;
+			stateSet: string;
+			stateRemove: string;
+			stateGetAll: string;
+			stateListKeys: string;
+			stateClear: string;
+			stateGetSchemaVersion: string;
+			stateSetSchemaVersion: string;
+			stateRegisterMigration: string;
 		};
 }
 
@@ -138,6 +151,19 @@ const fallbackRuntimeActions = {
 	AgentSessionSetModel: "agent_session_set_model",
 	AgentSessionSetThinkingLevel: "agent_session_set_thinking_level",
 	AgentSessionDispose: "agent_session_dispose",
+	SettingsGet: "settings_get",
+	SettingsGetCore: "settings_get_core",
+	SettingsSet: "settings_set",
+	SettingsRemove: "settings_remove",
+	StateGet: "state_get",
+	StateSet: "state_set",
+	StateRemove: "state_remove",
+	StateGetAll: "state_get_all",
+	StateListKeys: "state_list_keys",
+	StateClear: "state_clear",
+	StateGetSchemaVersion: "state_get_schema_version",
+	StateSetSchemaVersion: "state_set_schema_version",
+	StateRegisterMigration: "state_register_migration",
 };
 
 export function createBridgeProtocol(manifest?: BridgeManifest | null): BridgeProtocol {
@@ -207,6 +233,19 @@ export function createBridgeProtocol(manifest?: BridgeManifest | null): BridgePr
 				agentSessionSetModel: required(runtimeActions, "AgentSessionSetModel"),
 				agentSessionSetThinkingLevel: required(runtimeActions, "AgentSessionSetThinkingLevel"),
 				agentSessionDispose: required(runtimeActions, "AgentSessionDispose"),
+				settingsGet: required(runtimeActions, "SettingsGet"),
+				settingsGetCore: required(runtimeActions, "SettingsGetCore"),
+				settingsSet: required(runtimeActions, "SettingsSet"),
+				settingsRemove: required(runtimeActions, "SettingsRemove"),
+				stateGet: required(runtimeActions, "StateGet"),
+				stateSet: required(runtimeActions, "StateSet"),
+				stateRemove: required(runtimeActions, "StateRemove"),
+				stateGetAll: required(runtimeActions, "StateGetAll"),
+				stateListKeys: required(runtimeActions, "StateListKeys"),
+				stateClear: required(runtimeActions, "StateClear"),
+				stateGetSchemaVersion: required(runtimeActions, "StateGetSchemaVersion"),
+				stateSetSchemaVersion: required(runtimeActions, "StateSetSchemaVersion"),
+				stateRegisterMigration: required(runtimeActions, "StateRegisterMigration"),
 			},
 		};
 }

@@ -20,6 +20,22 @@ public static class EnvApiKeyDetector
         ["cerebras"] = ["CEREBRAS_API_KEY"],
         ["moonshot"] = ["MOONSHOT_API_KEY"],
         ["kimi"] = ["KIMI_API_KEY"],
+        ["huggingface"] = ["HUGGINGFACE_API_KEY", "HF_TOKEN"],
+        ["minimax"] = ["MINIMAX_API_KEY"],
+        ["minimax-cn"] = ["MINIMAX_API_KEY"],
+        ["moonshotai"] = ["MOONSHOT_API_KEY"],
+        ["moonshotai-cn"] = ["MOONSHOT_API_KEY"],
+        ["kimi-coding"] = ["KIMI_API_KEY"],
+        ["zai"] = ["ZAI_API_KEY"],
+        ["opencode"] = ["OPENCODE_API_KEY"],
+        ["opencode-go"] = ["OPENCODE_API_KEY"],
+        ["xiaomi"] = ["XIAOMI_API_KEY"],
+        ["xiaomi-token-plan-cn"] = ["XIAOMI_API_KEY"],
+        ["xiaomi-token-plan-ams"] = ["XIAOMI_API_KEY"],
+        ["xiaomi-token-plan-sgp"] = ["XIAOMI_API_KEY"],
+        ["cloudflare-workers-ai"] = ["CLOUDFLARE_API_KEY"],
+        ["cloudflare-ai-gateway"] = ["CLOUDFLARE_API_KEY"],
+        ["perplexity"] = ["PERPLEXITY_API_KEY"],
     };
 
     public static string? GetEnvApiKey(string provider)

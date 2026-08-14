@@ -7,14 +7,6 @@ public sealed class GitHubCopilotOAuthProvider : IOAuthProvider
     private const string ClientId = "SXYxLmI1MDdhMDhjODdlY2ZlOTg=";
     private const string DefaultDomain = "github.com";
 
-    private static readonly Dictionary<string, string> CopilotHeaders = new()
-    {
-        ["User-Agent"] = "GitHubCopilotChat/0.35.0",
-        ["Editor-Version"] = "vscode/1.107.0",
-        ["Editor-Plugin-Version"] = "copilot-chat/0.35.0",
-        ["Copilot-Integration-Id"] = "vscode-chat"
-    };
-
     private static readonly HttpClient Client = new()
     {
         Timeout = TimeSpan.FromSeconds(30)
@@ -201,7 +193,7 @@ public sealed class GitHubCopilotOAuthProvider : IOAuthProvider
         var request = new HttpRequestMessage(HttpMethod.Get, urls.CopilotTokenUrl);
         request.Headers.Add("Accept", "application/json");
         request.Headers.Add("Authorization", $"Bearer {githubToken}");
-        foreach (var (key, value) in CopilotHeaders)
+        foreach (var (key, value) in CopilotConstants.Headers)
             request.Headers.Add(key, value);
 
         var response = await Client.SendAsync(request, ct);
@@ -241,7 +233,7 @@ public sealed class GitHubCopilotOAuthProvider : IOAuthProvider
                 var url = $"{baseUrl}/models/{modelId}/policy";
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
                 request.Headers.Add("Authorization", $"Bearer {token}");
-                foreach (var (key, value) in CopilotHeaders)
+                foreach (var (key, value) in CopilotConstants.Headers)
                     request.Headers.Add(key, value);
                 request.Headers.Add("openai-intent", "chat-policy");
                 request.Headers.Add("x-interaction-type", "chat-policy");

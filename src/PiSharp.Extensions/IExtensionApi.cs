@@ -17,6 +17,8 @@ public interface IExtensionApi
     IExtensionModelApi Model { get; }
     IExtensionEventBus Events { get; }
     IExtensionPromptApi Prompt { get; }
+    IExtensionSettingsApi Settings { get; }
+    IExtensionStateApi State { get; }
 
     IDisposable On(string eventName, ExtensionEventHandler handler);
     IDisposable Use(ExtensionMiddleware middleware);

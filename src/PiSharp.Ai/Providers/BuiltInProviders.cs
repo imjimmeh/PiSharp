@@ -1,6 +1,7 @@
 using PiSharp.Ai.Auth;
 using PiSharp.Ai.Providers.Anthropic;
 using PiSharp.Ai.Providers.Bedrock;
+using PiSharp.Ai.Providers.Copilot;
 using PiSharp.Ai.Providers.Faux;
 using PiSharp.Ai.Providers.Google;
 using PiSharp.Ai.Providers.Mistral;
@@ -25,7 +26,8 @@ public static class BuiltInProviders
         GoogleVertexProvider.ApiName,
         BedrockProvider.ApiName,
         MistralProvider.ApiName,
-        FauxProvider.DefaultApi
+        FauxProvider.DefaultApi,
+        GitHubCopilotProvider.ApiName
     ];
 
     public static IReadOnlyList<RegisteredApiProvider> RegisterAll(HttpClient? httpClient = null, IProviderCredentialResolver? credentialResolver = null)
@@ -42,7 +44,8 @@ public static class BuiltInProviders
             ApiRegistry.Register(new GoogleVertexProvider(httpClient, credentialResolver), SourceId),
             ApiRegistry.Register(new BedrockProvider(httpClient, credentialResolver), SourceId),
             ApiRegistry.Register(new MistralProvider(httpClient, credentialResolver), SourceId),
-            ApiRegistry.Register(new FauxProvider(), SourceId)
+            ApiRegistry.Register(new FauxProvider(), SourceId),
+            ApiRegistry.Register(new GitHubCopilotProvider(httpClient, credentialResolver), SourceId)
         };
 
         return registrations;

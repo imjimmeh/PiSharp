@@ -177,6 +177,8 @@ public static class InteractiveMode
                 var outdated = await checker.CheckAsync(packages, token);
                 var message = OutdatedPackagesSummary.Format(outdated);
                 if (message is not null) await inject(message);
+
+                await CheckSelfUpdateAsync(runtime, inject, token);
             },
             Theme: runtime.Theme,
             GetExtensionShortcuts: () => runtime.ExtensionManager?.Registry.Shortcuts ?? [],
@@ -226,4 +228,33 @@ public static class InteractiveMode
 
     private static SlashCommandRegistry BuildCommandRegistry(SessionRuntime runtime)
         => SlashCommandRegistryFactory.Create(runtime);
+    private static async Task CheckSelfUpdateAsync(
+        SessionRuntime runtime,
+        Func<string, Task> inject,
+        CancellationToken token)
+    {
+        try
+        {
+            var checkOnStartup = true;
+            try
+            {
+                var node = runtime.SettingsSnapshot?.Merged.Root["selfUpdate"]?["checkOnStartup"];
+                if (node is not null) checkOnStartup = node.GetValue<bool>();
+            }
+            catch
+            {
+                // Unparseable value; default to on.
+            }
+            if (!checkOnStartup) return;
+
+            var selfInfo = await new SelfUpdateChecker(new NuGetRegistryClient(new HttpClient()))
+                .CheckAsync(VersionInfo.Current, offline: false, token);
+            var selfMessage = SelfUpdateSummary.Format(selfInfo);
+            if (selfMessage is not null) await inject(selfMessage);
+        }
+        catch
+        {
+            // The startup check lane must never crash the TUI.
+        }
+    }
 }

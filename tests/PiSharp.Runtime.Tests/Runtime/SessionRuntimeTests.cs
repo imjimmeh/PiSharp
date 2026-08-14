@@ -842,8 +842,12 @@ public sealed class SessionRuntimeTests
                 => new(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), stream, FakeCompletion, [new RuntimeTestTool("read")], Skills: skills, Extensions: registry));
             var manager = new ExtensionManager(registry);
             var binding = new ExtensionRuntimeBinding(root, false, NoExtensionUi.Instance);
-            await using var tsHost = new TsExtensionHost(new TsBridgeOptions(ExtensionPaths: [], WorkingDirectory: root), registry, binding);
-            await tsHost.StartAsync(CancellationToken.None);
+            // These extensions use real TypeScript syntax, so the bridge needs the TypeScript
+            // compiler. The output-copied bridge (bin/Node) has no adjacent node_modules; run the
+            // repo bridge instead, where `npm ci` (BuildTypeScriptBridgeInstall) installs the
+            // `typescript` package next to the runner.
+            var bridgeRunner = Path.Combine(repositoryRoot, "src", "PiSharp.TsBridge", "Node", "TsBridgeRunner.mjs");
+            await using var tsHost = new TsExtensionHost(new TsBridgeOptions(ExtensionPaths: [], WorkingDirectory: root, RunnerPath: bridgeRunner), registry, binding);
             var loaded = await tsHost.LoadManyAsync([embeddingsExtensionPath, fakeProviderPath, selectorExtensionPath], binding, CancellationToken.None);
             Assert.All(loaded.Results!, item => Assert.True(item.Ok, item.Error));
             var runtime = new SessionRuntime(repo, createOptions, HarnessWithSkills, initial, extensionManager: manager, tsHost: tsHost, extensionBinding: binding, skills: skills);

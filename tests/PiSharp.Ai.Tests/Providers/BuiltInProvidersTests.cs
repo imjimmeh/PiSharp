@@ -27,6 +27,17 @@ public sealed class BuiltInProvidersTests : IDisposable
     }
 
     [Fact]
+    public void CopilotChatProviderIsRegisteredAsBuiltIn()
+    {
+        BuiltInProviders.RegisterAll();
+
+        var registration = ApiRegistry.Get("github-copilot-chat");
+        Assert.NotNull(registration);
+        Assert.Equal(BuiltInProviders.SourceId, registration!.SourceId);
+        Assert.IsType<PiSharp.Ai.Providers.Copilot.GitHubCopilotProvider>(registration.Provider);
+    }
+
+    [Fact]
     public void BuiltInRegistrationsCanBeClearedWithoutRemovingExtensionProviders()
     {
         ApiRegistry.Register(new FauxProvider(api: "extension-api"), "extension");

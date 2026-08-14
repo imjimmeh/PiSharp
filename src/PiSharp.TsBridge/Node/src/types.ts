@@ -731,6 +731,19 @@ export interface BridgeProtocol {
 		agentSessionSetModel: string;
 		agentSessionSetThinkingLevel: string;
 		agentSessionDispose: string;
+		settingsGet: string;
+		settingsGetCore: string;
+		settingsSet: string;
+		settingsRemove: string;
+		stateGet: string;
+		stateSet: string;
+		stateRemove: string;
+		stateGetAll: string;
+		stateListKeys: string;
+		stateClear: string;
+		stateGetSchemaVersion: string;
+		stateSetSchemaVersion: string;
+		stateRegisterMigration: string;
 	};
 }
 

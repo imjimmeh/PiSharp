@@ -28,6 +28,27 @@ internal static class OpenAIEndpoint
             return new Uri($"{baseUrl}/{normalizedResource}");
         }
 
+        if (HasEmbeddedVersionSegment(baseUrl))
+        {
+            return new Uri($"{baseUrl}/{normalizedResource}");
+        }
+
         return new Uri($"{baseUrl}/v1/{normalizedResource}");
+    }
+
+    private static bool HasEmbeddedVersionSegment(string baseUrl)
+    {
+        // Recognize bases whose final segment already pins an API version or
+        // compatibility surface (ZAI .../api/paas/v4, Cloudflare gateway .../compat,
+        // Perplexity .../anthropic, Gemini .../v1beta) so the builder does not
+        // inject a spurious /v1 into the middle of the path.
+        var lastSegment = baseUrl[(baseUrl.LastIndexOf('/') + 1)..];
+        if (lastSegment.Length == 0) return false;
+        if (lastSegment.Equals("compat", StringComparison.OrdinalIgnoreCase)) return true;
+        if (lastSegment.Equals("anthropic", StringComparison.OrdinalIgnoreCase)) return true;
+        if (lastSegment.StartsWith("v1beta", StringComparison.OrdinalIgnoreCase)) return true;
+        return lastSegment.Length > 1
+            && lastSegment[0] is 'v' or 'V'
+            && lastSegment.Skip(1).All(char.IsDigit);
     }
 }

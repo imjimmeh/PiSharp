@@ -170,7 +170,7 @@ public sealed class PackageCommandIntegrationTests
     }
 
     [Fact]
-    public async Task UpdateSelfCommandReturnsNotice()
+    public async Task UpdateSelfCommandDelegatesToRunner()
     {
         var console = new TestPackageConsoleIO();
         var runner = new FakePackageCommandRunner();
@@ -181,7 +181,10 @@ public sealed class PackageCommandIntegrationTests
             packageCommandRunner: runner);
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("not yet implemented", console.GetOutput(), StringComparison.OrdinalIgnoreCase);
+        Assert.True(runner.UpdateCalled);
+        Assert.NotNull(runner.LastUpdateRequest);
+        Assert.True(runner.LastUpdateRequest.Self);
+        Assert.DoesNotContain("not yet implemented", console.GetOutput(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

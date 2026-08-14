@@ -35,7 +35,7 @@ public static class PiRuntimeBootstrap
         var logger = loggerFactory?.CreateLogger("PiSharp.Runtime.Bootstrap") ?? NullLogger.Instance;
 
         var settingsStore = new PiSettingsStore();
-        var settings = await startupContext.MeasureAsync("settings.load", () => settingsStore.LoadAsync(options.Env.Cwd, options.HomeDirectory, cancellationToken));
+        var settings = await startupContext.MeasureAsync("settings.load", () => settingsStore.LoadAsync(options.Env.Cwd, options.HomeDirectory, cancellationToken: cancellationToken));
         var credentialResolver = options.CredentialResolver ?? new ProviderCredentialResolver(new FileOAuthStorage(settings.Paths.AuthPath));
         RegisterBuiltInOAuthProviders();
         startupContext.Measure("providers.register", () =>

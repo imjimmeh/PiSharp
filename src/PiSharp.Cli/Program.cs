@@ -7,6 +7,7 @@ using PiSharp.Cli.IO;
 using PiSharp.Cli.Logging;
 using PiSharp.Cli.Modes;
 using PiSharp.Cli.Packages;
+using PiSharp.Cli.Runtime;
 using PiSharp.Cli.Parsing;
 using PiSharp.Compatibility.Settings;
 using PiSharp.Runtime;
@@ -30,17 +31,35 @@ public static class Program
 
         if (parsed.DiagnosticsOrEmpty.Any(d => d.Type == CliDiagnosticType.Error)) return 2;
 
+        // P18: resolve the active profile (flag > PISHARP_PROFILE > PI_PROFILE > none).
+        //
+        // Important: `default` is reserved and maps to no profile (byte-identical layout), so a null
+        // resolved profile with an explicit --profile of "default" is treated as no relocation.
+        var profile = PiProfiles.Resolve(parsed.Profile);
+        if (parsed.Profile is not null && !PiProfiles.IsValidName(parsed.Profile, out var profileError))
+        {
+            await console.Error.WriteLineAsync($"Error: {profileError}");
+            return 2;
+        }
+
         if (parsed.PackageCommand is not null)
         {
             var offline = parsed.Offline || string.Equals(Environment.GetEnvironmentVariable("PI_OFFLINE"), "1", StringComparison.Ordinal);
-            return await HandlePackageCommandAsync(parsed.PackageCommand, console, packageCommandRunner, offline);
+            return await HandlePackageCommandAsync(parsed.PackageCommand, console, packageCommandRunner, offline, profile?.Name);
         }
 
         if (parsed.Version)
         {
-            await console.Out.WriteLineAsync(typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0");
+            await console.Out.WriteLineAsync(VersionInfo.Current);
             return 0;
         }
+
+        if (parsed.CheckUpdates)
+        {
+            var runner = packageCommandRunner ?? await CreateDefaultPackageCommandRunnerAsync(profile?.Name);
+            return await HandleCheckUpdatesAsync(console, runner);
+        }
+
 
         CliFileLoggingRegistration? fileLogging = null;
         var cwd = Directory.GetCurrentDirectory();
@@ -49,7 +68,7 @@ public static class Program
             builder
                 .SetMinimumLevel(LogLevel.Debug)
                 .AddDebug();
-            fileLogging = CliFileLogging.AddConfiguredFileLogging(builder, cwd);
+            fileLogging = CliFileLogging.AddConfiguredFileLogging(builder, cwd, profile?.Name);
         });
 
         var mode = CliParser.SelectAppMode(parsed, console.IsInputRedirected);
@@ -69,7 +88,8 @@ public static class Program
 
         var runtimeOptions = CliRuntimeOptionsMapper.FromCliArgs(
             runtimeArgs with { HelpOnly = parsed.Help },
-            env);
+            env,
+            profile: profile?.Name);
         if (mode == AppMode.Interactive)
         {
             var extensionOptions = runtimeOptions.Extensions ?? new RuntimeExtensionOptions();
@@ -104,7 +124,7 @@ public static class Program
 
         if (parsed.LoginProvider is not null || parsed.Logout)
         {
-            return await HandleLoginLogoutAsync(parsed, env.Cwd, cancellationToken);
+            return await HandleLoginLogoutAsync(parsed, env.Cwd, profile?.Name, cancellationToken);
         }
 
         var fileReferences = parsed.FileArgsOrEmpty.Count == 0
@@ -114,6 +134,7 @@ public static class Program
         return mode switch
         {
             AppMode.Rpc => await RpcMode.RunAsync(runtime, console, cancellationToken),
+            AppMode.Acp => await AcpMode.RunAsync(runtime, console, parsed.ApprovalMode ?? AcpApprovalMode.Ask, cancellationToken),
             AppMode.SubagentJson => await SubagentJsonMode.RunAsync(runtime, new SubagentJsonModeOptions(InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty), console, cancellationToken),
             AppMode.PrintJson => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Json, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
             AppMode.PrintText => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Text, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
@@ -122,9 +143,9 @@ public static class Program
         };
     }
 
-    private static async Task<int> HandlePackageCommandAsync(PackageCommandArgs cmd, IConsoleIO console, IPackageCommandRunner? runner, bool offline = false)
+    private static async Task<int> HandlePackageCommandAsync(PackageCommandArgs cmd, IConsoleIO console, IPackageCommandRunner? runner, bool offline = false, string? profile = null)
     {
-        runner ??= await CreateDefaultPackageCommandRunnerAsync();
+        runner ??= await CreateDefaultPackageCommandRunnerAsync(profile);
 
         return cmd.Kind switch
         {
@@ -137,20 +158,21 @@ public static class Program
         };
     }
 
-    private static async Task<IPackageCommandRunner> CreateDefaultPackageCommandRunnerAsync()
+    private static async Task<IPackageCommandRunner> CreateDefaultPackageCommandRunnerAsync(string? profile = null)
     {
         var cwd = Directory.GetCurrentDirectory();
         var store = new PiSettingsStore();
-        var snapshot = await store.LoadAsync(cwd);
+        var snapshot = await store.LoadAsync(cwd, profile: profile);
         var settingsService = new PiPackageSettingsService(store, snapshot);
         var processRunner = new SystemProcessRunner();
-        var agentPaths = PiAgentPaths.FromCwd(cwd);
+        var agentPaths = PiAgentPaths.FromCwd(cwd, profile: profile);
         var packageRoot = Path.Combine(agentPaths.GlobalAgentDirectory, "packages");
         var packageManager = new PiPackageManager(packageRoot, processRunner);
         var nativeExtensionInstaller = new NativeExtensionInstaller(snapshot.Paths.HomeDirectory, snapshot.Paths.Cwd);
-        return new PiPackageCommandRunner(settingsService, packageManager, nativeExtensionInstaller);
+        var method = await SelfUpdateMethodDetector.DetectAsync(AppContext.BaseDirectory, processRunner, CancellationToken.None);
+        var selfUpdateService = new SelfUpdateService(method);
+        return new PiPackageCommandRunner(settingsService, packageManager, nativeExtensionInstaller, selfUpdateService);
     }
-
     private static async Task<int> HandleInstallAsync(PackageCommandArgs cmd, IConsoleIO console, IPackageCommandRunner runner, bool offline = false)
     {
         var source = cmd.Source!;
@@ -223,22 +245,30 @@ public static class Program
     private static async Task<int> HandleUpdateAsync(PackageCommandArgs cmd, IConsoleIO console, IPackageCommandRunner runner, bool offline = false)
     {
         var request = new PackageUpdateRequest(
-            cmd.Source, cmd.Self, cmd.Extensions, cmd.ExtensionSource, cmd.Force, offline);
-
-        if (cmd.Self)
-        {
-            await console.Out.WriteLineAsync("Self-update is not yet implemented. Use your package manager to update PiSharp.");
-            return 0;
-        }
+            cmd.Source, cmd.Self, cmd.Extensions, cmd.ExtensionSource, cmd.Force, offline, cmd.AddSource);
 
         await runner.UpdateAsync(request);
         await console.Out.WriteLineAsync("Update completed.");
         return 0;
     }
-
-    private static async Task<int> HandleLoginLogoutAsync(CliArgs args, string cwd, CancellationToken cancellationToken = default)
+    private static async Task<int> HandleCheckUpdatesAsync(IConsoleIO console, IPackageCommandRunner runner)
     {
-        var authPath = PiAgentPaths.FromCwd(cwd).AuthPath;
+        var offline = string.Equals(Environment.GetEnvironmentVariable("PI_OFFLINE"), "1", StringComparison.Ordinal);
+        var checker = new SelfUpdateChecker(new NuGetRegistryClient(new HttpClient()));
+        var info = await checker.CheckAsync(VersionInfo.Current, offline, CancellationToken.None);
+        if (info is null)
+        {
+            await console.Out.WriteLineAsync("PiSharp is up to date.");
+            return 0;
+        }
+
+        await console.Out.WriteLineAsync(SelfUpdateSummary.Format(info));
+        return 0;
+    }
+
+    private static async Task<int> HandleLoginLogoutAsync(CliArgs args, string cwd, string? profile = null, CancellationToken cancellationToken = default)
+    {
+        var authPath = PiAgentPaths.FromCwd(cwd, profile: profile).AuthPath;
         var storage = new FileOAuthStorage(authPath);
 
         if (args.Logout)

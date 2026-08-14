@@ -34,6 +34,76 @@ public sealed class ModelCatalogGeneratorTests
     }
 
     [Fact]
+    public void GithubCopilotEmitUsesCopilotChatApiAndOmitsBaseUrl()
+    {
+        var output = ModelCatalogGenerator.Emit([
+            new GeneratedModel(
+                "github-copilot",
+                "claude-sonnet-4.5",
+                "github-copilot-chat",
+                "Claude Sonnet 4.5",
+                "",
+                true,
+                ["text"],
+                200000,
+                128000,
+                new ModelCost(0m, 0m))
+        ]);
+
+        Assert.Contains("Api: \"github-copilot-chat\"", output);
+        Assert.DoesNotContain("BaseUrl:", output);
+    }
+
+    [Fact]
+    public async Task GenerateAsyncProjectsGithubCopilotModelsDevProviderToCopilotChatApi()
+    {
+        var outputPath = Path.Combine(Path.GetTempPath(), $"pisharp-copilot-{Guid.NewGuid():N}.g.cs");
+        try
+        {
+            var options = new ModelCatalogGeneratorOptions(
+                outputPath,
+                new Uri("https://models.local/api.json"),
+                new Uri("https://openrouter.local/api/v1/models"),
+                new Uri("https://gateway.local/v1/models"));
+
+            var result = await ModelCatalogGenerator.GenerateAsync(options, new HttpClient(new CopilotStubHandler()));
+            var output = await File.ReadAllTextAsync(outputPath);
+
+            Assert.Equal(1, result.Providers["github-copilot"]);
+            Assert.Contains("new(\"github-copilot\", \"claude-sonnet-4.5\", new ModelDescriptor(", output);
+            var entryStart = output.IndexOf("new(\"github-copilot\", \"claude-sonnet-4.5\"", StringComparison.Ordinal);
+            Assert.True(entryStart >= 0);
+            var entryEnd = output.IndexOf(")))", entryStart, StringComparison.Ordinal);
+            var copilotEntry = output.Substring(entryStart, entryEnd - entryStart);
+            Assert.Contains("Api: \"github-copilot-chat\"", copilotEntry);
+            Assert.DoesNotContain("BaseUrl:", copilotEntry);
+        }
+        finally
+        {
+            if (File.Exists(outputPath)) File.Delete(outputPath);
+        }
+    }
+
+    private sealed class CopilotStubHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var body = request.RequestUri?.Host switch
+            {
+                "models.local" => "{\"github-copilot\":{\"models\":{\"claude-sonnet-4.5\":{\"tool_call\":true,\"name\":\"Claude Sonnet 4.5\",\"limit\":{\"context\":200000,\"output\":128000}}}}}",
+                "openrouter.local" => "{\"data\":[]}",
+                "gateway.local" => "[]",
+                _ => throw new InvalidOperationException($"Unexpected catalog URI: {request.RequestUri}")
+            };
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body)
+            });
+        }
+    }
+
+    [Fact]
     public async Task GenerateAsyncIncludesCurrentOpenAiCodexManualModels()
     {
         var outputPath = Path.Combine(Path.GetTempPath(), $"pisharp-models-{Guid.NewGuid():N}.g.cs");
