@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace PiSharp.Cli.Logging;
 
-internal sealed class RollingFileLoggerProvider : ILoggerProvider
+internal class RollingFileLoggerProvider : ILoggerProvider
 {
     private RollingFileLoggerOptions _options;
     private readonly object _gate = new();
@@ -56,7 +56,7 @@ internal sealed class RollingFileLoggerProvider : ILoggerProvider
     internal bool IsEnabled(LogLevel logLevel)
         => !_disposed && logLevel != LogLevel.None && logLevel >= _options.MinimumLevel;
 
-    internal void Write<TState>(string category, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    internal virtual void Write<TState>(string category, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         if (!IsEnabled(logLevel)) return;
 
@@ -88,7 +88,11 @@ internal sealed class RollingFileLoggerProvider : ILoggerProvider
         }
     }
 
-    private void EnsureWriter(DateOnly date)
+    protected object Gate => _gate;
+    protected bool Disposed => _disposed;
+    protected StreamWriter? Writer => _writer;
+
+    protected void EnsureWriter(DateOnly date)
     {
         var nextPath = _options.Mode == RollingFileMode.ExactFile ? _options.FilePath : BuildDatedPath(_options.FilePath, date);
         if (_writer is not null && _currentPath == nextPath) return;
@@ -136,8 +140,7 @@ internal sealed class RollingFileLoggerProvider : ILoggerProvider
             => provider.Write(category, logLevel, eventId, state, exception, formatter);
     }
 }
-
-internal sealed record RollingFileLoggerOptions(string FilePath, LogLevel MinimumLevel, int MaxRetainedFiles, RollingFileMode Mode = RollingFileMode.Dated);
+internal sealed record RollingFileLoggerOptions(string FilePath, LogLevel MinimumLevel, int MaxRetainedFiles, RollingFileMode Mode = RollingFileMode.Dated, bool Json = false);
 
 internal enum RollingFileMode
 {

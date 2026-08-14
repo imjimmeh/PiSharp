@@ -8,6 +8,7 @@ internal static class CliFileLogging
     public const string PathEnvironmentVariable = "PISHARP_LOG_FILE";
     public const string LevelEnvironmentVariable = "PISHARP_LOG_LEVEL";
     public const string MaxFilesEnvironmentVariable = "PISHARP_LOG_MAX_FILES";
+    public const string FormatEnvironmentVariable = "PISHARP_LOG_FORMAT";
 
     public static CliFileLoggingRegistration? AddConfiguredFileLogging(ILoggingBuilder builder, string? cwd = null, string? profile = null)
     {
@@ -26,7 +27,10 @@ internal static class CliFileLogging
         var configuration = ResolveConfiguration(cwd, homeDirectory, overrides, profile);
         if (configuration is null) return null;
 
-        return new CliFileLoggingRegistration(new RollingFileLoggerProvider(configuration.Options), configuration.HomeDirectory, configuration.RetargetsToSession, configuration.GlobalPiSharpDirectory);
+        var provider = configuration.Options.Json
+            ? new JsonFileLoggerProvider(configuration.Options)
+            : new RollingFileLoggerProvider(configuration.Options);
+        return new CliFileLoggingRegistration(provider, configuration.HomeDirectory, configuration.RetargetsToSession, configuration.GlobalPiSharpDirectory);
     }
 
     private static ResolvedFileLogging? ResolveConfiguration(string cwd, string? homeDirectory, CliFileLoggingOverrides? overrides, string? profile = null)
@@ -42,9 +46,10 @@ internal static class CliFileLogging
 
         var resolvedLevel = ResolveLogLevel(logging.Level, overrides.Level);
         var resolvedMaxFiles = ResolveMaxFiles(logging.MaxFiles?.ToString(), overrides.MaxFiles);
+        var jsonFormat = ResolveJsonFormat(logging.Json, overrides.Format);
         var retargetsToSession = logging.File is null && overrides.File is null;
         var mode = retargetsToSession ? RollingFileMode.ExactFile : RollingFileMode.Dated;
-        return new ResolvedFileLogging(new RollingFileLoggerOptions(resolvedPath, resolvedLevel, resolvedMaxFiles, mode), paths.HomeDirectory, retargetsToSession, paths.GlobalPiSharpDirectory);
+        return new ResolvedFileLogging(new RollingFileLoggerOptions(resolvedPath, resolvedLevel, resolvedMaxFiles, mode, jsonFormat), paths.HomeDirectory, retargetsToSession, paths.GlobalPiSharpDirectory);
     }
 
     internal static string GetDefaultLogFilePath(string? homeDirectory = null)
@@ -81,6 +86,12 @@ internal static class CliFileLogging
         return resolved;
     }
 
+    internal static bool ResolveJsonFormat(bool settingsJson, string? envFormat)
+    {
+        if (envFormat is not null) return string.Equals(envFormat, "json", StringComparison.OrdinalIgnoreCase);
+        return settingsJson;
+    }
+
     private static LogLevel? ParseLogLevel(string? value)
         => Enum.TryParse<LogLevel>(value, ignoreCase: true, out var level) ? level : null;
 
@@ -104,11 +115,12 @@ internal sealed class CliFileLoggingRegistration(RollingFileLoggerProvider provi
 
 internal sealed record ResolvedFileLogging(RollingFileLoggerOptions Options, string HomeDirectory, bool RetargetsToSession, string GlobalPiSharpDirectory);
 
-internal sealed record CliFileLoggingOverrides(string? File, string? Level, string? MaxFiles)
+internal sealed record CliFileLoggingOverrides(string? File, string? Level, string? MaxFiles, string? Format = null)
 {
     public static CliFileLoggingOverrides FromEnvironment()
         => new(
             Environment.GetEnvironmentVariable(CliFileLogging.PathEnvironmentVariable),
             Environment.GetEnvironmentVariable(CliFileLogging.LevelEnvironmentVariable),
-            Environment.GetEnvironmentVariable(CliFileLogging.MaxFilesEnvironmentVariable));
+            Environment.GetEnvironmentVariable(CliFileLogging.MaxFilesEnvironmentVariable),
+            Environment.GetEnvironmentVariable(CliFileLogging.FormatEnvironmentVariable));
 }
