@@ -13,6 +13,7 @@ public sealed class ClientSessionConnection : IAsyncDisposable
     private readonly IClientTransport _transport;
     private readonly CancellationTokenSource _pumpCts = new();
     private readonly Task _pumpTask;
+    private int _disposed;
 
     public ClientSessionConnection(IClientTransport transport)
     {
@@ -52,6 +53,10 @@ public sealed class ClientSessionConnection : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
         _pumpCts.Cancel();
         try
         {

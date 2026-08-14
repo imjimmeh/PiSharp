@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Threading.Channels;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
@@ -7,6 +8,7 @@ using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Harness;
 using PiSharp.Server.Contracts;
+using PiSharp.Server.Serialization;
 using PiSharp.Tui.Interactive;
 using Xunit;
 
@@ -101,6 +103,27 @@ public sealed class RemoteTuiBackendTests
         Assert.Equal("e1", parsed.Id);
     }
 
+
+    [Fact]
+    public async Task GetSessionName_DeserializesWireStateWithStringThinkingLevel()
+    {
+        var state = new ServerSessionState(
+            SessionId, "rt-1", "/s.jsonl", "Session", "/cwd", TestModel, ThinkingLevel.Off,
+            IsBusy: false, IsCompacting: false, MessageCount: 0);
+        using var document = JsonDocument.Parse(ServerJsonSerializer.Serialize(state));
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.GetState
+                ? ServerResponse.Ok("st", type, document.RootElement.Clone())
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var sessionName = await backend.GetSessionNameAsync(CancellationToken.None);
+
+        Assert.Equal("Session", sessionName);
+    }
     [Fact]
     public async Task GapInSequence_TriggersGetStateAndAttach()
     {

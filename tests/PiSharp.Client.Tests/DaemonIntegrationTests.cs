@@ -3,6 +3,7 @@ using PiSharp.Agent.Core.Events;
 using PiSharp.Client;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Hosting;
+using PiSharp.Server.Serialization;
 using Xunit;
 
 namespace PiSharp.Client.Tests;
@@ -133,6 +134,60 @@ public sealed class DaemonIntegrationTests
         Assert.NotNull(result);
         Assert.True(result!.Handled);
         Assert.Equal("a", result.Message);
+    }
+
+    [Fact]
+    public async Task CreateSession_DefaultPayload_Succeeds_OverRealTransport()
+    {
+        // The InteractiveMode default create_session payload: cwd only, with none of the
+        // noTools/noExtensions/noSkills/noPromptTemplates/noThemes/noContextFiles suppression
+        // flags set. Default startup still runs extension discovery (observed ~23s), so the
+        // transport is given a generous command timeout rather than a short arbitrary one.
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(90));
+        await using var conn = new ClientSessionConnection(transport);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        // Explicit envelope id proves wire correlation: the real transport resolves the matching
+        // ServerResponse by id and the server echoes it back.
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession, Id: "itest-create-default"),
+            new { cwd = root },
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        Assert.Equal("itest-create-default", createResp.Id);
+
+        // Round-trip the wire payload through the server JSON options into the typed contract.
+        var created = JsonSerializer.Deserialize<ServerSessionCreated>(
+            JsonSerializer.Serialize(createResp.Data, ServerJsonSerializer.Options),
+            ServerJsonSerializer.Options);
+        Assert.NotNull(created);
+        Assert.False(string.IsNullOrEmpty(created!.ServerSessionId));
+        Assert.NotNull(created.State);
+        Assert.Equal(created.ServerSessionId, created.State.ServerSessionId);
+        Assert.Equal(root, created.State.Cwd);
+
+        // Post-create remote startup sequence driven through the real backend on the same
+        // connection, mirroring what InteractiveMode runs after create_session.
+        await using var backend = new RemoteTuiBackend(conn)
+        {
+            ServerSessionId = created.ServerSessionId,
+        };
+        Assert.Empty(await backend.GetStartupMessagesAsync()); // default host has no delegate
+        Assert.Null(await backend.GetThemeAsync()); // default host has no theme
+
+        var sessionName = await backend.GetSessionNameAsync();
+        var snapshot = await backend.GetSessionSnapshotAsync();
+        Assert.Equal(created.State.RuntimeSessionId, snapshot.SessionId);
+        Assert.Equal(created.State.RuntimeSessionPath, snapshot.SessionFile);
+        Assert.Equal(sessionName, snapshot.SessionName);
     }
 
     // --- helpers ---

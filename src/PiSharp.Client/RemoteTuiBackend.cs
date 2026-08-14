@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Messages;
@@ -9,6 +10,7 @@ using PiSharp.Agent.Resources.Theme;
 using PiSharp.Extensions;
 using PiSharp.Runtime;
 using PiSharp.Server.Contracts;
+using PiSharp.Server.Serialization;
 using PiSharp.Tui.Interactive;
 
 namespace PiSharp.Client;
@@ -254,7 +256,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             throw new InvalidOperationException($"run_command failed: {response.Error?.Code}: {response.Error?.Message}");
         }
 
-        var result = ClientToTuiAdapter.FromPayload<ServerCommandResult>(response.Data);
+        var result = FromServerPayload<ServerCommandResult>(response.Data);
         return result is null
             ? new TuiCommandDispatchResult(false)
             : new TuiCommandDispatchResult(result.Handled, result.ShouldExit);
@@ -267,7 +269,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             new { text },
             token);
         return response.Success
-            ? ClientToTuiAdapter.FromPayload<IReadOnlyList<string>>(response.Data) ?? []
+            ? FromServerPayload<IReadOnlyList<string>>(response.Data) ?? []
             : [];
     }
 
@@ -282,7 +284,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             throw new InvalidOperationException($"process_input failed: {response.Error?.Code}: {response.Error?.Message}");
         }
 
-        var result = ClientToTuiAdapter.FromPayload<ProcessInputResult>(response.Data);
+        var result = FromServerPayload<ProcessInputResult>(response.Data);
         return result is null
             ? new TuiInputHookResult(false, text, images)
             : new TuiInputHookResult(result.Handled, result.Text, result.Images);
@@ -293,7 +295,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetTheme, ServerSessionId: RequireSessionId()),
             token);
-        return response.Success ? ClientToTuiAdapter.FromPayload<TuiThemeDocument>(response.Data) : null;
+        return response.Success ? FromServerPayload<TuiThemeDocument>(response.Data) : null;
     }
 
     public async Task<TuiSessionSnapshot> GetSessionSnapshotAsync(CancellationToken token = default)
@@ -306,7 +308,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             throw new InvalidOperationException($"get_session_snapshot failed: {response.Error?.Code}: {response.Error?.Message}");
         }
 
-        var snapshot = ClientToTuiAdapter.FromPayload<ServerSessionSnapshot>(response.Data)
+        var snapshot = FromServerPayload<ServerSessionSnapshot>(response.Data)
             ?? throw new InvalidOperationException("get_session_snapshot returned no snapshot.");
         return ClientToTuiAdapter.ToSessionSnapshot(snapshot);
     }
@@ -320,7 +322,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         ThrowOnFailure(response, "fork");
 
         // The daemon switched to a new live session: adopt it, then let the TUI refresh its snapshot.
-        var state = ClientToTuiAdapter.FromPayload<ServerSessionState>(response.Data);
+        var state = FromServerPayload<ServerSessionState>(response.Data);
         if (state is not null)
         {
             lock (_sync)
@@ -346,7 +348,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             token);
         if (!response.Success) return [];
 
-        var items = ClientToTuiAdapter.FromPayload<IReadOnlyList<ShortcutWire>>(response.Data) ?? [];
+        var items = FromServerPayload<IReadOnlyList<ShortcutWire>>(response.Data) ?? [];
         var shortcuts = new List<OwnedExtensionRegistration<ExtensionShortcutRegistration>>(items.Count);
         foreach (var item in items)
         {
@@ -378,7 +380,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             token);
         if (!response.Success) return new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
 
-        var summary = ClientToTuiAdapter.FromPayload<ExtensionLoadSummary>(response.Data);
+        var summary = FromServerPayload<ExtensionLoadSummary>(response.Data);
         if (summary is null) return new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
 
         var failures = summary.FailedDiagnostics is { Count: > 0 }
@@ -394,7 +396,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             token);
         if (!response.Success) return [];
 
-        return ClientToTuiAdapter.FromPayload<ServerStartupMessages>(response.Data)?.Messages ?? [];
+        return FromServerPayload<ServerStartupMessages>(response.Data)?.Messages ?? [];
     }
 
     public async Task PostStartupChecksAsync(Func<string, Task> emit, CancellationToken token = default)
@@ -411,7 +413,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             new ServerCommandEnvelope(ServerCommandTypes.CycleThinkingLevel, ServerSessionId: RequireSessionId()),
             token);
         ThrowOnFailure(response, "cycle_thinking_level");
-        var payload = ClientToTuiAdapter.FromPayload<ThinkingLevelWire>(response.Data);
+        var payload = FromServerPayload<ThinkingLevelWire>(response.Data);
         if (payload is { Level: { } level } && ClientToTuiAdapter.TryParseThinkingLevel(level) is { } parsed)
         {
             lock (_sync)
@@ -428,7 +430,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             token);
         if (!response.Success) return [];
 
-        return ClientToTuiAdapter.FromPayload<IReadOnlyList<ModelDescriptor>>(response.Data) ?? [];
+        return FromServerPayload<IReadOnlyList<ModelDescriptor>>(response.Data) ?? [];
     }
 
     public async Task<IReadOnlyList<string>> GetCommandsAsync(CancellationToken token = default)
@@ -437,7 +439,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             new ServerCommandEnvelope(ServerCommandTypes.GetCommands, ServerSessionId: RequireSessionId()),
             token);
         return response.Success
-            ? ClientToTuiAdapter.FromPayload<IReadOnlyList<string>>(response.Data) ?? []
+            ? FromServerPayload<IReadOnlyList<string>>(response.Data) ?? []
             : [];
     }
 
@@ -448,7 +450,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             token);
         if (!response.Success) return string.Empty;
 
-        return ClientToTuiAdapter.FromPayload<TextWire>(response.Data)?.Text ?? string.Empty;
+        return FromServerPayload<TextWire>(response.Data)?.Text ?? string.Empty;
     }
 
     // --- event pipeline ---
@@ -604,6 +606,13 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     private Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, object payload, CancellationToken token)
         => _connection.SendAsync(envelope, payload, token);
 
+    private static T? FromServerPayload<T>(object? data)
+        => data is null
+            ? default
+            : JsonSerializer.Deserialize<T>(
+                JsonSerializer.Serialize(data, ServerJsonSerializer.Options),
+                ServerJsonSerializer.Options);
+
     private async Task<ServerSessionState> GetStateAsync(CancellationToken token)
     {
         var sessionId = RequireSessionId();
@@ -611,7 +620,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             new ServerCommandEnvelope(ServerCommandTypes.GetState, ServerSessionId: sessionId),
             token);
         ThrowOnFailure(response, "get_state");
-        return ClientToTuiAdapter.FromPayload<ServerSessionState>(response.Data)
+        return FromServerPayload<ServerSessionState>(response.Data)
             ?? throw new InvalidOperationException("get_state returned no state.");
     }
 
