@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Ai;
 using PiSharp.Ai.Models;
+using PiSharp.Runtime;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -50,18 +51,35 @@ public sealed class ModelSlashCommand : IBuiltInSlashCommand
 
         if (string.IsNullOrWhiteSpace(selectedText)) return new SlashCommandResult(true, "Model selection cancelled.");
 
+        // @role branch — resolve through RuntimeModelSelector instead of FindModel.
+        if (selectedText.StartsWith('@'))
+        {
+            try
+            {
+                var selection = RuntimeModelSelector.Resolve(new RuntimeModelSelectionRequest(null, selectedText, null));
+                await context.Runtime.SetModelAsync(selection, "slash", cancellationToken);
+                await context.Runtime.PersistCurrentModelSelectionAsync(cancellationToken);
+                logger?.LogDebug("Model command applied role role={Role} provider={Provider} model={ModelId}", selectedText, selection.Model.Provider, selection.Model.Id);
+                return new SlashCommandResult(true, $"Model set to {selection.Model.Provider}/{selection.Model.Id} (role {selectedText})");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return new SlashCommandResult(true, ex.Message, IsError: true);
+            }
+        }
+
         var selected = FindModel(candidates, selectedText);
         if (selected is null)
         {
             return new SlashCommandResult(true, $"Model '{selectedText}' was not found.", IsError: true);
         }
 
-        var selection = current with { Model = selected, ThinkingLevel = ModelRegistry.ClampThinkingLevel(selected, current.ThinkingLevel) };
-        logger?.LogDebug("Model command applying selection provider={Provider} model={ModelId}", selection.Model.Provider, selection.Model.Id);
-        await context.Runtime.SetModelAsync(selection, "slash", cancellationToken);
+        var selection2 = current with { Model = selected, ThinkingLevel = ModelRegistry.ClampThinkingLevel(selected, current.ThinkingLevel) };
+        logger?.LogDebug("Model command applying selection provider={Provider} model={ModelId}", selection2.Model.Provider, selection2.Model.Id);
+        await context.Runtime.SetModelAsync(selection2, "slash", cancellationToken);
         await context.Runtime.PersistCurrentModelSelectionAsync(cancellationToken);
-        logger?.LogDebug("Model command applied selection provider={Provider} model={ModelId}", selection.Model.Provider, selection.Model.Id);
-        return new SlashCommandResult(true, $"Model set to {selection.Model.Provider}/{selection.Model.Id}");
+        logger?.LogDebug("Model command applied selection provider={Provider} model={ModelId}", selection2.Model.Provider, selection2.Model.Id);
+        return new SlashCommandResult(true, $"Model set to {selection2.Model.Provider}/{selection2.Model.Id}");
     }
 
     private static string ModelOptionText(ModelDescriptor model)

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Runtime.CompilerServices;
+using PiSharp.Ai.Auth;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,6 +18,7 @@ using PiSharp.Compatibility.Settings;
 using PiSharp.Extensions;
 using PiSharp.PluginHost;
 using PiSharp.TsBridge;
+using PiSharp.Runtime.Telemetry;
 
 namespace PiSharp.Runtime;
 
@@ -40,7 +42,10 @@ public sealed class SessionRuntime(
     TuiThemeDocument? theme = null,
     StartupBenchmarkReport? startupBenchmark = null,
     ExtensionLoadCoordinator? extensionLoadCoordinator = null,
-    ILoggerFactory? loggerFactory = null) : IAsyncDisposable
+    ILoggerFactory? loggerFactory = null,
+    IReadOnlyList<PiSharp.Agent.Core.Tools.IAgentTool>? tools = null,
+    IOAuthStorage? authStorage = null,
+    TelemetryService? telemetry = null) : IAsyncDisposable
 {
     private Func<SessionRuntime, CancellationToken, Task>? _rebind;
     private const int BridgeForwardingQueueCapacity = 2048;
@@ -56,6 +61,8 @@ public sealed class SessionRuntime(
     private IDisposable? _bridgeSettingsChangedSubscription;
     private IDisposable? _bridgeSessionShutdownSubscription;
     private IDisposable? _extensionDispatchSubscription;
+    private IDisposable? _telemetryInstrumentorSubscription;
+    private HarnessTelemetryInstrumentor? _harnessTelemetryInstrumentor;
     private readonly RuntimeSessionController _sessionController = new(repo, createOptions, harnessFactory, extensionManager);
     private readonly ExtensionSettingsService _settingsService = new(settingsStore, settingsSnapshot, extensionManager?.Registry, loggerFactory);
     private readonly ExtensionStateService _stateService = BuildStateService(settingsSnapshot, createOptions.Cwd, loggerFactory);
@@ -69,6 +76,15 @@ public sealed class SessionRuntime(
 
     internal ExtensionSettingsService SettingsService => _settingsService;
     internal ExtensionStateService StateService => _stateService;
+    private static ExtensionRuntimeBinding WireBinding(
+        ExtensionRuntimeBinding? provided,
+        JsonlSessionCreateOptions opts,
+        TelemetryService? telemetry)
+    {
+        var binding = provided ?? new ExtensionRuntimeBinding(opts.Cwd, false, NoExtensionUi.Instance);
+        if (telemetry is not null) binding.Telemetry = telemetry;
+        return binding;
+    }
     private static ExtensionStateService BuildStateService(PiSettingsSnapshot? snapshot, string cwd, ILoggerFactory? loggerFactory)
     {
         var paths = snapshot is null
@@ -88,13 +104,16 @@ public sealed class SessionRuntime(
     public ISession<JsonlSessionMetadata> Session { get; private set; } = initialSession;
     public AgentHarness<JsonlSessionMetadata> Harness { get; private set; } = harnessFactory(initialSession);
     public ExtensionManager? ExtensionManager { get; } = extensionManager;
+    public ExtensionRuntimeBinding ExtensionBinding { get; } = WireBinding(extensionBinding, createOptions, telemetry);
+    public TelemetryService? Telemetry { get; } = telemetry;
     public NativePluginHost? PluginHost { get; } = pluginHost;
     public TsExtensionHost? TsHost { get; } = tsHost;
     public PiResources? Resources { get; } = resources;
     public PiSettingsSnapshot? SettingsSnapshot { get; } = settingsSnapshot;
     public SystemPromptBuildOptions? SystemPromptOptions { get; } = systemPromptOptions;
     public IReadOnlyList<Skill> Skills => Harness.Skills;
-    public ExtensionRuntimeBinding ExtensionBinding { get; } = extensionBinding ?? new ExtensionRuntimeBinding(createOptions.Cwd, false, NoExtensionUi.Instance);
+    public IReadOnlyList<PiSharp.Agent.Core.Tools.IAgentTool> Tools { get; } = tools ?? [];
+    internal IOAuthStorage? AuthStorage { get; } = authStorage;
     public IReadOnlyList<RuntimeDiagnostic> ExtensionFlagDiagnostics { get; } = extensionFlagDiagnostics ?? [];
     public PromptTemplateCatalog PromptTemplates { get; } = promptTemplates ?? PromptTemplateCatalog.Empty;
     public bool AutoCompactionEnabled { get; set; }
@@ -102,7 +121,23 @@ public sealed class SessionRuntime(
     public string SteeringMode { get; set; } = "all";
     public string FollowUpMode { get; set; } = "all";
     public void ResetRetryState() { AutoRetryEnabled = false; }
-    public TuiThemeDocument? Theme { get; } = theme;
+    public TuiThemeDocument? Theme { get; private set; } = theme;
+
+    /// <summary>
+    /// Raised when the active theme document changes (in-process theme authority;
+    /// daemon-side theme events land in P01).
+    /// </summary>
+    public event EventHandler? ThemeChanged;
+    public async Task SetThemeByNameAsync(string name, CancellationToken cancellationToken = default)
+    {
+        var paths = Resources?.ThemePaths;
+        if (paths is null || paths.Count == 0) return;
+        var documents = await TuiThemeDocument.LoadAllAsync(paths, cancellationToken);
+        var match = documents.FirstOrDefault(d => string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (match is null || (Theme is not null && string.Equals(Theme.Name, match.Name, StringComparison.OrdinalIgnoreCase))) return;
+        Theme = match;
+        ThemeChanged?.Invoke(this, EventArgs.Empty);
+    }
     public StartupBenchmarkReport? StartupBenchmark { get; } = startupBenchmark;
     public ExtensionLoadCoordinator ExtensionLoadCoordinator { get; } = extensionLoadCoordinator ?? new ExtensionLoadCoordinator();
     public ExtensionLoadSummary GetExtensionLoadSummary() => ExtensionLoadSummary.From(ExtensionLoadCoordinator.Statuses);
@@ -196,6 +231,16 @@ public sealed class SessionRuntime(
                 ExtensionEventNames.SettingsChanged,
                 TsHost.ForwardExtensionEventAsync);
         }
+    }
+
+    public void BindTelemetryInstrumentation()
+    {
+        _telemetryInstrumentorSubscription?.Dispose();
+        _telemetryInstrumentorSubscription = null;
+        if (Telemetry is null) return;
+        var instrumentor = new HarnessTelemetryInstrumentor(Telemetry);
+        _harnessTelemetryInstrumentor = instrumentor;
+        _telemetryInstrumentorSubscription = Harness.Subscribe(instrumentor.OnEventAsync);
     }
 
     private void UnbindHarnessEventForwarding()
@@ -342,6 +387,36 @@ public sealed class SessionRuntime(
             CurrentModelSelection.ThinkingLevel,
             CurrentModelSelection.Model.Provider,
             CurrentModelSelection.Model.Id);
+    }
+
+    public Task<ExtensionModelSelection?> ResolveRoleAsync(string role, CancellationToken cancellationToken = default)
+    {
+        var normalizedName = role.StartsWith('@') ? role[1..] : role;
+        try
+        {
+            var selection = RuntimeModelSelector.Resolve(new RuntimeModelSelectionRequest(null, "@" + normalizedName, null));
+            return Task.FromResult<ExtensionModelSelection?>(new ExtensionModelSelection(selection.Model, selection.ThinkingLevel));
+        }
+        catch (InvalidOperationException)
+        {
+            return Task.FromResult<ExtensionModelSelection?>(null);
+        }
+    }
+
+    public async Task<bool> SetModelByRoleAsync(string role, CancellationToken cancellationToken = default)
+    {
+        var normalizedName = role.StartsWith('@') ? role[1..] : role;
+        try
+        {
+            var selection = RuntimeModelSelector.Resolve(new RuntimeModelSelectionRequest(null, "@" + normalizedName, null));
+            await SetModelAsync(selection, "extension", cancellationToken);
+            await PersistCurrentModelSelectionAsync(cancellationToken);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     public async Task ShutdownFromExtensionAsync(CancellationToken cancellationToken = default)
@@ -526,6 +601,16 @@ public sealed class SessionRuntime(
         }
     }
 
+    /// <summary>
+    /// Emits a runtime-originated extension event (e.g. package/skill changes) to
+    /// registered extension handlers without round-tripping through the harness loop.
+    /// </summary>
+    public Task EmitRuntimeExtensionEventAsync(string name, object? payload, CancellationToken cancellationToken = default)
+    {
+        var harnessEvent = new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.RuntimeEvent(name, payload));
+        return DispatchRuntimeExtensionEventAsync(new ExtensionEvent(name, harnessEvent, payload), cancellationToken);
+    }
+
     private async Task ApplySessionReplacementAsync(RuntimeSessionReplacement replacement, CancellationToken cancellationToken)
     {
         UnbindHarnessEventForwarding();
@@ -644,6 +729,9 @@ public sealed class SessionRuntime(
         }
         UnbindHarnessEventForwarding();
         _extensionDispatchSubscription?.Dispose();
+        _telemetryInstrumentorSubscription?.Dispose();
+        _telemetryInstrumentorSubscription = null;
+        Telemetry?.Flush();
         await _sessionController.ExtensionBinder.DisposeAsync();
         await Harness.WaitForIdleAsync();
         if (TsHost is not null) await TsHost.DisposeAsync();

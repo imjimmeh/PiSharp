@@ -1,5 +1,5 @@
 using PiSharp.Cli.IO;
-using PiSharp.Cli.Packages;
+using PiSharp.Packages;
 using PiSharp.Cli.Parsing;
 using PiSharp.Compatibility.Settings;
 using Xunit;
@@ -85,8 +85,8 @@ public sealed class PackageCommandIntegrationTests
         var runner = new FakePackageCommandRunner
         {
             ListResult = [
-                new PiSharp.Cli.Packages.PackageListEntry("npm:global-pkg", PiSettingsLayer.GlobalLegacy),
-                new PiSharp.Cli.Packages.PackageListEntry("npm:project-pkg", PiSettingsLayer.ProjectLegacy)
+                new PiSharp.Packages.PackageListEntry("npm:global-pkg", PiSettingsLayer.GlobalLegacy),
+                new PiSharp.Packages.PackageListEntry("npm:project-pkg", PiSettingsLayer.ProjectLegacy)
             ]
         };
 
@@ -123,8 +123,8 @@ public sealed class PackageCommandIntegrationTests
         var runner = new FakePackageCommandRunner
         {
             ListResult = [
-                new PiSharp.Cli.Packages.PackageListEntry("npm:global-pkg", PiSettingsLayer.GlobalLegacy),
-                new PiSharp.Cli.Packages.PackageListEntry("npm:project-pkg", PiSettingsLayer.ProjectLegacy)
+                new PiSharp.Packages.PackageListEntry("npm:global-pkg", PiSettingsLayer.GlobalLegacy),
+                new PiSharp.Packages.PackageListEntry("npm:project-pkg", PiSettingsLayer.ProjectLegacy)
             ]
         };
 
@@ -223,7 +223,7 @@ public sealed class PackageCommandIntegrationTests
 public sealed class FakePackageCommandRunner : IPackageCommandRunner
 {
     public bool RemoveResult { get; set; }
-    public List<PiSharp.Cli.Packages.PackageListEntry> ListResult { get; set; } = [];
+    public List<PiSharp.Packages.PackageListEntry> ListResult { get; set; } = [];
     public List<string> InstallCalls { get; } = [];
     public bool UpdateCalled { get; private set; }
     public PackageUpdateRequest? LastUpdateRequest { get; private set; }

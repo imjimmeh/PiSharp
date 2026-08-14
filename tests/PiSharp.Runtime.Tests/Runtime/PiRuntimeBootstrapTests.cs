@@ -3,6 +3,7 @@ using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Sessions;
 using PiSharp.Runtime.IO;
+using PiSharp.Extensions;
 using Xunit;
 
 namespace PiSharp.Runtime.Tests.Runtime;
@@ -654,6 +655,85 @@ public sealed class PiRuntimeBootstrapTests
         Assert.True(timing.BridgeTimings.Transpile >= 0);
         Assert.True(timing.BridgeTimings.ModuleImport >= 0);
     }
+    [Fact]
+    public async Task CreateRuntimeWiresPackageApiAndManagedSkillStoreIntoExtensionBinding()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-runtime-bootstrap-" + Guid.NewGuid().ToString("N"));
+        var home = Path.Combine(root, "home");
+        var repoRoot = Path.Combine(root, "repo");
+        Directory.CreateDirectory(repoRoot);
+        var resources = new RuntimeResourceOptions(DisableExtensions: true, DisableSkills: true, DisablePromptTemplates: true, DisableThemes: true, DisableContextFiles: true);
+
+        await using var runtime = await PiRuntimeBootstrap.CreateRuntimeAsync(new PiRuntimeOptions(
+            new SystemExecutionEnv(repoRoot),
+            HomeDirectory: home,
+            Resources: resources));
+
+        // Packages surface is backed by RuntimePackageService (returns installed entries; empty here).
+        var installed = await runtime.ExtensionBinding.Packages.ListAsync();
+        Assert.Empty(installed);
+
+        // ManagedSkills surface is backed by ManagedSkillStore at ~/.pi/PiSharp/managed-skills.
+        var created = await runtime.ExtensionBinding.Skills.ManagedSkills.CreateAsync(
+            new ManagedSkillCreateRequest("bound-skill", "Bound skill", "bound-body"));
+        Assert.Equal("bound-skill", created.Name);
+        Assert.Equal("managed", created.Source);
+        Assert.Equal(5, created.SourcePriority);
+
+        var registered = Assert.Single(runtime.ExtensionManager!.Registry.Skills, skill => skill.Value.Name == "bound-skill").Value;
+        Assert.Equal("managed", registered.Source);
+        Assert.Equal(5, registered.SourcePriority);
+        Assert.Equal("bound-body", registered.Content);
+
+        var listed = await runtime.ExtensionBinding.Skills.ManagedSkills.ListAsync();
+        Assert.Equal("bound-skill", Assert.Single(listed).Name);
+
+        // The managed-skill pack survives restart at the home directory.
+        await using var restarted = await PiRuntimeBootstrap.CreateRuntimeAsync(new PiRuntimeOptions(
+            new SystemExecutionEnv(repoRoot),
+            HomeDirectory: home,
+            Resources: resources));
+        var restartedListed = await restarted.ExtensionBinding.Skills.ManagedSkills.ListAsync();
+        Assert.Equal("bound-skill", Assert.Single(restartedListed).Name);
+    }
+
+    [Fact]
+    public async Task CreateRuntimeBindsSkillProviderRegistrationIntoRegistry()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-runtime-bootstrap-" + Guid.NewGuid().ToString("N"));
+        var repoRoot = Path.Combine(root, "repo");
+        Directory.CreateDirectory(repoRoot);
+        var resources = new RuntimeResourceOptions(DisableExtensions: true, DisableSkills: true, DisablePromptTemplates: true, DisableThemes: true, DisableContextFiles: true);
+
+        await using var runtime = await PiRuntimeBootstrap.CreateRuntimeAsync(new PiRuntimeOptions(
+            new SystemExecutionEnv(repoRoot),
+            HomeDirectory: root,
+            Resources: resources));
+
+        var handle = await runtime.ExtensionBinding.RegisterSkillProviderAsync(
+            new TestSkillProvider("bound-provider", 4), CancellationToken.None);
+        try
+        {
+            Assert.Contains(runtime.ExtensionManager!.Registry.SkillProviders, provider => provider.Value.Name == "bound-provider");
+            var priorities = await runtime.ExtensionBinding.GetSkillProviderPrioritiesAsync(CancellationToken.None);
+            Assert.Equal(4, priorities["bound-provider"]);
+        }
+        finally
+        {
+            handle.Dispose();
+        }
+
+        Assert.DoesNotContain(runtime.ExtensionManager!.Registry.SkillProviders, provider => provider.Value.Name == "bound-provider");
+    }
+
+    private sealed class TestSkillProvider(string name, int priority) : ISkillProvider
+    {
+        public string Name { get; } = name;
+        public int Priority { get; } = priority;
+        public Task<IReadOnlyList<ExtensionSkillDefinition>> DiscoverAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ExtensionSkillDefinition>>([]);
+    }
+
 
     private static async Task WaitForExtensionStateAsync(ExtensionLoadCoordinator coordinator, string extensionPath, ExtensionLoadState expectedState, TimeSpan timeout)
     {

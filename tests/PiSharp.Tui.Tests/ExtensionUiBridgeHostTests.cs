@@ -235,6 +235,82 @@ public sealed class ExtensionUiBridgeHostTests
         Assert.False(session2Tcs.Task.IsCompleted, "Session 2 TCS must NOT be resolved by session 1's completion");
     }
 
+    [Fact]
+    public async Task GetToolsExpandedAsync_ReadsCurrentStateDefault()
+    {
+        var state = TuiRenderState.Empty("sid", null, new ModelDescriptor("test", "model", "test"), ThinkingLevel.Off, null);
+        var host = new ExtensionUiBridgeHost(new Window(), update => state = update(state), getState: () => state)
+        {
+            DispatchUi = action => action()
+        };
+
+        Assert.False(await host.GetToolsExpandedAsync());
+        state = state.SetToolOutput(true);
+        Assert.True(await host.GetToolsExpandedAsync());
+    }
+
+    [Fact]
+    public async Task SetToolsExpandedAsync_UpdatesShowToolOutput()
+    {
+        var state = TuiRenderState.Empty("sid", null, new ModelDescriptor("test", "model", "test"), ThinkingLevel.Off, null);
+        var host = new ExtensionUiBridgeHost(new Window(), update => state = update(state), getState: () => state)
+        {
+            DispatchUi = action => action()
+        };
+
+        await host.SetToolsExpandedAsync(true);
+
+        Assert.True(state.ShowToolOutput);
+    }
+
+    [Fact]
+    public async Task SetEditorComponentAsync_UpsertsEditorSlot()
+    {
+        var state = TuiRenderState.Empty("sid", null, new ModelDescriptor("test", "model", "test"), ThinkingLevel.Off, null);
+        var host = new ExtensionUiBridgeHost(new Window(), update => state = update(state), getState: () => state)
+        {
+            DispatchUi = action => action()
+        };
+
+        await host.SetEditorComponentAsync("ext-a", new ExtensionWidgetState("text", "editor body", "Ext", Placement: "editor"));
+
+        var slot = Assert.Single(state.BridgeSlots);
+        Assert.Equal("editor:ext-a", slot.Id);
+        Assert.Equal("editor body", slot.Content);
+    }
+
+    [Fact]
+    public async Task GetEditorComponentAsync_ReturnsStoredComponentAndClearRestoresPrompt()
+    {
+        var state = TuiRenderState.Empty("sid", null, new ModelDescriptor("test", "model", "test"), ThinkingLevel.Off, null);
+        var host = new ExtensionUiBridgeHost(new Window(), update => state = update(state), getState: () => state)
+        {
+            DispatchUi = action => action()
+        };
+
+        await host.SetEditorComponentAsync("ext-a", new ExtensionWidgetState("text", "editor body", "Ext", Placement: "editor"));
+        var stored = await host.GetEditorComponentAsync("ext-a");
+
+        Assert.NotNull(stored);
+        Assert.Equal("editor body", stored.Content);
+
+        await host.SetEditorComponentAsync("ext-a", null);
+        Assert.Null(await host.GetEditorComponentAsync("ext-a"));
+        Assert.Empty(state.BridgeSlots);
+    }
+
+    [Fact]
+    public async Task GetEditorComponentAsync_ReturnsNullWhenUnset()
+    {
+        var state = TuiRenderState.Empty("sid", null, new ModelDescriptor("test", "model", "test"), ThinkingLevel.Off, null);
+        var host = new ExtensionUiBridgeHost(new Window(), update => state = update(state), getState: () => state)
+        {
+            DispatchUi = action => action()
+        };
+
+        Assert.Null(await host.GetEditorComponentAsync("ext-a"));
+    }
+
     private static Task InvokeForwardCustomUiInputAsync(ExtensionUiBridgeHost host, string data, CancellationToken ct)
     {
         var method = typeof(ExtensionUiBridgeHost)

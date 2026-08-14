@@ -37,6 +37,22 @@ public static class EnvApiKeyDetector
         ["cloudflare-ai-gateway"] = ["CLOUDFLARE_API_KEY"],
         ["perplexity"] = ["PERPLEXITY_API_KEY"],
     };
+    private static readonly object MapGate = new();
+
+    /// <summary>
+    /// Registers (or replaces) the environment variables consulted for a
+    /// provider/service id, extending the ambient credential map beyond the
+    /// built-in model providers. Thread-safe; last write wins per provider.
+    /// </summary>
+    public static void RegisterProviderEnvVars(string provider, IReadOnlyList<string> envVars)
+    {
+        if (string.IsNullOrWhiteSpace(provider)) throw new ArgumentException("Provider id must not be empty.", nameof(provider));
+        if (envVars is null) throw new ArgumentNullException(nameof(envVars));
+        lock (MapGate)
+        {
+            ProviderEnvVarMap[provider] = envVars.ToArray();
+        }
+    }
 
     public static string? GetEnvApiKey(string provider)
     {
@@ -46,7 +62,11 @@ public static class EnvApiKeyDetector
             return HasAmbientCredentials(provider) ? AuthenticatedMarker : null;
         }
 
-        if (!ProviderEnvVarMap.TryGetValue(provider, out var envVars)) return null;
+        string[] envVars;
+        lock (MapGate)
+        {
+            if (!ProviderEnvVarMap.TryGetValue(provider, out envVars!)) return null;
+        }
 
         foreach (var envVar in envVars)
         {

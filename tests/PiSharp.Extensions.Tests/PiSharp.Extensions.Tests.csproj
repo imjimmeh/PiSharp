@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PiSharp.Extensions\PiSharp.Extensions.csproj" />
+    <ProjectReference Include="..\PiSharp.Extensions.Testing\PiSharp.Extensions.Testing.csproj" />
   </ItemGroup>
 
 </Project>

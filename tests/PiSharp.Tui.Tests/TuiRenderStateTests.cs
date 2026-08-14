@@ -5,6 +5,7 @@ using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Tui.Interactive;
+using PiSharp.Extensions;
 using PiSharp.Tui.Interactive.Components;
 using Xunit;
 
@@ -349,6 +350,53 @@ public sealed class TuiRenderStateTests
     {
         var state = Empty();
         Assert.Equal(0, state.PendingMessageCount);
+    }
+
+    [Fact]
+    public void SetToolOutput_TogglesFlag()
+    {
+        var state = Empty();
+
+        Assert.False(state.ShowToolOutput);
+        Assert.True(state.SetToolOutput(true).ShowToolOutput);
+        Assert.False(state.SetToolOutput(true).SetToolOutput(false).ShowToolOutput);
+    }
+
+    [Fact]
+    public void SetEditorComponent_UpsertsEditorSlot()
+    {
+        var state = Empty();
+        var component = new ExtensionWidgetState("text", "editor content", "Ext", Placement: "editor");
+
+        state = state.SetEditorComponent("ext-a", component);
+
+        var slot = Assert.Single(state.BridgeSlots);
+        Assert.Equal("editor:ext-a", slot.Id);
+        Assert.Equal("editor", slot.Placement);
+        Assert.Equal("ext-a", slot.SourceId);
+        Assert.Equal("editor content", slot.Content);
+    }
+
+    [Fact]
+    public void SetEditorComponent_ReplacesExistingSlotForSameExtension()
+    {
+        var state = Empty()
+            .SetEditorComponent("ext-a", new ExtensionWidgetState("text", "first", "Ext", Placement: "editor"));
+
+        state = state.SetEditorComponent("ext-a", new ExtensionWidgetState("text", "second", "Ext", Placement: "editor"));
+
+        var slot = Assert.Single(state.BridgeSlots);
+        Assert.Equal("second", slot.Content);
+    }
+
+    [Fact]
+    public void SetEditorComponent_NullRemovesEditorSlot()
+    {
+        var state = Empty().SetEditorComponent("ext-a", new ExtensionWidgetState("text", "content", "Ext", Placement: "editor"));
+
+        state = state.SetEditorComponent("ext-a", null);
+
+        Assert.Empty(state.BridgeSlots);
     }
 
     private static TuiRenderState Empty()

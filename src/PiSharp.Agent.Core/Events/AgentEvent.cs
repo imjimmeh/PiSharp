@@ -44,4 +44,15 @@ public abstract record AgentEvent
         string ToolName,
         object Result,
         bool IsError) : AgentEvent;
+
+    public sealed record AutoRetryStart(
+        int Attempt,
+        int MaxAttempts,
+        long DelayMs,
+        string ErrorMessage) : AgentEvent;
+
+    public sealed record AutoRetryEnd(
+        bool Success,
+        int Attempt,
+        string? FinalError) : AgentEvent;
 }

@@ -9,7 +9,7 @@ namespace PiSharp.Tui.Interactive;
 public sealed record ExtensionUiIntent(string RequestId, string Kind, string Title, string? Message, IReadOnlyList<string>? Options, object? Component, string? ExtensionId = null);
 public sealed record ExtensionUiIntentResult(string RequestId, object? Value, bool Cancelled = false);
 
-public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderState, TuiRenderState>>? updateState = null, Func<string?>? getEditorText = null, Action<string>? setEditorText = null, ILoggerFactory? loggerFactory = null)
+public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderState, TuiRenderState>>? updateState = null, Func<string?>? getEditorText = null, Action<string>? setEditorText = null, Func<TuiRenderState>? getState = null, ILoggerFactory? loggerFactory = null)
 {
     private readonly ILogger<ExtensionUiBridgeHost> _logger = loggerFactory?.CreateLogger<ExtensionUiBridgeHost>() ?? NullLogger<ExtensionUiBridgeHost>.Instance;
     private readonly object _customUiSessionGate = new();
@@ -216,6 +216,23 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
         {
             setEditorText?.Invoke(text);
             updateState?.Invoke(state => state.SetEditorText(text));
+        }, cancellationToken);
+
+    public Task<bool> GetToolsExpandedAsync(CancellationToken cancellationToken = default)
+        => TuiDispatcherExtensions.InvokeAsync(UiPost, () => getState?.Invoke()?.ShowToolOutput ?? false, cancellationToken);
+
+    public Task SetToolsExpandedAsync(bool expanded, CancellationToken cancellationToken = default)
+        => InvokeOnUiThreadAsync(() => updateState?.Invoke(state => state.SetToolOutput(expanded)), cancellationToken);
+
+    public Task SetEditorComponentAsync(string extensionId, ExtensionWidgetState? component, CancellationToken cancellationToken = default)
+        => InvokeOnUiThreadAsync(() => updateState?.Invoke(state => state.SetEditorComponent(extensionId, component)), cancellationToken);
+
+    public Task<ExtensionWidgetState?> GetEditorComponentAsync(string extensionId, CancellationToken cancellationToken = default)
+        => TuiDispatcherExtensions.InvokeAsync(UiPost, () =>
+        {
+            var state = getState?.Invoke();
+            var slot = state?.BridgeSlots.FirstOrDefault(candidate => StringComparer.Ordinal.Equals(candidate.Id, $"editor:{extensionId}"));
+            return slot is null ? null : new ExtensionWidgetState(slot.Kind, slot.Content, slot.Title, "editor");
         }, cancellationToken);
 
     public Task ClearSourceAsync(string sourceId, CancellationToken cancellationToken = default)

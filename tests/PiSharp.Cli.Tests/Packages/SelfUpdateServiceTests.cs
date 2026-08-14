@@ -1,4 +1,4 @@
-using PiSharp.Cli.Packages;
+using PiSharp.Packages;
 using Xunit;
 
 namespace PiSharp.Cli.Tests.Packages;

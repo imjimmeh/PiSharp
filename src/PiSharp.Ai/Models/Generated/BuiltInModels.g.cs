@@ -2606,6 +2606,622 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
+        new("cloudflare-ai-gateway", "deepseek/deepseek-chat", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "deepseek/deepseek-chat",
+            Api: "openai-completions",
+            Name: "DeepSeek Chat",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
+
+        new("cloudflare-ai-gateway", "deepseek/deepseek-reasoner", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "deepseek/deepseek-reasoner",
+            Api: "openai-completions",
+            Name: "DeepSeek Reasoner",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
+
+        new("cloudflare-ai-gateway", "deepseek/deepseek-v4-flash", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "deepseek/deepseek-v4-flash",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Flash",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.0028m))),
+
+        new("cloudflare-ai-gateway", "deepseek/deepseek-v4-pro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "deepseek/deepseek-v4-pro",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Pro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-2.5-flash", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-2.5-flash",
+            Api: "openai-completions",
+            Name: "Gemini 2.5 Flash",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-2.5-flash-lite", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-2.5-flash-lite",
+            Api: "openai-completions",
+            Name: "Gemini 2.5 Flash-Lite",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.4m, CacheRead: 0.01m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-2.5-pro", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-2.5-pro",
+            Api: "openai-completions",
+            Name: "Gemini 2.5 Pro",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.25m, Output: 10m, CacheRead: 0.125m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-3-flash-preview", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-3-flash-preview",
+            Api: "openai-completions",
+            Name: "Gemini 3 Flash Preview",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.5m, Output: 3m, CacheRead: 0.05m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-3.1-flash-lite", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-3.1-flash-lite",
+            Api: "openai-completions",
+            Name: "Gemini 3.1 Flash Lite",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-3.1-pro-preview", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-3.1-pro-preview",
+            Api: "openai-completions",
+            Name: "Gemini 3.1 Pro Preview",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-3.5-flash", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-3.5-flash",
+            Api: "openai-completions",
+            Name: "Gemini 3.5 Flash",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-3.5-flash-lite", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-3.5-flash-lite",
+            Api: "openai-completions",
+            Name: "Gemini 3.5 Flash Lite",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 2.5m, CacheRead: 0.03m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-3.6-flash", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-3.6-flash",
+            Api: "openai-completions",
+            Name: "Gemini 3.6 Flash",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m, CacheRead: 0.15m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-3.7-flash", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-3.7-flash",
+            Api: "openai-completions",
+            Name: "Gemini 3.7 Flash",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.75m, Output: 3.75m, CacheRead: 0.075m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-flash-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-flash-latest",
+            Api: "openai-completions",
+            Name: "Gemini Flash Latest",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 9m, CacheRead: 0.15m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemini-flash-lite-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemini-flash-lite-latest",
+            Api: "openai-completions",
+            Name: "Gemini Flash-Lite Latest",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 65536,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.25m, Output: 1.5m, CacheRead: 0.025m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemma-4-26b-a4b-it", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemma-4-26b-a4b-it",
+            Api: "openai-completions",
+            Name: "Gemma 4 26B A4B IT",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("cloudflare-ai-gateway", "google-ai-studio/gemma-4-31b-it", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "google-ai-studio/gemma-4-31b-it",
+            Api: "openai-completions",
+            Name: "Gemma 4 31B IT",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
+
+        new("cloudflare-ai-gateway", "grok/grok-4.20-0309-non-reasoning", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "grok/grok-4.20-0309-non-reasoning",
+            Api: "openai-completions",
+            Name: "Grok 4.20 (Non-Reasoning)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 1000000,
+            MaxTokens: 30000,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.25m, Output: 2.5m, CacheRead: 0.2m))),
+
+        new("cloudflare-ai-gateway", "grok/grok-4.20-0309-reasoning", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "grok/grok-4.20-0309-reasoning",
+            Api: "openai-completions",
+            Name: "Grok 4.20 (Reasoning)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 30000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.25m, Output: 2.5m, CacheRead: 0.2m))),
+
+        new("cloudflare-ai-gateway", "grok/grok-4.3", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "grok/grok-4.3",
+            Api: "openai-completions",
+            Name: "Grok 4.3",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 30000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.25m, Output: 2.5m, CacheRead: 0.2m))),
+
+        new("cloudflare-ai-gateway", "grok/grok-4.5", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "grok/grok-4.5",
+            Api: "openai-completions",
+            Name: "Grok 4.5",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 500000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.3m))),
+
+        new("cloudflare-ai-gateway", "grok/grok-4.6", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "grok/grok-4.6",
+            Api: "openai-completions",
+            Name: "Grok 4.6",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 500000,
+            MaxTokens: 500000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.5m))),
+
+        new("cloudflare-ai-gateway", "grok/grok-build-0.1", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "grok/grok-build-0.1",
+            Api: "openai-completions",
+            Name: "Grok Build 0.1",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 256000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1m, Output: 2m, CacheRead: 0.2m))),
+
+        new("cloudflare-ai-gateway", "groq/llama-3.1-8b-instant", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "groq/llama-3.1-8b-instant",
+            Api: "openai-completions",
+            Name: "Llama 3.1 8B",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 131072,
+            MaxTokens: 131072,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.05m, Output: 0.08m))),
+
+        new("cloudflare-ai-gateway", "groq/llama-3.3-70b-versatile", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "groq/llama-3.3-70b-versatile",
+            Api: "openai-completions",
+            Name: "Llama 3.3 70B",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.59m, Output: 0.79m))),
+
+        new("cloudflare-ai-gateway", "mistral/codestral-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/codestral-latest",
+            Api: "openai-completions",
+            Name: "Codestral (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 256000,
+            MaxTokens: 4096,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.3m, Output: 0.9m))),
+
+        new("cloudflare-ai-gateway", "mistral/magistral-medium-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/magistral-medium-latest",
+            Api: "openai-completions",
+            Name: "Magistral Medium (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 128000,
+            MaxTokens: 16384,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 2m, Output: 5m))),
+
+        new("cloudflare-ai-gateway", "mistral/magistral-small", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/magistral-small",
+            Api: "openai-completions",
+            Name: "Magistral Small",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 128000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.5m, Output: 1.5m))),
+
+        new("cloudflare-ai-gateway", "mistral/ministral-8b-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/ministral-8b-latest",
+            Api: "openai-completions",
+            Name: "Ministral 8B (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 128000,
+            MaxTokens: 128000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.1m, Output: 0.1m))),
+
+        new("cloudflare-ai-gateway", "mistral/mistral-large-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/mistral-large-latest",
+            Api: "openai-completions",
+            Name: "Mistral Large (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.5m, Output: 1.5m))),
+
+        new("cloudflare-ai-gateway", "mistral/mistral-medium-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/mistral-medium-latest",
+            Api: "openai-completions",
+            Name: "Mistral Medium (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 262144,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 1.5m, Output: 7.5m))),
+
+        new("cloudflare-ai-gateway", "mistral/mistral-small-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/mistral-small-latest",
+            Api: "openai-completions",
+            Name: "Mistral Small (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: true,
+            ContextWindow: 256000,
+            MaxTokens: 256000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.15m, Output: 0.6m))),
+
+        new("cloudflare-ai-gateway", "mistral/pixtral-large-latest", new ModelDescriptor(
+            Provider: "cloudflare-ai-gateway",
+            Id: "mistral/pixtral-large-latest",
+            Api: "openai-completions",
+            Name: "Pixtral Large (latest)",
+            BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
+            Reasoning: false,
+            ContextWindow: 128000,
+            MaxTokens: 128000,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2m, Output: 6m))),
+
         new("cloudflare-ai-gateway", "openai/gpt-4", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
             Id: "openai/gpt-4",
@@ -6701,6 +7317,26 @@ public static class BuiltInModels
             },
             Input: ["text"],
             Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
+
+        new("huggingface", "deepseek-ai/DeepSeek-V4-Pro-0813", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "deepseek-ai/DeepSeek-V4-Pro-0813",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Pro 0813",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 1000000,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.32m, Output: 3.96m))),
 
         new("huggingface", "google/gemma-4-26B-A4B-it", new ModelDescriptor(
             Provider: "huggingface",
@@ -12692,9 +13328,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 1048576,
-            MaxTokens: 16384,
+            MaxTokens: 4096,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.2m, Output: 0.8m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 0.696m))),
 
         new("openrouter", "meta-llama/llama-4-scout", new ModelDescriptor(
             Provider: "openrouter",
@@ -13078,7 +13714,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.95m, Output: 4m, CacheRead: 0.16m))),
+            Cost: new ModelCost(Input: 0.5795m, Output: 2.44m, CacheRead: 0.0976m))),
 
         new("openrouter", "moonshotai/kimi-k2.7-code", new ModelDescriptor(
             Provider: "openrouter",
@@ -14983,7 +15619,7 @@ public static class BuiltInModels
             Name: "Qwen: Qwen3.8 2.4T A95B",
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
-            ContextWindow: 1010000,
+            ContextWindow: 1048576,
             MaxTokens: 262144,
             Input: ["text"],
             Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.25m))),
@@ -15392,9 +16028,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 4096,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.63m, Output: 1.98m, CacheRead: 0.0945m))),
+            Cost: new ModelCost(Input: 1.19m, Output: 3.74m, CacheRead: 0.221m))),
 
         new("openrouter", "z-ai/glm-5.2:batch", new ModelDescriptor(
             Provider: "openrouter",
@@ -15476,9 +16112,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 4096,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.079996m, Output: 0.252m, CacheRead: 0.0252m))),
+            Cost: new ModelCost(Input: 0.0798m, Output: 0.1596m, CacheRead: 0.01596m))),
 
         new("openrouter", "~google/gemini-flash-latest", new ModelDescriptor(
             Provider: "openrouter",

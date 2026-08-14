@@ -50,6 +50,11 @@ public static class ExtensionEventNames
     public const string ThinkingLevelSelect = "thinking_level_select";
     public const string SettingsChanged = "settings_changed";
     public const string ResourcesUpdate = "resources_update";
+    public const string AdvisorNote = "advisor_note";
+    public const string PackagesChanged = "extensions_changed";   // package install/update/remove (daemon-facing name)
+    public const string SkillsChanged = "skills_changed";          // skill set changed (register/discover/managed store)
+    public const string SkillExecutionStart = "skill_execution_start";
+    public const string SkillExecutionEnd = "skill_execution_end";
 }
 
 public sealed record ExtensionInputEvent(string Text, IReadOnlyList<ImageContent>? Images = null, string Source = "runtime");
@@ -169,6 +174,8 @@ public static class ExtensionEventMapper
         AgentHarnessEvent.Core { Event: AgentEvent.ToolExecutionStart } => ExtensionEventNames.ToolExecutionStart,
         AgentHarnessEvent.Core { Event: AgentEvent.ToolExecutionUpdate } => ExtensionEventNames.ToolExecutionUpdate,
         AgentHarnessEvent.Core { Event: AgentEvent.ToolExecutionEnd } => ExtensionEventNames.ToolExecutionEnd,
+        AgentHarnessEvent.Core { Event: AgentEvent.AutoRetryStart } => ExtensionEventNames.AutoRetryStart,
+        AgentHarnessEvent.Core { Event: AgentEvent.AutoRetryEnd } => ExtensionEventNames.AutoRetryEnd,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.QueueUpdate } => ExtensionEventNames.QueueUpdate,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CompactionStart } => ExtensionEventNames.CompactionStart,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CompactionEnd } => ExtensionEventNames.CompactionEnd,
@@ -194,15 +201,23 @@ public static class ExtensionEventMapper
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ModelSelect } => ExtensionEventNames.ModelSelect,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ThinkingLevelSelect } => ExtensionEventNames.ThinkingLevelSelect,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ResourcesUpdate } => ExtensionEventNames.ResourcesUpdate,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.RuntimeEvent runtimeEvent } => runtimeEvent.Name,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionStart } => ExtensionEventNames.SkillExecutionStart,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionEnd } => ExtensionEventNames.SkillExecutionEnd,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CustomEvent customEvent } => customEvent.Name,
         _ => throw new NotSupportedException($"Unsupported extension event '{evt.GetType().Name}'.")
     };
 
     private static object? Payload(AgentHarnessEvent evt) => evt switch
     {
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.Input input } => new ExtensionInputEvent(input.Text, input.Images, input.Source),
-        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionBeforeSwitch beforeSwitch } => new ExtensionSessionBeforeSwitchEvent(beforeSwitch.Reason, beforeSwitch.TargetSessionFile, beforeSwitch.CurrentSession, beforeSwitch.TargetSession),
-        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionBeforeFork beforeFork } => new ExtensionSessionBeforeForkEvent(beforeFork.EntryId, beforeFork.Position, beforeFork.SourceSession, beforeFork.ForkOptions),
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionShutdown shutdown } => new ExtensionSessionShutdownEvent(shutdown.Reason, shutdown.TargetSessionFile, shutdown.Session),
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.RuntimeEvent runtimeEvent } => runtimeEvent.Payload,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionStart start } => new { start.Name, start.AdditionalInstructions, start.Args },
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionEnd end } => new { end.Name, end.AdditionalInstructions, end.Args, end.Result, end.IsError, end.ErrorMessage },
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionBeforeSwitch beforeSwitch } => new ExtensionSessionBeforeSwitchEvent(beforeSwitch.Reason, beforeSwitch.TargetSessionFile, beforeSwitch.CurrentSession, beforeSwitch.TargetSession),
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CustomEvent customEvent } => customEvent.Payload,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionBeforeFork beforeFork } => new ExtensionSessionBeforeForkEvent(beforeFork.EntryId, beforeFork.Position, beforeFork.SourceSession, beforeFork.ForkOptions),
         AgentHarnessEvent.Core core => core.Event,
         AgentHarnessEvent.Own own => own.Event,
         _ => null

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using PiSharp.Tui.Interactive.Keybindings;
 using Terminal.Gui;
 
 namespace PiSharp.Tui.Interactive;
@@ -16,41 +17,33 @@ public static class TuiShortcutRegistrar
     public static ILoggerFactory? LoggerFactory { get; set; }
 
     private static ILogger Logger => LoggerFactory?.CreateLogger(nameof(TuiShortcutRegistrar)) ?? NullLogger.Instance;
-    private static readonly IReadOnlyDictionary<Key, TuiShortcutAction> GlobalActionsByKey = BuildGlobalActionsByKey();
+
+    /// <summary>
+    /// Process-wide effective binding table. <c>TuiHost</c> replaces this with the store it loads
+    /// from the user keybindings file, so static shortcut dispatch honors remaps. Consumers that
+    /// need a specific store use the store-accepting overloads.
+    /// </summary>
+    public static TuiKeybindingStore DefaultStore
+    {
+        get => TuiKeybindings.DefaultStore;
+        set => TuiKeybindings.DefaultStore = value;
+    }
 
     public static bool TryResolveGlobalAction(Key key, out TuiShortcutAction action)
-    {
-        if (GlobalActionsByKey.TryGetValue(key, out action)) return true;
-        if (!key.Handled) return false;
+        => TryResolveGlobalAction(key, DefaultStore, out action);
 
-        return GlobalActionsByKey.TryGetValue(new Key(key.KeyCode), out action);
-    }
-
-    private static IReadOnlyDictionary<Key, TuiShortcutAction> BuildGlobalActionsByKey()
-    {
-        var actions = new Dictionary<Key, TuiShortcutAction>();
-        foreach (var binding in TuiBuiltInShortcutCatalog.GlobalShortcuts)
-        {
-            foreach (var key in binding.TerminalKeys.SelectMany(TuiShortcutKeyParser.ExpandTerminalKeyAliases))
-            {
-                if (actions.TryGetValue(key, out var existing) && existing != binding.ShortcutAction)
-                    throw new InvalidOperationException($"Shortcut key '{key}' is already registered for '{existing}'.");
-
-                actions[key] = binding.ShortcutAction;
-            }
-        }
-
-        return actions;
-    }
+    public static bool TryResolveGlobalAction(Key key, TuiKeybindingStore store, out TuiShortcutAction action)
+        => store.TryResolveGlobalAction(key, out action);
 
     public static bool TryResolveExtensionShortcut(
         Key key,
         IReadOnlyList<TuiExtensionShortcutBinding> extensionShortcuts,
         Action<string> reportError,
-        out TuiExtensionShortcutBinding binding)
+        out TuiExtensionShortcutBinding binding,
+        TuiKeybindingStore? store = null)
     {
         binding = default!;
-        if (TryResolveGlobalAction(key, out var builtInAction))
+        if (TryResolveGlobalAction(key, store ?? DefaultStore, out var builtInAction))
         {
             var conflicting = extensionShortcuts
                 .Where(shortcut => shortcut.TerminalKeys.Contains(key))
@@ -99,9 +92,10 @@ public static class TuiShortcutRegistrar
         Func<IReadOnlyList<TuiExtensionShortcutBinding>> getExtensionShortcuts,
         Action<string> reportError,
         CancellationToken cancellationToken = default,
-        bool allowHandledGlobalShortcuts = false)
+        bool allowHandledGlobalShortcuts = false,
+        TuiKeybindingStore? store = null)
     {
-        if (TryResolveGlobalAction(key, out var action))
+        if (TryResolveGlobalAction(key, store ?? DefaultStore, out var action))
         {
             Logger.LogDebug(
                 "Resolved TUI shortcut key {Key} handled={Handled} allowHandledGlobal={AllowHandledGlobalShortcuts} action={Action}",

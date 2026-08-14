@@ -1,4 +1,5 @@
 using Terminal.Gui;
+using PiSharp.Tui.Interactive.Keybindings;
 
 namespace PiSharp.Tui.Interactive;
 
@@ -58,15 +59,18 @@ public static class TuiKeybindings
     public static IEnumerable<TuiKeybinding> GlobalShortcuts
         => TuiBuiltInShortcutCatalog.GlobalShortcuts;
 
-    public static IReadOnlyList<TuiCommandDescriptor> CommandDescriptors { get; }
-        = TuiBuiltInShortcutCatalog.CommandDescriptors;
+    /// <summary>
+    /// Process-wide effective binding table. <c>TuiHost</c> replaces this with the store it builds
+    /// from <see cref="TuiHostOptions.KeybindingsPath"/> so every static consumer (header hints,
+    /// /hotkeys, HintText, shortcut dispatch) honors user remaps.
+    /// </summary>
+    public static TuiKeybindingStore DefaultStore { get; set; } = new(TuiBuiltInShortcutCatalog.Bindings);
 
-    public static IReadOnlyList<TuiHeaderHintDescriptor> HeaderHints { get; }
-        = TuiBuiltInShortcutCatalog.HeaderHints;
+    public static IReadOnlyList<TuiCommandDescriptor> CommandDescriptors => DefaultStore.CommandDescriptors;
 
-    public static string HotkeysText()
-        => TuiHotkeyText.RenderFromDescriptors(CommandDescriptors, []);
+    public static IReadOnlyList<TuiHeaderHintDescriptor> HeaderHints => DefaultStore.HeaderHints;
 
-    public static string HintText(string action, string fallback)
-        => Defaults.FirstOrDefault(binding => string.Equals(binding.Action, action, StringComparison.Ordinal))?.Keys ?? fallback;
+    public static string HotkeysText() => DefaultStore.HotkeysText();
+
+    public static string HintText(string action, string fallback) => DefaultStore.HintText(action, fallback);
 }

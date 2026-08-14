@@ -1,4 +1,4 @@
-using PiSharp.Cli.Packages;
+using PiSharp.Packages;
 using PiSharp.Compatibility.Resources;
 using Xunit;
 

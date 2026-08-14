@@ -69,9 +69,37 @@ public sealed class TuiExtensionUi(ExtensionUiBridgeHost bridge, Func<string, IR
                     GetString(request.Payload, "command") ?? string.Empty,
                     GetString(request.Payload, "shortcut")), cancellationToken);
                 return new ExtensionUiResult(true);
+            case "tools_expanded_get":
+                return new ExtensionUiResult(true, await bridge.GetToolsExpandedAsync(cancellationToken));
+            case "tools_expanded_set":
+                await bridge.SetToolsExpandedAsync(GetNullableBoolean(request.Payload, "expanded") ?? false, cancellationToken);
+                return new ExtensionUiResult(true);
+            case "editor_component_set":
+                await bridge.SetEditorComponentAsync(request.ExtensionId, CreateEditorComponent(request.Payload), cancellationToken);
+                return new ExtensionUiResult(true);
+            case "editor_component_get":
+                return new ExtensionUiResult(true, await bridge.GetEditorComponentAsync(request.ExtensionId, cancellationToken));
+            case "get_all_themes":
+                // [daemon: deferred until P01] ThemeRegistry lives daemon-side; return an inert empty list.
+                return new ExtensionUiResult(true, Array.Empty<object>());
+            case "get_theme":
+                // [daemon: deferred until P01] ThemeRegistry lives daemon-side; return an inert null theme.
+                return new ExtensionUiResult(true, null);
+            case "set_theme":
+                // [daemon: deferred until P01] ThemeRegistry lives daemon-side; inert success until the apply delegate is wired.
+                return new ExtensionUiResult(true);
             default:
                 return new ExtensionUiResult(false, Error: $"Unsupported extension UI request kind '{request.Kind}'.");
         }
+    }
+
+    private static ExtensionWidgetState? CreateEditorComponent(JsonElement payload)
+    {
+        // uiApi.setEditorComponent sends the rendered component lines under "message" (and may
+        // also carry a structured "component" payload); either way it becomes a text editor slot.
+        var content = GetString(payload, "component") ?? GetString(payload, "message");
+        if (content is null) return null;
+        return new ExtensionWidgetState("text", content, GetString(payload, "title"), "editor");
     }
 
     public Task NotifyAsync(string message, ExtensionUiSeverity severity = ExtensionUiSeverity.Info, CancellationToken cancellationToken = default)

@@ -3,10 +3,21 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Environment;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-
+using PiSharp.Extensions;
 namespace PiSharp.Agent.Resources;
 
-public sealed record Skill(string Name, string Description, string Content, string FilePath, bool DisableModelInvocation = false);
+public sealed record Skill(
+    string Name,
+    string Description,
+    string Content,
+    string FilePath,
+    bool DisableModelInvocation = false,
+    IReadOnlyList<string>? Globs = null,
+    bool AlwaysApply = false,
+    bool Hide = false,
+    string? Source = null,
+    int SourcePriority = 0,
+    ExtensionSkillRunner? Runner = null);
 public sealed record SkillDiagnostic(string Type, string Code, string Message, string Path);
 
 public static class SkillManager

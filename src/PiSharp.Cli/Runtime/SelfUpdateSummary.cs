@@ -1,4 +1,4 @@
-using PiSharp.Cli.Packages;
+using PiSharp.Packages;
 
 namespace PiSharp.Cli.Runtime;
 

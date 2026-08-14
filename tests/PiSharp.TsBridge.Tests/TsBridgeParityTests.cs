@@ -701,7 +701,7 @@ public sealed class TsBridgeParityTests
         {
             WaitForIdleAsync = _ => Task.CompletedTask,
             GetSessionSnapshotAsync = _ => Task.FromResult<object?>(new { branch = new object[] { new { type = "message" } }, entries = Array.Empty<object>(), sessionId = "session" }),
-            NewSessionAsync = _ => Task.FromResult(new ExtensionSessionReplacementResult(false, SessionId: "replacement-session")),
+            NewSessionAsync = (_, _) => Task.FromResult(new ExtensionSessionReplacementResult(false, SessionId: "replacement-session")),
             SendUserMessageAsync = (content, _, _) => { messages.Add(content); return Task.CompletedTask; }
         };
         var registry = new ExtensionRegistry();
@@ -749,7 +749,7 @@ public sealed class TsBridgeParityTests
                 Interlocked.Increment(ref snapshotCallCount);
                 return Task.FromResult<object?>(new { branch = new object[] { new { type = "message", role = "assistant" } }, entries = Array.Empty<object>(), sessionId = "session" });
             },
-            NewSessionAsync = _ => Task.FromResult(new ExtensionSessionReplacementResult(false, SessionId: "replacement-session")),
+            NewSessionAsync = (_, _) => Task.FromResult(new ExtensionSessionReplacementResult(false, SessionId: "replacement-session")),
             SendUserMessageAsync = (content, _, _) => { messages.Add(content); return Task.CompletedTask; }
         };
         var registry = new ExtensionRegistry();
@@ -794,7 +794,7 @@ public sealed class TsBridgeParityTests
             GetSessionSnapshotAsync = _ => Task.FromResult<object?>(userMessageSent
                 ? new { branch = new object[] { new { type = "message", role = "assistant" } }, entries = Array.Empty<object>(), sessionId = "replacement-session" }
                 : new { branch = Array.Empty<object>(), entries = Array.Empty<object>(), sessionId = newSessionStarted ? "replacement-session" : "initial-session" }),
-            NewSessionAsync = _ =>
+            NewSessionAsync = (_, _) =>
             {
                 newSessionStarted = true;
                 return Task.FromResult(new ExtensionSessionReplacementResult(false, SessionId: "replacement-session"));
@@ -1010,7 +1010,7 @@ public sealed class TsBridgeParityTests
         var registry = new ExtensionRegistry();
         var binding = new ExtensionRuntimeBinding(dir, false, NoExtensionUi.Instance)
         {
-            GetAllSkillsAsync = _ => Task.FromResult<IReadOnlyList<ExtensionSkillRegistration>>([
+            GetAllSkillsAsync = _ => Task.FromResult<IReadOnlyList<ExtensionSkillDefinition>>([
                 new("alpha", "Alpha", "body", "/repo/alpha/SKILL.md")
             ]),
             SetSelectedSkillsAsync = (names, _) => { selected = names.ToArray(); return Task.CompletedTask; }

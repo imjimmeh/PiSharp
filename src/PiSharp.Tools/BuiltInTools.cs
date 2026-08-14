@@ -9,9 +9,9 @@ namespace PiSharp.Tools;
 
 public static class BuiltInTools
 {
-    public static IReadOnlyDictionary<string, IAgentTool> CreateAll(IExecutionEnv env, ToolsOptions? options = null)
+    public static IReadOnlyDictionary<string, IAgentTool> CreateAll(IExecutionEnv env, ToolsOptions? options = null, PiSharp.Extensions.InternalUrlRegistry? urlRegistry = null, PiSharp.Extensions.FileContentExtractorRegistry? contentExtractors = null)
         => ToDictionary([
-            new ReadTool(env),
+            new ReadTool(env, urlRegistry: urlRegistry, contentExtractors: contentExtractors),
             new BashTool(env),
             new EditTool(env),
             new WriteTool(env),
@@ -20,18 +20,18 @@ public static class BuiltInTools
             new LsTool(env)
         ]);
 
-    public static IReadOnlyDictionary<string, IAgentTool> CreateReadOnly(IExecutionEnv env, ToolsOptions? options = null)
+    public static IReadOnlyDictionary<string, IAgentTool> CreateReadOnly(IExecutionEnv env, ToolsOptions? options = null, PiSharp.Extensions.InternalUrlRegistry? urlRegistry = null, PiSharp.Extensions.FileContentExtractorRegistry? contentExtractors = null)
         => ToDictionary([
-            new ReadTool(env),
+            new ReadTool(env, urlRegistry: urlRegistry, contentExtractors: contentExtractors),
             new GrepTool(env),
             new FindTool(env),
             new LsTool(env)
         ]);
 
-    public static IAgentTool CreateTool(string name, IExecutionEnv env, ToolsOptions? options = null)
+    public static IAgentTool CreateTool(string name, IExecutionEnv env, ToolsOptions? options = null, PiSharp.Extensions.InternalUrlRegistry? urlRegistry = null, PiSharp.Extensions.FileContentExtractorRegistry? contentExtractors = null)
         => name switch
         {
-            "read" => new ReadTool(env),
+            "read" => new ReadTool(env, urlRegistry: urlRegistry, contentExtractors: contentExtractors),
             "bash" => new BashTool(env),
             "edit" => new EditTool(env),
             "write" => new WriteTool(env),
@@ -40,6 +40,7 @@ public static class BuiltInTools
             "ls" => new LsTool(env),
             _ => throw new ArgumentException($"Unknown built-in tool: {name}", nameof(name))
         };
+
 
     private static IReadOnlyDictionary<string, IAgentTool> ToDictionary(IEnumerable<IAgentTool> tools)
         => tools.ToDictionary(tool => tool.Name, StringComparer.Ordinal);

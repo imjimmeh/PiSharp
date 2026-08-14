@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PiSharp.Abstractions\PiSharp.Abstractions.csproj" />
     <ProjectReference Include="..\PiSharp.Agent.Core\PiSharp.Agent.Core.csproj" />
+    <ProjectReference Include="..\PiSharp.Extensions\PiSharp.Extensions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

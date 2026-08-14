@@ -7,6 +7,7 @@ using PiSharp.Extensions;
 using PiSharp.Tui.Interactive.Components;
 using PiSharp.Tui.Interactive.Harness;
 using PiSharp.Tui.Interactive.Input;
+using PiSharp.Tui.Interactive.Keybindings;
 using PiSharp.Tui.Interactive.Prompt;
 using PiSharp.Tui.Interactive.Rendering;
 using PiSharp.Tui.Interactive.Sessions;
@@ -58,6 +59,23 @@ public sealed class TuiHost(TuiHostOptions options)
         }
         TuiTheme.Apply(options.Theme);
         TuiShortcutRegistrar.LoggerFactory = options.LoggerFactory;
+
+        var keybindingsStore = new TuiKeybindingStore(options.KeybindingsDefaults ?? TuiBuiltInShortcutCatalog.Bindings);
+        TuiShortcutRegistrar.DefaultStore = keybindingsStore;
+        var initialKeybindingsDiagnostics = new List<string>();
+        if (!string.IsNullOrEmpty(options.KeybindingsPath) && File.Exists(options.KeybindingsPath))
+        {
+            if (KeybindingsLoader.TryReadFile(options.KeybindingsPath, out var keybindingsJson, out var keybindingsError))
+            {
+                keybindingsStore.Reload(keybindingsJson);
+                initialKeybindingsDiagnostics.AddRange(keybindingsStore.Diagnostics);
+            }
+            else if (keybindingsError is not null)
+            {
+                initialKeybindingsDiagnostics.Add(keybindingsError);
+            }
+        }
+
         var appContext = new TerminalGuiApplicationContext();
 
         var startupHarness = options.GetCurrentHarness?.Invoke() ?? options.Harness;
@@ -72,6 +90,8 @@ public sealed class TuiHost(TuiHostOptions options)
         }
         foreach (var message in options.StartupMessages ?? [])
             state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+        foreach (var diagnostic in initialKeybindingsDiagnostics)
+            state = state.AppendSystem(diagnostic, isError: true);
 
         var shell = new TuiShellView(options.LoggerFactory);
         shell.ProfilingCounters = options.ProfilingCounters;
@@ -118,6 +138,7 @@ public sealed class TuiHost(TuiHostOptions options)
             updateState: u => { state = u(state); renderCoordinator.RequestRender(); },
             getEditorText: () => shell.Prompt.PromptText,
             setEditorText: t => shell.Prompt.SetPromptText(t),
+            getState: () => state,
             loggerFactory: options.LoggerFactory)
         {
             DispatchUi = appContext.Post,
@@ -153,7 +174,7 @@ public sealed class TuiHost(TuiHostOptions options)
             next => { state = next; renderCoordinator.RequestRender(); },
             () => (options.GetCurrentHarness?.Invoke() ?? startupHarness).Abort(),
             () => appContext.Post(() => appContext.RequestStop(shell.Window)),
-            () => TuiHotkeyText.Render(TuiKeybindings.Defaults, options.GetExtensionShortcuts?.Invoke() ?? []),
+            () => TuiHotkeyText.RenderFromDescriptors(keybindingsStore.CommandDescriptors, options.GetExtensionShortcuts?.Invoke() ?? []),
             commandText => new TuiCommandDispatchRequest(commandText, SelectInlineWithLoggingAsync,
                 (string text, CancellationToken ct) => PromptDialog.InputAsync(text, ct, dispatcher: appContext),
                 (msg, isErr, _) =>
@@ -220,7 +241,7 @@ public sealed class TuiHost(TuiHostOptions options)
             shell.Window, shell.Chat, shell.Prompt,
             () => renderCoordinator.RequestRender(),
             shortcutDispatcher, shortcutContext, shortcutController,
-            shortcutActions.ReportShortcutError, cancellationToken, () => bridge.HasActiveCustomUi, options.LoggerFactory);
+            shortcutActions.ReportShortcutError, cancellationToken, () => bridge.HasActiveCustomUi, () => shell.HasActiveEditorComponent, options.LoggerFactory);
         inputCoordinator.Attach();
 
         var customUiCapture = new ExtensionCustomUiInputCapture(bridge);
@@ -241,6 +262,11 @@ public sealed class TuiHost(TuiHostOptions options)
             },
             loggerFactory: options.LoggerFactory);
         inputRouter.Attach();
+
+        keybindingsStore.Changed += () => appContext.Post(() => renderCoordinator.RequestRender());
+        using var keybindingsWatcher = string.IsNullOrEmpty(options.KeybindingsPath)
+            ? null
+            : new KeybindingsWatcher(options.KeybindingsPath, keybindingsStore, appContext.Post, shortcutActions.ReportShortcutError);
 
         ConsoleCancelEventHandler consoleCancelKeyPressHandler = (_, args) =>
         {

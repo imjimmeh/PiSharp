@@ -23,10 +23,13 @@ internal sealed class TuiShellView
     public TextView PromptTitle { get; }
     public PromptEditor Prompt { get; }
     public LineView PromptBottomBorder { get; }
+    public TextView EditorComponent { get; }
     public InlineSuggestionListView Suggestions { get; }
     public FooterView Footer { get; }
     public ScrollBar ChatScrollBar { get; }
     internal TuiProfilingCounters? ProfilingCounters { get; set; }
+
+    private TuiBridgeSlot? _editorComponentSlot;
 
     public TuiShellView(ILoggerFactory? loggerFactory = null)
     {
@@ -91,6 +94,20 @@ internal sealed class TuiShellView
             Width = Dim.Fill(),
             Height = 1
         };
+        // Backing editor shown in place of the prompt title/prompt/bottom-border while an
+        // editor-placement bridge slot is active. Hidden (not destroyed) so the default prompt
+        // editor is restored when the slot is removed.
+        EditorComponent = new TextView
+        {
+            X = 0,
+            Y = Pos.AnchorEnd(6),
+            Width = Dim.Fill(),
+            Height = 3,
+            Multiline = true,
+            WordWrap = true,
+            Visible = false,
+            ColorScheme = TuiTheme.DefaultColorScheme
+        };
         Footer = new FooterView(loggerFactory)
         {
             X = 0,
@@ -146,8 +163,9 @@ internal sealed class TuiShellView
         Window.Add(ChatScrollBar);
         Window.Add(WorkingIndicator);
         Window.Add(PromptTitle);
-        Window.Add(Prompt);
         Window.Add(PromptBottomBorder);
+        Window.Add(Prompt);
+        Window.Add(EditorComponent);
         Window.Add(Suggestions);
         Window.Add(Footer);
         Window.Add(MenuBar);
@@ -159,6 +177,25 @@ internal sealed class TuiShellView
     {
         LeftSidebar.Visible = leftVisible;
         RightSidebar.Visible = rightVisible;
+    }
+
+    public bool HasActiveEditorComponent => _editorComponentSlot is not null;
+
+    /// <summary>
+    /// Shows the editor-placement slot's content in place of the default prompt editor, or hides
+    /// it and restores the prompt when <paramref name="slot"/> is null. The prompt is hidden, not
+    /// destroyed, so all its wiring (suggestions, submission, history) survives.
+    /// </summary>
+    public void SetEditorComponentSlot(TuiBridgeSlot? slot)
+    {
+        _editorComponentSlot = slot;
+        var active = slot is not null;
+        PromptTitle.Visible = !active;
+        Prompt.Visible = !active;
+        PromptBottomBorder.Visible = !active;
+        EditorComponent.Visible = active;
+        if (active && !string.Equals(EditorComponent.Text?.ToString(), slot!.Content, StringComparison.Ordinal))
+            EditorComponent.Text = slot.Content;
     }
 
     public void ApplyLayout(TuiShellLayoutMetrics metrics)
@@ -189,6 +226,9 @@ internal sealed class TuiShellView
         Prompt.Height = promptHeight;
         Prompt.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight + promptHeight);
         PromptTitle.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight + promptHeight + TuiLayoutMetrics.PromptTitleHeight);
+        // The editor-placement slot occupies the same region as the hidden prompt trio.
+        EditorComponent.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight + promptHeight + TuiLayoutMetrics.PromptTitleHeight);
+        EditorComponent.Height = promptHeight + TuiLayoutMetrics.PromptBorderHeight + TuiLayoutMetrics.PromptTitleHeight;
         Suggestions.Height = suggestionsHeight;
         Suggestions.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight + promptHeight + TuiLayoutMetrics.PromptTitleHeight + suggestionsHeight);
         WorkingIndicator.Y = Pos.AnchorEnd(bottomReserved);

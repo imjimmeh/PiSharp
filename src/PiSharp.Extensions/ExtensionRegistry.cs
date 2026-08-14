@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Prompting;
 using PiSharp.Agent.Core.Tools;
@@ -12,12 +14,14 @@ public sealed record ExtensionRegistryChange(ExtensionRegistryChangeKind Kind, s
 public sealed class ExtensionRegistry
 {
     private readonly IExtensionRegistryChangeStream _changeStream;
+    private readonly ILogger _logger;
     private readonly object _changedEventGate = new();
     private readonly List<(Func<ExtensionRegistryChange, CancellationToken, Task> Handler, IDisposable Subscription)> _changedEventSubscriptions = [];
 
-    public ExtensionRegistry(IExtensionRegistryChangeStream? changeStream = null)
+    public ExtensionRegistry(IExtensionRegistryChangeStream? changeStream = null, ILoggerFactory? loggerFactory = null)
     {
-        _changeStream = changeStream ?? new ExtensionRegistryChangeStream();
+        _changeStream = changeStream ?? new ExtensionRegistryChangeStream(loggerFactory);
+        _logger = loggerFactory?.CreateLogger<ExtensionRegistry>() ?? NullLogger<ExtensionRegistry>.Instance;
     }
 
     public event Func<ExtensionRegistryChange, CancellationToken, Task> Changed
@@ -46,7 +50,7 @@ public sealed class ExtensionRegistry
 
     private readonly object _gate = new();
     private readonly Dictionary<string, RegistrationStack<IAgentTool>> _tools = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, RegistrationStack<ExtensionSkillRegistration>> _skills = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RegistrationStack<ExtensionSkillDefinition>> _skills = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RegistrationStack<IModelProvider>> _providers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OwnedExtensionRegistration<(string EventName, ExtensionEventHandler Handler)>> _handlers = new(StringComparer.Ordinal);
     private readonly List<string> _handlerRegistrationOrder = [];
@@ -59,11 +63,16 @@ public sealed class ExtensionRegistry
     private readonly Dictionary<string, OwnedExtensionRegistration<IPromptContributor>> _promptContributors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RegistrationStack<PromptSection>> _promptSections = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OwnedExtensionRegistration<IPromptTransform>> _promptTransforms = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RegistrationStack<IRuleProvider>> _ruleProviders = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OwnedExtensionRegistration<IStreamDeltaInterceptor>> _streamDeltaInterceptors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RegistrationStack<ISkillProvider>> _skillProviders = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RegistrationStack<ExtensionSkillRunner>> _skillRunners = new(StringComparer.Ordinal);
 
     public IReadOnlySet<string> BuiltInToolNames { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 
     public IReadOnlyList<OwnedExtensionRegistration<IAgentTool>> Tools => SnapshotWinners(_tools);
-    public IReadOnlyList<OwnedExtensionRegistration<ExtensionSkillRegistration>> Skills => SnapshotWinners(_skills);
+    public IReadOnlyList<OwnedExtensionRegistration<ExtensionSkillDefinition>> Skills => SnapshotWinners(_skills);
+    public IReadOnlyList<OwnedExtensionRegistration<ISkillProvider>> SkillProviders => SnapshotWinners(_skillProviders);
     public IReadOnlyList<OwnedExtensionRegistration<IModelProvider>> Providers => SnapshotWinners(_providers);
     public IReadOnlyList<OwnedExtensionRegistration<(string EventName, ExtensionEventHandler Handler)>> Handlers => Snapshot(_handlers, _handlerRegistrationOrder);
     public IReadOnlyList<OwnedExtensionRegistration<(string EventName, ExtensionEventHandler Handler)>> HandlersFor(string eventName)
@@ -86,6 +95,8 @@ public sealed class ExtensionRegistry
     public IReadOnlyList<OwnedExtensionRegistration<IPromptContributor>> PromptContributors => Snapshot(_promptContributors);
     public IReadOnlyList<OwnedExtensionRegistration<PromptSection>> PromptSections => SnapshotWinners(_promptSections);
     public IReadOnlyList<OwnedExtensionRegistration<IPromptTransform>> PromptTransforms => Snapshot(_promptTransforms);
+    public IReadOnlyList<OwnedExtensionRegistration<IRuleProvider>> RuleProviders => SnapshotWinners(_ruleProviders);
+    public IReadOnlyList<OwnedExtensionRegistration<IStreamDeltaInterceptor>> StreamDeltaInterceptors => Snapshot(_streamDeltaInterceptors);
     public IReadOnlyList<string> SourceIds => AllSourceIds().Distinct(StringComparer.Ordinal).ToArray();
 
     public IDisposable RegisterTool(string sourceId, IAgentTool tool, ExtensionOverridePolicy overridePolicy = ExtensionOverridePolicy.Reject)
@@ -102,12 +113,68 @@ public sealed class ExtensionRegistry
         return Push(_providers, $"provider:{provider.Api}", sourceId, provider, "provider", overridePolicy);
     }
 
-    public IDisposable RegisterSkill(string sourceId, ExtensionSkillRegistration registration, ExtensionOverridePolicy overridePolicy = ExtensionOverridePolicy.Reject)
+    public IDisposable RegisterSkill(string sourceId, ExtensionSkillDefinition registration, ExtensionOverridePolicy overridePolicy = ExtensionOverridePolicy.Reject)
     {
         if (string.IsNullOrWhiteSpace(registration.Name)) throw new ArgumentException("Skill name is required.", nameof(registration));
         if (string.IsNullOrWhiteSpace(registration.Description)) throw new ArgumentException("Skill description is required.", nameof(registration));
         if (string.IsNullOrWhiteSpace(registration.FilePath)) throw new ArgumentException("Skill file path is required.", nameof(registration));
-        return Push(_skills, $"skill:{registration.Name}", sourceId, registration, "skill", overridePolicy);
+        var skillHandle = Push(_skills, $"skill:{registration.Name}", sourceId, registration, "skill", overridePolicy);
+        if (registration.Runner is null) return skillHandle;
+        var runnerHandle = Push(_skillRunners, $"skill-runner:{registration.Name}", sourceId, registration.Runner, "skill-runner", overridePolicy);
+        return new CompositeHandle(skillHandle, runnerHandle);
+    }
+
+    /// <summary>
+    /// Registers a skill provider whose discovered skills merge with
+    /// first-wins dedup by name (higher <see cref="ExtensionSkillDefinition.SourcePriority"/> wins).
+    /// </summary>
+    public IDisposable RegisterSkillProvider(string sourceId, ISkillProvider provider, ExtensionOverridePolicy overridePolicy = ExtensionOverridePolicy.Reject)
+    {
+        if (string.IsNullOrWhiteSpace(provider.Name)) throw new ArgumentException("Skill provider name is required.", nameof(provider));
+        return Push(_skillProviders, $"skill-provider:{provider.Name}", sourceId, provider, "skill-provider", overridePolicy);
+    }
+
+    /// <summary>Returns the runner of the current winning registration for the named skill, if any.</summary>
+    public ExtensionSkillRunner? GetSkillRunner(string name)
+    {
+        lock (_gate)
+        {
+            return _skillRunners.TryGetValue($"skill-runner:{name}", out var stack)
+                ? stack.Current?.Value
+                : null;
+        }
+    }
+
+    /// <summary>
+    /// Merges registered extension skills with all registered skill providers'
+    /// discovered skills. Dedup by name is first-wins with higher
+    /// <c>SourcePriority</c> winning; ties keep the already-registered skill.
+    /// </summary>
+    public async Task<IReadOnlyList<ExtensionSkillDefinition>> DiscoverSkillProvidersAsync(CancellationToken cancellationToken = default)
+    {
+        var providers = SkillProviders;
+        var discovered = new List<ExtensionSkillDefinition>();
+        foreach (var provider in providers)
+        {
+            var skills = await provider.Value.DiscoverAsync(cancellationToken);
+            foreach (var skill in skills)
+            {
+                discovered.Add(skill with
+                {
+                    Source = string.IsNullOrWhiteSpace(skill.Source) ? provider.Value.Name : skill.Source,
+                    SourcePriority = skill.SourcePriority != 0 ? skill.SourcePriority : provider.Value.Priority
+                });
+            }
+        }
+
+        var byName = new Dictionary<string, ExtensionSkillDefinition>(StringComparer.Ordinal);
+        foreach (var registration in Skills) byName[registration.Value.Name] = registration.Value;
+        foreach (var skill in discovered)
+        {
+            if (!byName.TryGetValue(skill.Name, out var existing) || skill.SourcePriority > existing.SourcePriority)
+                byName[skill.Name] = skill;
+        }
+        return byName.Values.ToArray();
     }
 
     public IDisposable RegisterHandler(string sourceId, string eventName, ExtensionEventHandler handler)
@@ -161,6 +228,26 @@ public sealed class ExtensionRegistry
     public IDisposable RegisterPromptTransform(string sourceId, IPromptTransform transform)
         => SetOwned(_promptTransforms, $"prompt-transform:{Guid.NewGuid():N}", sourceId, transform, "prompt-transform");
 
+    public IDisposable RegisterRuleProvider(string sourceId, IRuleProvider provider)
+    {
+        if (string.IsNullOrWhiteSpace(provider.Name)) throw new ArgumentException("Rule provider name is required.", nameof(provider));
+        var key = $"rule-provider:{provider.Name}";
+        lock (_gate)
+        {
+            if (_ruleProviders.TryGetValue(key, out var stack) && stack.Current is not null)
+            {
+                _logger.LogWarning("Rule provider '{Name}' is already registered by '{ExistingSource}'; replacing it with '{NewSource}'.", provider.Name, stack.Current.SourceId, sourceId);
+            }
+        }
+        return Push(_ruleProviders, key, sourceId, provider, "rule-provider", ExtensionOverridePolicy.Override);
+    }
+
+    public IDisposable RegisterStreamDeltaInterceptor(string sourceId, IStreamDeltaInterceptor interceptor)
+    {
+        if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("Source id is required.", nameof(sourceId));
+        return SetOwned(_streamDeltaInterceptors, $"stream-delta:{sourceId}", sourceId, interceptor, "stream-delta");
+    }
+
     public int UnregisterBySource(string sourceId)
     {
         var changes = new List<ExtensionRegistryChange>();
@@ -179,7 +266,11 @@ public sealed class ExtensionRegistry
                 + RemoveBySource(_decorators, sourceId)
                 + RemoveBySource(_promptContributors, sourceId)
                 + RemoveBySourceStack(_promptSections, sourceId, "prompt-section", changes)
-                + RemoveBySource(_promptTransforms, sourceId);
+                + RemoveBySource(_promptTransforms, sourceId)
+                + RemoveBySourceStack(_ruleProviders, sourceId, "rule-provider", changes)
+                + RemoveBySource(_streamDeltaInterceptors, sourceId)
+                + RemoveBySourceStack(_skillProviders, sourceId, "skill-provider", changes)
+                + RemoveBySourceStack(_skillRunners, sourceId, "skill-runner", changes);
         }
         foreach (var change in changes) Publish(change);
         if (removed > 0) Publish(new ExtensionRegistryChange(ExtensionRegistryChangeKind.SourceRemoved, sourceId, "source", sourceId, removed));
@@ -212,6 +303,10 @@ public sealed class ExtensionRegistry
                 .Concat(_promptContributors.Values.Select(x => x.SourceId))
                 .Concat(AllStackRegistrations(_promptSections).Select(x => x.SourceId))
                 .Concat(_promptTransforms.Values.Select(x => x.SourceId))
+                .Concat(AllStackRegistrations(_ruleProviders).Select(x => x.SourceId))
+                .Concat(_streamDeltaInterceptors.Values.Select(x => x.SourceId))
+                .Concat(AllStackRegistrations(_skillProviders).Select(x => x.SourceId))
+                .Concat(AllStackRegistrations(_skillRunners).Select(x => x.SourceId))
                 .ToArray();
         }
     }
@@ -379,6 +474,17 @@ public sealed class ExtensionRegistry
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 0) dispose();
+        }
+    }
+
+    private sealed class CompositeHandle(IDisposable first, IDisposable? second) : IDisposable
+    {
+        private int _disposed;
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            first.Dispose();
+            second?.Dispose();
         }
     }
 }

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PiSharp.Advisor</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Extensions\PiSharp.Extensions.csproj" />
+    <ProjectReference Include="..\PiSharp.Agent.Core\PiSharp.Agent.Core.csproj" />
+    <ProjectReference Include="..\PiSharp.Abstractions\PiSharp.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

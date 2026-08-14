@@ -36,7 +36,7 @@ public sealed class SkillExtensionApiTests
         var selected = Array.Empty<string>();
         var binding = new ExtensionRuntimeBinding("/repo", false, NoExtensionUi.Instance)
         {
-            GetAllSkillsAsync = _ => Task.FromResult<IReadOnlyList<ExtensionSkillRegistration>>([
+            GetAllSkillsAsync = _ => Task.FromResult<IReadOnlyList<ExtensionSkillDefinition>>([
                 new("alpha", "Alpha", "body", "/repo/alpha/SKILL.md")
             ]),
             GetSelectedSkillsAsync = _ => Task.FromResult<IReadOnlyList<string>>(selected),

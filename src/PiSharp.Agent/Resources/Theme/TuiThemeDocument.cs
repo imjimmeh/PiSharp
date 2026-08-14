@@ -28,6 +28,20 @@ public sealed record TuiThemeDocument(
         return (null, diagnostics);
     }
 
+    public static async Task<IReadOnlyList<TuiThemeDocument>> LoadAllAsync(
+        IEnumerable<string> paths,
+        CancellationToken cancellationToken = default)
+    {
+        var documents = new List<TuiThemeDocument>();
+        foreach (var path in paths.Where(path => !string.IsNullOrWhiteSpace(path)))
+            foreach (var candidate in ExpandCandidates(path))
+            {
+                var (document, _) = await LoadAsync(candidate, cancellationToken);
+                if (document is not null) documents.Add(document);
+            }
+        return documents;
+    }
+
     public static async Task<(TuiThemeDocument? Theme, TuiThemeDiagnostic? Diagnostic)> LoadAsync(
         string path,
         CancellationToken cancellationToken = default)

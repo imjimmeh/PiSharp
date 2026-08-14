@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using PiSharp.Cli.Packages;
+using PiSharp.Packages;
 using Xunit;
 
 namespace PiSharp.Cli.Tests.Packages;

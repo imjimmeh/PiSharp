@@ -5,7 +5,7 @@ using PiSharp.Ai.Auth;
 using PiSharp.Ai.Models;
 using PiSharp.Cli.Commands;
 using PiSharp.Cli.Files;
-using PiSharp.Cli.Packages;
+using PiSharp.Packages;
 using PiSharp.Cli.Runtime;
 using PiSharp.Compatibility.Settings;
 using PiSharp.Runtime;
@@ -181,6 +181,7 @@ public static class InteractiveMode
                 await CheckSelfUpdateAsync(runtime, inject, token);
             },
             Theme: runtime.Theme,
+            KeybindingsPath: PiAgentPaths.FromCwd(runtime.Session.Metadata.Cwd).KeybindingsPath,
             GetExtensionShortcuts: () => runtime.ExtensionManager?.Registry.Shortcuts ?? [],
             GetExtensionRegistry: () => runtime.ExtensionManager?.Registry,
             ResolveTool: ResolveExtensionTool,

@@ -17,6 +17,7 @@ using PiSharp.Agent.Resources;
 using PiSharp.Agent.Resources.Prompting;
 using PiSharp.Agent.Harness.LoopEvents;
 using PiSharp.Extensions;
+using PiSharp.Agent.Serialization;
 using System.Runtime.CompilerServices;
 
 namespace PiSharp.Agent.Harness;
@@ -140,11 +141,22 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
         return names.Length;
     }
 
-    public IDisposable RegisterSkill(string sourceId, ExtensionSkillRegistration registration)
+    public IDisposable RegisterSkill(string sourceId, ExtensionSkillDefinition definition)
     {
         if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("Source id is required.", nameof(sourceId));
-        if (string.IsNullOrWhiteSpace(registration.Name)) throw new ArgumentException("Skill name is required.", nameof(registration));
-        var skill = new Skill(registration.Name, registration.Description, registration.Content, registration.FilePath, registration.DisableModelInvocation);
+        if (string.IsNullOrWhiteSpace(definition.Name)) throw new ArgumentException("Skill name is required.", nameof(definition));
+        var skill = new Skill(
+            definition.Name,
+            definition.Description,
+            definition.Content,
+            definition.FilePath,
+            definition.DisableModelInvocation,
+            definition.Globs,
+            definition.AlwaysApply,
+            definition.Hide,
+            definition.Source,
+            definition.SourcePriority,
+            definition.Runner);
         if (!_extensionSkills.TryGetValue(skill.Name, out var stack)) _extensionSkills[skill.Name] = stack = [];
         stack.RemoveAll(item => StringComparer.Ordinal.Equals(item.SourceId, sourceId));
         var entry = new SkillRegistration(sourceId, skill);
@@ -234,7 +246,7 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
         try
         {
             var turnState = await CreateTurnStateAsync(cancellationToken);
-            var promptText = ExpandSkillCommand(text);
+            var promptText = await ExpandSkillCommandAsync(text, cancellationToken);
             var systemPrompt = await BuildSystemPromptAsync(promptText, images, turnState, cancellationToken);
             var beforeStart = await DispatchBeforeAgentStartAsync(promptText, images, systemPrompt, turnState.ActiveTools, cancellationToken);
             systemPrompt = beforeStart.ModifiedSystemPrompt ?? systemPrompt;
@@ -306,8 +318,7 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
         }
         finally { _phase = AgentHarnessPhase.Idle; }
     }
-
-    private string ExpandSkillCommand(string text)
+    private async Task<string> ExpandSkillCommandAsync(string text, CancellationToken cancellationToken)
     {
         const string prefix = "/skill:";
         if (!text.StartsWith(prefix, StringComparison.Ordinal)) return text;
@@ -317,8 +328,28 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
         var args = separator < 0 ? string.Empty : remainder[(separator + 1)..];
         if (string.IsNullOrWhiteSpace(name)) return text;
         var skill = ResolveSkill(name);
-        return skill is null ? text : SkillManager.FormatInvocation(skill, string.IsNullOrWhiteSpace(args) ? null : args);
+        if (skill is null) return text;
+        var additionalInstructions = string.IsNullOrWhiteSpace(args) ? null : args;
+        var argList = ArgList(args);
+        if (skill.Runner is null) return SkillManager.FormatInvocation(skill, additionalInstructions);
+
+        await PublishOwnEventAsync(new AgentHarnessOwnEvent.SkillExecutionStart(skill.Name, additionalInstructions, argList), cancellationToken);
+        try
+        {
+            var result = await skill.Runner(new ExtensionSkillRunContext(skill.Name, skill.Content, additionalInstructions, argList), cancellationToken);
+            await PublishOwnEventAsync(new AgentHarnessOwnEvent.SkillExecutionEnd(skill.Name, additionalInstructions, argList, result.Details, false), cancellationToken);
+            return string.IsNullOrWhiteSpace(result.Content) ? SkillManager.FormatInvocation(skill, additionalInstructions) : result.Content;
+        }
+        catch (Exception ex)
+        {
+            await PublishOwnEventAsync(new AgentHarnessOwnEvent.SkillExecutionEnd(skill.Name, additionalInstructions, argList, null, true, ex.Message), CancellationToken.None);
+            _logger.LogWarning(ex, "Skill runner '{SkillName}' failed; falling back to markdown injection", skill.Name);
+            return SkillManager.FormatInvocation(skill, additionalInstructions);
+        }
     }
+
+    private static IReadOnlyList<string> ArgList(string args)
+        => string.IsNullOrWhiteSpace(args) ? [] : args.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private async Task<AgentHarnessTurnState> CreateTurnStateAsync(CancellationToken cancellationToken)
     {
@@ -363,6 +394,7 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
             _nextTurnQueue.Clear();
             EmitQueueUpdate();
         }
+        var interceptors = _extensions?.StreamDeltaInterceptors ?? [];
         var config = new AgentLoopConfig(_model, _options.StreamAsync)
         {
             GetSteeringMessages = DrainSteeringQueueAsync,
@@ -371,10 +403,37 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
             AfterToolCall = _extensions is null ? null : (ctx, token) => RunAfterToolMiddlewareAsync(ctx, token),
             ToolExecution = _options.ToolExecution,
             StreamOptions = _options.StreamOptions,
-            ThinkingLevel = _thinkingLevel
+            ThinkingLevel = _thinkingLevel,
+            OnStreamDelta = interceptors.Count == 0 ? null : (delta, token) => RunStreamDeltaInterceptorsAsync(delta, token),
+            PrepareStreamMessages = interceptors.Count == 0 ? null : (messages, ctx, token) => RunPrepareStreamMessagesAsync(messages, ctx, token)
         };
         var results = await AgentLoop.RunAgentLoopAsync(messages, new AgentContext(systemPrompt, turnState.Messages, turnState.ActiveTools), config, HandleLoopEventAsync, _runAbort?.Token ?? cancellationToken);
         return results.OfType<AssistantMessage>().LastOrDefault() ?? throw new InvalidOperationException("No assistant message in results");
+    }
+
+    private async Task<StreamDeltaDecision?> RunStreamDeltaInterceptorsAsync(StreamDeltaContext delta, CancellationToken cancellationToken)
+    {
+        if (_extensions is null) return null;
+        foreach (var registration in _extensions.StreamDeltaInterceptors)
+        {
+            var decision = await registration.Value.InterceptDeltaAsync(delta, cancellationToken);
+            if (decision is not null) return decision;
+        }
+        return null;
+    }
+
+    private async Task<IReadOnlyList<AgentMessage>> RunPrepareStreamMessagesAsync(
+        IReadOnlyList<AgentMessage> messages,
+        AgentContext context,
+        CancellationToken cancellationToken)
+    {
+        if (_extensions is null) return messages;
+        var current = messages;
+        foreach (var registration in _extensions.StreamDeltaInterceptors)
+        {
+            current = await registration.Value.PrepareMessagesAsync(current, context, cancellationToken);
+        }
+        return current;
     }
 
     private async Task<string> BuildSystemPromptAsync(
@@ -448,9 +507,17 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
         => _loopEventPipeline.ExecuteAsync(
             CreateEventContext(new AgentHarnessEvent.Core(e), HarnessEventKind.CoreLoop),
             cancellationToken);
-
-    private async Task PublishOwnEventAsync(AgentHarnessOwnEvent ownEvent, CancellationToken cancellationToken)
+    /// <summary>
+    /// Publishes a harness-owned event through the loop-event pipeline
+    /// (extension dispatch + listener notification), making it visible to
+    /// in-process extension handlers and harness subscribers (the daemon wire
+    /// and TS bridge). Custom events are validated before dispatch.
+    /// </summary>
+    public async Task PublishOwnEventAsync(AgentHarnessOwnEvent ownEvent, CancellationToken cancellationToken)
     {
+        if (ownEvent is AgentHarnessOwnEvent.CustomEvent customEvent)
+            ValidateCustomEvent(customEvent);
+
         var context = CreateEventContext(new AgentHarnessEvent.Own(ownEvent), HarnessEventKind.Own);
         if (context.IsThinkingLevelOwnEvent)
         {
@@ -470,6 +537,19 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
                 "Published own harness event harnessId={HarnessId} event={EventName}",
                 context.HarnessId,
                 context.EventName);
+        }
+    }
+
+    private static void ValidateCustomEvent(AgentHarnessOwnEvent.CustomEvent customEvent)
+    {
+        AgentSessionEvent.ValidateCustomEventName(customEvent.Name);
+        try
+        {
+            AgentJsonSerializer.Serialize(customEvent.Payload);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            throw new InvalidOperationException($"Custom event '{customEvent.Name}' payload is not JSON-serializable: {ex.Message}", ex);
         }
     }
 

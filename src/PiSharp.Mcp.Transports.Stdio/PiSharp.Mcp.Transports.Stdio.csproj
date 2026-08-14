@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>PiSharp.Mcp.Transports.Stdio</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Mcp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Extensions\PiSharp.Extensions.csproj" />
+    <ProjectReference Include="..\PiSharp.Mcp\PiSharp.Mcp.csproj" />
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+  </ItemGroup>
+
+</Project>

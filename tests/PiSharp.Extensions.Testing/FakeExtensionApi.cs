@@ -1,6 +1,7 @@
 using PiSharp.Abstractions.Messages;
 using System.Text.Json;
 using PiSharp.Agent.Core.Models;
+using PiSharp.Agent.Core.Tools;
 using PiSharp.Ai.Providers;
 using PiSharp.Ai.Registry;
 using PiSharp.Extensions;
@@ -13,6 +14,8 @@ public sealed class FakeExtensionApi : IExtensionApi
     private readonly List<(string EventName, ExtensionEventHandler Handler)> _handlers = [];
     private readonly List<ExtensionMiddleware> _middlewares = [];
     private readonly List<CapturedMessage> _sentMessages = [];
+    private readonly List<IFileContentExtractor> _contentExtractors = [];
+    private readonly List<ISearchProvider> _searchProviders = [];
 
     public string Cwd { get; set; } = "/";
     public bool HasUi { get; set; }
@@ -68,9 +71,41 @@ public sealed class FakeExtensionApi : IExtensionApi
         throw new NotSupportedException("FakeExtensionApi.Prompt is not supported.");
     public IExtensionSettingsApi Settings { get; set; } = new InMemorySettingsApi();
     public IExtensionStateApi State { get; set; } = new InMemoryStateApi();
+    public IExtensionFileApi Files => new CapturedFileApi(this);
+    public IExtensionSearchApi Search => new CapturedSearchApi(this);
+
+    public IReadOnlyList<IFileContentExtractor> RegisteredContentExtractors => _contentExtractors;
+    public IReadOnlyList<ISearchProvider> RegisteredSearchProviders => _searchProviders;
+
+    private sealed class CapturedFileApi(FakeExtensionApi api) : IExtensionFileApi
+    {
+        public IDisposable RegisterContentExtractor(IFileContentExtractor extractor, bool overrideExisting = false)
+        {
+            if (!overrideExisting && api._contentExtractors.Any(e => string.Equals(e.Id, extractor.Id, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException($"Content extractor '{extractor.Id}' is already registered.");
+            api._contentExtractors.RemoveAll(e => string.Equals(e.Id, extractor.Id, StringComparison.OrdinalIgnoreCase));
+            api._contentExtractors.Add(extractor);
+            return new NullDisposable();
+        }
+        public IReadOnlyList<IFileContentExtractor> ContentExtractors => api._contentExtractors;
+    }
+
+    private sealed class CapturedSearchApi(FakeExtensionApi api) : IExtensionSearchApi
+    {
+        public IDisposable RegisterProvider(ISearchProvider provider, bool overrideExisting = false)
+        {
+            if (!overrideExisting && api._searchProviders.Any(p => string.Equals(p.Id, provider.Id, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException($"Search provider '{provider.Id}' is already registered.");
+            api._searchProviders.RemoveAll(p => string.Equals(p.Id, provider.Id, StringComparison.OrdinalIgnoreCase));
+            api._searchProviders.Add(provider);
+            return new NullDisposable();
+        }
+        public IReadOnlyList<ISearchProvider> Providers => api._searchProviders;
+        public ISearchProvider? GetProvider(string providerId) => api._searchProviders.FirstOrDefault(p => string.Equals(p.Id, providerId, StringComparison.OrdinalIgnoreCase));
+    }
 
     // Remaining IExtensionApi members — throw until promoted if a test needs them
-    public IDisposable RegisterSkill(ExtensionSkillRegistration r) =>
+    public IDisposable RegisterSkill(ExtensionSkillDefinition r) =>
         throw new NotSupportedException("FakeExtensionApi.RegisterSkill is not supported.");
     public IDisposable RegisterCommand(ExtensionCommandRegistration r) =>
         throw new NotSupportedException("FakeExtensionApi.RegisterCommand is not supported.");

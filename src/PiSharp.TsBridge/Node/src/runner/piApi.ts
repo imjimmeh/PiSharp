@@ -9,6 +9,17 @@ interface SkillRegistration {
 	path?: string;
 	disableModelInvocation?: boolean;
 	override?: string;
+	globs?: string[];
+	alwaysApply?: boolean;
+	hide?: boolean;
+	source?: string;
+	sourcePriority?: number;
+	runner?: (context: {
+		name: string;
+		body: string;
+		additionalInstructions?: string;
+		args: string[];
+	}) => unknown | Promise<unknown>;
 }
 
 interface CommandOptions {
@@ -171,6 +182,12 @@ export function createPiApi({ extensionId, state, deps }: { extensionId: string;
 					skill.filePath ?? skill.path ?? `${extensionId}#${skill.name}`,
 				disableModelInvocation: skill.disableModelInvocation ?? false,
 				override: skill.override ?? "reject",
+				globs: skill.globs ?? [],
+				alwaysApply: skill.alwaysApply ?? false,
+				hide: skill.hide ?? false,
+				source: skill.source,
+				sourcePriority: skill.sourcePriority ?? 0,
+				hasRunner: typeof skill.runner === "function",
 			};
 			state.descriptor.skills.push(descriptor);
 			trackRegistrationRequest(methods.registerSkill, descriptor);
@@ -180,6 +197,28 @@ export function createPiApi({ extensionId, state, deps }: { extensionId: string;
 		selected: async (): Promise<unknown> =>
 			((await runtime(actions.getSelectedSkills, {})) as Record<string, unknown> | undefined)?.value ?? [],
 		select: (skillNames: string[]): Promise<unknown> => runtime(actions.setSelectedSkills, { skillNames }),
+		managed: {
+			create: (request: { name: string; description: string; content: string; disableModelInvocation?: boolean }): Promise<unknown> =>
+				runtime(actions.managedSkillCreate, request as Record<string, unknown>),
+			update: (name: string, request: { description?: string; content?: string; disableModelInvocation?: boolean }): Promise<unknown> =>
+				runtime(actions.managedSkillUpdate, { name, ...request } as Record<string, unknown>),
+			delete: (name: string): Promise<unknown> => runtime(actions.managedSkillDelete, { name }),
+			list: async (): Promise<unknown> => ((await runtime(actions.managedSkillList, {})) as Record<string, unknown> | undefined)?.value ?? [],
+			promote: (sourceReference: string): Promise<unknown> => runtime(actions.managedSkillPromote, { sourceReference }),
+		},
+	};
+	const packagesApi = {
+		install: (reference: string, options: { local?: boolean; force?: boolean; offline?: boolean } = {}): Promise<unknown> =>
+			runtime(actions.installExtension, { reference, ...options } as Record<string, unknown>),
+		update: (request: { source?: string; extensions?: boolean; extensionSource?: string; force?: boolean; offline?: boolean } = {}): Promise<unknown> =>
+			runtime(actions.updateExtension, request as Record<string, unknown>),
+		remove: (reference: string, options: { local?: boolean } = {}): Promise<unknown> =>
+			runtime(actions.removeExtension, { reference, ...options } as Record<string, unknown>),
+		list: async (): Promise<unknown> => ((await runtime(actions.listInstalledExtensions, {})) as Record<string, unknown> | undefined)?.value ?? [],
+	};
+	const skillProvidersApi = {
+		register: (provider: { name: string; priority?: number }): Promise<unknown> =>
+			runtime(actions.registerSkillProvider, { name: provider.name, priority: provider.priority ?? 0 }),
 	};
 	const extensionsApi = {
 		provide: (key: string, api: unknown): { dispose: () => void } =>
@@ -399,6 +438,8 @@ export function createPiApi({ extensionId, state, deps }: { extensionId: string;
 		setSelectedSkills: (skillNames: string[]): Promise<unknown> => skillApi.select(skillNames),
 		skills: skillApi,
 		extensions: extensionsApi,
+		packages: packagesApi,
+		skillProviders: skillProvidersApi,
 		registerSkill: (skill: SkillRegistration): Disposable => skillApi.register(skill),
 		registerTool(tool: { name?: string; execute?: unknown } & Record<string, unknown>): Disposable {
 			if (!tool?.name || typeof tool.execute !== "function")
@@ -459,6 +500,10 @@ export function createPiApi({ extensionId, state, deps }: { extensionId: string;
 		setActiveTools: (toolNames: string[]): Promise<unknown> => runtime(actions.setActiveTools, { toolNames }),
 		setModel: (model: unknown): Promise<unknown> => runtime(actions.setModel, model as Record<string, unknown>),
 		setThinkingLevel: (level: unknown): Promise<unknown> => runtime(actions.setThinkingLevel, { level } as Record<string, unknown>),
+		resolveModelRole: (role: string): Promise<{ model: unknown; thinkingLevel: string } | { error: string }> =>
+			runtime(actions.modelRolesResolve, { role } as Record<string, unknown>) as Promise<{ model: unknown; thinkingLevel: string } | { error: string }>,
+		setModelRole: (role: string): Promise<{ ok: boolean }> =>
+			runtime(actions.setModelRole, { role } as Record<string, unknown>) as Promise<{ ok: boolean }>,
 		exec: async (command: string, options: Record<string, unknown> = {}): Promise<unknown> =>
 			((await runtime(actions.exec, { command, options })) as Record<string, unknown> | undefined)?.value,
 		reload: (): Promise<unknown> => runtime(actions.reloadExtensions, {}),

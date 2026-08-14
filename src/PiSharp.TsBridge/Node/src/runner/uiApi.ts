@@ -344,7 +344,7 @@ export function createUiApi({ extensionId, state, sendRequest }: UiApiOptions): 
 			})();
 		},
 		customComponent: (key: unknown, factory: unknown, options: Record<string, unknown> = {}) => ui("custom", { key, message: renderLines(typeof factory === "function" ? factory({ requestRender: () => {} }, bridgeTheme) as RenderableComponent : factory as RenderableComponent).join("\n"), ...options }),
-		setEditorComponent: (factory: unknown) => setComponent("editorComponent", "editor_component", factory),
+		setEditorComponent: (factory: unknown) => setComponent("editorComponent", "editor_component_set", factory),
 		getEditorComponent: () => state.editorComponent,
 		getToolsExpanded: async () => ((await ui("tools_expanded_get", {}) as Record<string, unknown> | undefined)?.value as boolean) ?? false,
 		setToolsExpanded: (expanded: boolean) => ui("tools_expanded_set", { expanded } as Record<string, unknown>),

@@ -146,7 +146,14 @@ public sealed record TsSkillRegistration(
     string Content,
     string FilePath,
     bool DisableModelInvocation = false,
-    string Override = "reject");
+    string Override = "reject",
+    IReadOnlyList<string>? Globs = null,
+    bool AlwaysApply = false,
+    bool Hide = false,
+    string? Source = null,
+    int SourcePriority = 0,
+    bool HasRunner = false);
+public sealed record TsSkillProviderRegistration(string ExtensionId, string Name, int Priority = 0);
 public sealed record TsExtensionRegistration(string ExtensionId, string SourceId, string Kind, string Name, object Payload);
 public sealed record TsCommandRegistration(string ExtensionId, string Name, string Description);
 public sealed record TsShortcutRegistration(string ExtensionId, string Keys, string Description);

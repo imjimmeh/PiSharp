@@ -12,8 +12,24 @@ public static class RuntimeModelSelector
 {
     public static RuntimeModelSelection Resolve(RuntimeModelSelectionRequest request)
     {
+        // @role expansion — first step, before the provider/model split.
+        EffortPreset? roleEffort = null;
+        ThinkingLevel? roleRequestSuffixThinking = null;
+        string? modelToken = request.Model;
+
+        if (modelToken is not null && modelToken.StartsWith('@'))
+        {
+            // Extract :thinking suffix from @role:high before expansion.
+            var (_, rolePattern, suffixThinking) = SplitModelAndThinking(modelToken);
+            roleRequestSuffixThinking = suffixThinking;
+            var patternToExpand = rolePattern ?? modelToken;
+            var (expandedModel, effort) = ExpandRole(patternToExpand, depth: 0, visited: []);
+            modelToken = expandedModel;
+            roleEffort = effort;
+        }
+
         var scoped = ResolveScopedModels(request.ScopedModels);
-        var (provider, modelPattern, thinkingFromModel) = SplitModelAndThinking(request.Model);
+        var (provider, modelPattern, thinkingFromModel) = SplitModelAndThinking(modelToken);
         if (provider is null && modelPattern is not null && modelPattern.Contains('/', StringComparison.Ordinal))
         {
             var parts = modelPattern.Split('/', 2, StringSplitOptions.TrimEntries);
@@ -27,7 +43,17 @@ public static class RuntimeModelSelector
             ?? PublicApi.Models.FirstOrDefault()?.Descriptor
             ?? throw new InvalidOperationException("No models are registered. Call PublicApi.RegisterBuiltInProviders() before model selection.");
         model = PublicApi.ResolveCatalogModel(model.Provider, model.Id);
-        var requestedThinking = request.Thinking ?? thinkingFromModel ?? ThinkingLevel.Off;
+
+        // Budget overrides (role requests only) — applied before clamping so supported levels reflect the override.
+        if (roleEffort?.Budgets is not null)
+            model = MergeBudgets(model, roleEffort.Budgets);
+
+        // Precedence: request.Thinking > :thinking suffix from @role:high > :thinking from role selector > effort preset > Off.
+        var requestedThinking = request.Thinking
+            ?? roleRequestSuffixThinking
+            ?? thinkingFromModel
+            ?? roleEffort?.ThinkingLevel
+            ?? ThinkingLevel.Off;
         return new RuntimeModelSelection(model, ModelRegistry.ClampThinkingLevel(model, requestedThinking), scoped, scoped.Count > 0);
     }
 
@@ -86,5 +112,71 @@ public static class RuntimeModelSelector
             resolved.Add(PublicApi.ResolveCatalogModel(descriptor.Provider, descriptor.Id));
         }
         return resolved;
+    }
+
+    private const int MaxRoleDepth = 8;
+
+    private static (string Model, EffortPreset? Effort) ExpandRole(string token, int depth, HashSet<string> visited)
+    {
+        if (depth > MaxRoleDepth)
+            throw new InvalidOperationException($"Model role expansion exceeded max depth of {MaxRoleDepth}. Possible circular role reference.");
+
+        var name = token.Trim();
+        if (name.StartsWith('@')) name = name[1..];
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException("Empty model role name. Define it in settings 'modelRoles' or load the PiSharp.ModelRoles plugin.");
+
+        var normalizedName = name.ToLowerInvariant();
+        if (visited.Contains(normalizedName))
+            throw new InvalidOperationException($"Circular model role reference detected: '@{normalizedName}'.");
+
+        var resolution = ModelRoleRegistry.Resolve(normalizedName)
+            ?? throw new InvalidOperationException($"Unknown model role '@{normalizedName}'. Define it in settings 'modelRoles' or load the PiSharp.ModelRoles plugin.");
+
+        var newVisited = new HashSet<string>(visited, StringComparer.Ordinal) { normalizedName };
+
+        foreach (var selector in resolution.Selectors)
+        {
+            var candidate = selector.Trim();
+            if (string.IsNullOrWhiteSpace(candidate)) continue;
+
+            if (candidate.StartsWith('@'))
+            {
+                try
+                {
+                    var (expandedModel, effort) = ExpandRole(candidate, depth + 1, newVisited);
+                    return (expandedModel, resolution.Effort ?? effort);
+                }
+                catch (InvalidOperationException)
+                {
+                    continue;
+                }
+            }
+
+            // Direct selector — verify it resolves to a model.
+            var (prov, pat, _) = SplitModelAndThinking(candidate);
+            if (prov is null && pat is not null && pat.Contains('/', StringComparison.Ordinal))
+            {
+                var parts = pat.Split('/', 2, StringSplitOptions.TrimEntries);
+                prov = parts[0];
+                pat = parts[1];
+            }
+            if (ResolveModel(prov, pat, []) is not null)
+                return (candidate, resolution.Effort);
+        }
+
+        throw new InvalidOperationException($"Model role '@{normalizedName}' has no resolvable candidates.");
+    }
+
+    private static ModelDescriptor MergeBudgets(ModelDescriptor model, IReadOnlyDictionary<string, int> budgets)
+    {
+        var baseMap = model.ThinkingLevelMap ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var merged = new Dictionary<string, int>(baseMap, StringComparer.OrdinalIgnoreCase);
+        foreach (var (level, budget) in budgets)
+        {
+            var key = level.ToLowerInvariant();
+            merged[key] = budget;
+        }
+        return model with { ThinkingLevelMap = merged };
     }
 }

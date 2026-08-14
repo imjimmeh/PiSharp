@@ -73,6 +73,19 @@ public sealed class AgentEventJsonConverter : JsonConverter<AgentEvent>
                 JsonSerializer.Serialize(writer, tool.Result, options);
                 writer.WriteBoolean("isError", tool.IsError);
                 break;
+            case AgentEvent.AutoRetryStart retry:
+                writer.WriteString("type", "auto_retry_start");
+                writer.WriteNumber("attempt", retry.Attempt);
+                writer.WriteNumber("maxAttempts", retry.MaxAttempts);
+                writer.WriteNumber("delayMs", retry.DelayMs);
+                writer.WriteString("errorMessage", retry.ErrorMessage);
+                break;
+            case AgentEvent.AutoRetryEnd retryEnd:
+                writer.WriteString("type", "auto_retry_end");
+                writer.WriteBoolean("success", retryEnd.Success);
+                writer.WriteNumber("attempt", retryEnd.Attempt);
+                if (retryEnd.FinalError is not null) writer.WriteString("finalError", retryEnd.FinalError);
+                break;
             default:
                 throw new JsonException($"Unsupported AgentEvent type {value.GetType().Name}.");
         }

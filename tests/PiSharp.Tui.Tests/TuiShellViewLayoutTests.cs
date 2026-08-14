@@ -1,4 +1,5 @@
 using PiSharp.Tui.Interactive.Shell;
+using PiSharp.Tui.Interactive;
 using Terminal.Gui;
 using Xunit;
 
@@ -37,5 +38,36 @@ public sealed class TuiShellViewLayoutTests
         // edge at 75% of the window width so the sidebar occupies the rightmost 25%.
         var xTypeName = shell.RightSidebar.X.GetType().Name;
         Assert.DoesNotContain("AnchorEnd", xTypeName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SetEditorComponentSlot_ShowsEditorAndHidesPrompt()
+    {
+        var shell = new TuiShellView();
+        var slot = new TuiBridgeSlot("editor:ext-a", "text", "Ext", "editor body", Placement: "editor");
+
+        shell.SetEditorComponentSlot(slot);
+
+        Assert.True(shell.HasActiveEditorComponent);
+        Assert.True(shell.EditorComponent.Visible);
+        Assert.False(shell.Prompt.Visible);
+        Assert.False(shell.PromptTitle.Visible);
+        Assert.False(shell.PromptBottomBorder.Visible);
+        Assert.Equal("editor body", shell.EditorComponent.Text?.ToString());
+    }
+
+    [Fact]
+    public void SetEditorComponentSlot_NullRestoresPrompt()
+    {
+        var shell = new TuiShellView();
+        shell.SetEditorComponentSlot(new TuiBridgeSlot("editor:ext-a", "text", "Ext", "body", Placement: "editor"));
+
+        shell.SetEditorComponentSlot(null);
+
+        Assert.False(shell.HasActiveEditorComponent);
+        Assert.False(shell.EditorComponent.Visible);
+        Assert.True(shell.Prompt.Visible);
+        Assert.True(shell.PromptTitle.Visible);
+        Assert.True(shell.PromptBottomBorder.Visible);
     }
 }

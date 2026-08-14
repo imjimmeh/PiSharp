@@ -35,6 +35,7 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
     private readonly ITsBridgeClient _client = new NodeTsBridgeClient(options, loggerFactory: loggerFactory);
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private readonly Dictionary<string, ISkillProvider> _skillProviders = new(StringComparer.Ordinal);
     private Func<TsUiRequest, Task<object?>>? _uiBridge;
     private ExtensionRuntimeBinding? _runtimeBinding = runtimeBinding;
     private readonly List<Exception> _emitDiagnostics = [];
@@ -608,7 +609,7 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
 
     private void RegisterSkillDescriptor(TsSkillRegistration registration, string sourceId)
     {
-        registry.RegisterSkill(sourceId, ToExtensionSkillRegistration(registration), ParseOverride(registration.Override));
+        registry.RegisterSkill(sourceId, ToExtensionSkillDefinition(registration), ParseOverride(registration.Override));
     }
 
     private void RegisterPromptSectionDescriptor(TsPromptSectionRegistration registration, string sourceId)
@@ -639,6 +640,7 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
         {
             TsBridgeMethods.RegisterTool => RegisterToolAsync(request.Params!, cancellationToken),
             TsBridgeMethods.RegisterSkill => RegisterSkillAsync(request.Params!, cancellationToken),
+            TsBridgeMethods.RegisterSkillProvider => RegisterSkillProviderAsync(request.Params!, cancellationToken),
             TsBridgeMethods.RegisterProvider => RegisterProviderAsync(request.Params!, cancellationToken),
             TsBridgeMethods.UnregisterProvider => UnregisterProviderAsync(request.Params!, cancellationToken),
             TsBridgeMethods.RegisterCommand => RegisterCommandAsync(request.Params!, cancellationToken),
@@ -667,8 +669,91 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
     {
         var registration = DeserializeObject<TsSkillRegistration>(parameters)!;
         EnsureDescriptorSourceReplaced(registration.ExtensionId);
-        registry.RegisterSkill(SourceId(registration.ExtensionId), ToExtensionSkillRegistration(registration), ParseOverride(registration.Override));
+        registry.RegisterSkill(SourceId(registration.ExtensionId), ToExtensionSkillDefinition(registration), ParseOverride(registration.Override));
         return Task.FromResult<object?>(new { ok = true });
+    }
+
+    private async Task<object?> RegisterSkillProviderAsync(object parameters, CancellationToken cancellationToken)
+    {
+        var registration = DeserializeObject<TsSkillProviderRegistration>(parameters)!;
+        var adapter = new TsSkillProviderAdapter(registration, this);
+        _skillProviders[registration.Name] = adapter;
+        if (_runtimeBinding is not null)
+            await _runtimeBinding.RegisterSkillProviderAsync(adapter, cancellationToken);
+        return new { ok = true };
+    }
+
+    private async Task<object?> DiscoverSkillProviderRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+    {
+        var name = GetString(payload, "name") ?? string.Empty;
+        if (!_skillProviders.TryGetValue(name, out var provider)) return new JsonRpcError(-32602, $"Skill provider '{name}' is not registered.");
+        var skills = await provider.DiscoverAsync(cancellationToken);
+        return new TsRuntimeActionResult(skills);
+    }
+
+    private Task<object?> InstallExtensionRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+        => _runtimeBinding is null
+            ? Task.FromResult<object?>(new JsonRpcError(-32000, "Extension runtime is not bound."))
+            : _runtimeBinding.InstallExtensionAsync(
+                GetString(payload, "reference") ?? string.Empty,
+                GetBool(payload, "local"),
+                GetBool(payload, "force"),
+                GetBool(payload, "offline"),
+                cancellationToken).ContinueWith(task => (object?)new TsRuntimeActionResult(task.Result), cancellationToken);
+
+    private Task<object?> UpdateExtensionRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+        => _runtimeBinding is null
+            ? Task.FromResult<object?>(new JsonRpcError(-32000, "Extension runtime is not bound."))
+            : _runtimeBinding.UpdateExtensionAsync(DeserializePayload<ExtensionPackageUpdateRequest>(payload), cancellationToken)
+                .ContinueWith(task => (object?)new TsRuntimeActionResult(task.Result), cancellationToken);
+
+    private Task<object?> RemoveExtensionRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+        => _runtimeBinding is null
+            ? Task.FromResult<object?>(new JsonRpcError(-32000, "Extension runtime is not bound."))
+            : _runtimeBinding.RemoveExtensionAsync(GetString(payload, "reference") ?? string.Empty, GetBool(payload, "local"), cancellationToken)
+                .ContinueWith(task => (object?)new TsRuntimeActionResult(task.Result), cancellationToken);
+
+    private Task<object?> ManagedSkillCreateRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+        => _runtimeBinding is null
+            ? Task.FromResult<object?>(new JsonRpcError(-32000, "Extension runtime is not bound."))
+            : _runtimeBinding.ManagedSkillCreateAsync(DeserializePayload<ManagedSkillCreateRequest>(payload), cancellationToken)
+                .ContinueWith(task => (object?)new TsRuntimeActionResult(task.Result), cancellationToken);
+
+    private Task<object?> ManagedSkillUpdateRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+        => _runtimeBinding is null
+            ? Task.FromResult<object?>(new JsonRpcError(-32000, "Extension runtime is not bound."))
+            : _runtimeBinding.ManagedSkillUpdateAsync(GetString(payload, "name") ?? string.Empty, DeserializePayload<ManagedSkillUpdateRequest>(payload), cancellationToken)
+                .ContinueWith(task => (object?)new TsRuntimeActionResult(task.Result), cancellationToken);
+
+    private Task<object?> ManagedSkillDeleteRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+        => _runtimeBinding is null
+            ? Task.FromResult<object?>(new JsonRpcError(-32000, "Extension runtime is not bound."))
+            : _runtimeBinding.ManagedSkillDeleteAsync(GetString(payload, "name") ?? string.Empty, cancellationToken)
+                .ContinueWith(task => (object?)new TsRuntimeActionResult(task.Result), cancellationToken);
+
+    private Task<object?> ManagedSkillPromoteRuntimeActionAsync(object payload, CancellationToken cancellationToken)
+        => _runtimeBinding is null
+            ? Task.FromResult<object?>(new JsonRpcError(-32000, "Extension runtime is not bound."))
+            : _runtimeBinding.ManagedSkillPromoteAsync(GetString(payload, "sourceReference") ?? GetString(payload, "reference") ?? string.Empty, cancellationToken)
+                .ContinueWith(task => (object?)new TsRuntimeActionResult(task.Result), cancellationToken);
+
+    private async Task<object?> RegisterSkillProviderRuntimeActionAsync(string extensionId, object payload, CancellationToken cancellationToken)
+    {
+        if (_runtimeBinding is null) return new JsonRpcError(-32000, "Extension runtime is not bound.");
+        var name = GetString(payload, "name") ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name)) return new JsonRpcError(-32602, "Skill provider name is required.");
+        var registration = new TsSkillProviderRegistration(extensionId, name, int.TryParse(GetString(payload, "priority"), out var priority) ? priority : 0);
+        var adapter = new TsSkillProviderAdapter(registration, this);
+        _skillProviders[name] = adapter;
+        await _runtimeBinding.RegisterSkillProviderAsync(adapter, cancellationToken);
+        return new { ok = true };
+    }
+
+    private static bool GetBool(object? payload, string property)
+    {
+        var value = GetPayloadValue(payload, property);
+        return value.ValueKind == JsonValueKind.True
+            || (value.ValueKind == JsonValueKind.String && string.Equals(value.GetString(), "true", StringComparison.OrdinalIgnoreCase));
     }
 
     private Task<object?> RegisterProviderAsync(object parameters, CancellationToken cancellationToken)
@@ -958,8 +1043,22 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
             TsBridgeRuntimeActions.SetActiveTools => await SetActiveToolsAsync(request.Payload, cancellationToken),
             TsBridgeRuntimeActions.SetModel => new TsRuntimeActionResult(await _runtimeBinding.SetModelAsync(DeserializePayload<PiSharp.Agent.Core.Models.ModelDescriptor>(request.Payload), cancellationToken)),
             TsBridgeRuntimeActions.SetThinkingLevel => await SetThinkingLevelAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.ModelRolesResolve => new TsRuntimeActionResult(await _runtimeBinding.ResolveModelRoleAsync(GetString(request.Payload, "role") ?? string.Empty, cancellationToken)),
+            TsBridgeRuntimeActions.SetModelRole => new TsRuntimeActionResult(await _runtimeBinding.SetModelByRoleAsync(GetString(request.Payload, "role") ?? string.Empty, cancellationToken)),
             TsBridgeRuntimeActions.ReloadExtensions => await ReloadExtensionsAsync(cancellationToken),
             TsBridgeRuntimeActions.EmitEvent => await HandleEmitEventAsync(request, cancellationToken),
+            TsBridgeRuntimeActions.InstallExtension => await InstallExtensionRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.UpdateExtension => await UpdateExtensionRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.RemoveExtension => await RemoveExtensionRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.ListInstalledExtensions => new TsRuntimeActionResult(await _runtimeBinding.ListInstalledExtensionsAsync(cancellationToken)),
+            TsBridgeRuntimeActions.ManagedSkillCreate => await ManagedSkillCreateRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.ManagedSkillUpdate => await ManagedSkillUpdateRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.ManagedSkillDelete => await ManagedSkillDeleteRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.ManagedSkillList => new TsRuntimeActionResult(await _runtimeBinding.ManagedSkillListAsync(cancellationToken)),
+            TsBridgeRuntimeActions.ManagedSkillPromote => await ManagedSkillPromoteRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.RegisterSkillProvider => await RegisterSkillProviderRuntimeActionAsync(request.ExtensionId, request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.DiscoverSkillProvider => await DiscoverSkillProviderRuntimeActionAsync(request.Payload, cancellationToken),
+            TsBridgeRuntimeActions.GetSkillProviderPriorities => new TsRuntimeActionResult(await _runtimeBinding.GetSkillProviderPrioritiesAsync(cancellationToken)),
             TsBridgeRuntimeActions.CompleteSimple => await CompleteSimpleAsync(request.Payload, cancellationToken),
             TsBridgeRuntimeActions.PromptAndWait => await PromptAndWaitAsync(request.Payload, cancellationToken),
             TsBridgeRuntimeActions.CreateAgentSession => await CreateAgentSessionAsync(request.Payload, cancellationToken),
@@ -1258,13 +1357,13 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
 
     private async Task<TsRuntimeActionResult> NewSessionAsync(CancellationToken cancellationToken)
     {
-        var result = await _runtimeBinding!.NewSessionAsync(cancellationToken);
+        var result = await _runtimeBinding!.NewSessionAsync(null, cancellationToken);
         return new TsRuntimeActionResult(new { result.Cancelled, result.Reason, result.SessionId, result.SessionFile, session = await RuntimeSessionSnapshotAsync(cancellationToken) });
     }
 
     private async Task<TsRuntimeActionResult> ForkSessionAsync(object? payload, CancellationToken cancellationToken)
     {
-        var result = await _runtimeBinding!.ForkSessionAsync(GetString(payload, "entryId"), GetString(payload, "position"), cancellationToken);
+        var result = await _runtimeBinding!.ForkSessionAsync(GetString(payload, "entryId"), GetString(payload, "position"), null, cancellationToken);
         return new TsRuntimeActionResult(new { result.Cancelled, result.Reason, result.SessionId, result.SessionFile, session = await RuntimeSessionSnapshotAsync(cancellationToken) });
     }
 
@@ -1276,7 +1375,7 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
 
     private async Task<TsRuntimeActionResult> SwitchSessionAsync(object? payload, CancellationToken cancellationToken)
     {
-        var result = await _runtimeBinding!.SwitchSessionAsync(GetString(payload, "sessionPath") ?? GetString(payload, "path") ?? string.Empty, cancellationToken);
+        var result = await _runtimeBinding!.SwitchSessionAsync(GetString(payload, "sessionPath") ?? GetString(payload, "path") ?? string.Empty, null, cancellationToken);
         return new TsRuntimeActionResult(new { result.Cancelled, result.Reason, result.SessionId, result.SessionFile, session = await RuntimeSessionSnapshotAsync(cancellationToken) });
     }
 
@@ -1709,8 +1808,43 @@ public sealed class TsExtensionHost(TsBridgeOptions options, ExtensionRegistry r
         return new TsRuntimeActionResult();
     }
 
-    private static ExtensionSkillRegistration ToExtensionSkillRegistration(TsSkillRegistration registration)
-        => new(registration.Name, registration.Description, registration.Content, registration.FilePath, registration.DisableModelInvocation, ParseOverride(registration.Override));
+    private ExtensionSkillDefinition ToExtensionSkillDefinition(TsSkillRegistration registration)
+        => new(
+            registration.Name,
+            registration.Description,
+            registration.Content,
+            registration.FilePath,
+            registration.DisableModelInvocation,
+            ParseOverride(registration.Override),
+            registration.Globs,
+            registration.AlwaysApply,
+            registration.Hide,
+            registration.Source,
+            registration.SourcePriority,
+            registration.HasRunner ? CreateBridgeRunner(registration) : null);
+
+    private ExtensionSkillRunner CreateBridgeRunner(TsSkillRegistration registration)
+        => async (context, ct) =>
+        {
+            if (!_client.IsStarted) return new ExtensionSkillRunResult(null, new { error = "bridge_not_running" });
+            var result = await _client.RequestAsync("skill_run", new { extensionId = registration.ExtensionId, name = context.Name, body = context.Body, additionalInstructions = context.AdditionalInstructions, args = context.Args }, ct);
+            var error = GetString(result, "error");
+            if (error is not null) throw new InvalidOperationException(error);
+            return new ExtensionSkillRunResult(GetString(result, "content"));
+        };
+
+    private sealed class TsSkillProviderAdapter(TsSkillProviderRegistration registration, TsExtensionHost host) : ISkillProvider
+    {
+        public string Name => registration.Name;
+        public int Priority => registration.Priority;
+        public async Task<IReadOnlyList<ExtensionSkillDefinition>> DiscoverAsync(CancellationToken ct = default)
+        {
+            if (!host._client.IsStarted) return [];
+            var result = await host._client.RequestAsync("skill_provider_discover", new { providerName = registration.Name }, ct);
+            var skills = DeserializeObject<List<TsSkillRegistration>>(GetPayloadValue(result, "skills"));
+            return (skills ?? []).Select(host.ToExtensionSkillDefinition).ToArray();
+        }
+    }
 
     private static ExtensionOverridePolicy ParseOverride(string? value)
         => value switch

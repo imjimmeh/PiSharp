@@ -21,7 +21,10 @@ public sealed record AgentLoopConfig(
     Func<CancellationToken, Task<IReadOnlyList<AgentMessage>>>? GetFollowUpMessages = null,
     ToolExecutionMode ToolExecution = ToolExecutionMode.Parallel,
     AgentStreamOptions? StreamOptions = null,
-    ThinkingLevel ThinkingLevel = ThinkingLevel.Off);
+    ThinkingLevel ThinkingLevel = ThinkingLevel.Off,
+    Func<StreamDeltaContext, CancellationToken, Task<StreamDeltaDecision?>>? OnStreamDelta = null,
+    Func<IReadOnlyList<AgentMessage>, AgentContext, CancellationToken, Task<IReadOnlyList<AgentMessage>>>? PrepareStreamMessages = null,
+    int MaxStreamRetries = 3);
 
 public sealed record AgentLoopTurnUpdate(
     AgentContext? Context = null,

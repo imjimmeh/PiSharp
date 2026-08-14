@@ -27,6 +27,24 @@ public interface IExtensionUi
     Task PasteToEditorAsync(string extensionId, string text, CancellationToken cancellationToken = default) => SetEditorTextAsync(extensionId, text, cancellationToken);
     Task<string?> OpenEditorAsync(string title, string? prefill = null, CancellationToken cancellationToken = default) => InputAsync(title, prefill, cancellationToken);
     IDisposable AddAutocompleteProvider(string extensionId, Func<string, IReadOnlyList<string>> provider) => new DisposableAction(() => { });
+
+    // Theme (global; parity with JS pi ui.getAllThemes/getTheme/setTheme).
+    Task<IReadOnlyList<ExtensionThemeInfo>> GetAllThemesAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<ExtensionThemeInfo>>([]);
+    Task<ExtensionThemeInfo?> GetThemeAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<ExtensionThemeInfo?>(null);
+    Task SetThemeAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    // Tools-expanded (transcript tool-output expansion; parity with JS pi ui.getToolsExpanded/setToolsExpanded).
+    Task<bool> GetToolsExpandedAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(false);
+    Task SetToolsExpandedAsync(bool expanded, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    // Editor component (parity with JS pi ui.setEditorComponent/getEditorComponent).
+    // null removes the component and restores the default prompt editor.
+    Task SetEditorComponentAsync(string extensionId, ExtensionWidgetState? component, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    Task<ExtensionWidgetState?> GetEditorComponentAsync(string extensionId, CancellationToken cancellationToken = default)
+        => Task.FromResult<ExtensionWidgetState?>(null);
 }
 
 public enum ExtensionUiSeverity { Info, Success, Warning, Error }
@@ -48,6 +66,13 @@ public sealed class NoExtensionUi : IExtensionUi
     public Task<string?> SelectAsync(string prompt, IReadOnlyList<string> options, CancellationToken cancellationToken = default) => Unsupported<string?>();
     public Task SetStatusAsync(string extensionId, string? status, CancellationToken cancellationToken = default) => Unsupported();
     public Task SetWidgetAsync(string extensionId, ExtensionWidgetState? widget, CancellationToken cancellationToken = default) => Unsupported();
+    public Task<IReadOnlyList<ExtensionThemeInfo>> GetAllThemesAsync(CancellationToken cancellationToken = default) => Unsupported<IReadOnlyList<ExtensionThemeInfo>>();
+    public Task<ExtensionThemeInfo?> GetThemeAsync(CancellationToken cancellationToken = default) => Unsupported<ExtensionThemeInfo?>();
+    public Task SetThemeAsync(string name, CancellationToken cancellationToken = default) => Unsupported();
+    public Task<bool> GetToolsExpandedAsync(CancellationToken cancellationToken = default) => Unsupported<bool>();
+    public Task SetToolsExpandedAsync(bool expanded, CancellationToken cancellationToken = default) => Unsupported();
+    public Task SetEditorComponentAsync(string extensionId, ExtensionWidgetState? component, CancellationToken cancellationToken = default) => Unsupported();
+    public Task<ExtensionWidgetState?> GetEditorComponentAsync(string extensionId, CancellationToken cancellationToken = default) => Unsupported<ExtensionWidgetState?>();
 
     private static Task Unsupported() => Task.FromException(new NotSupportedException("Extension UI is not available in this mode."));
     private static Task<T> Unsupported<T>() => Task.FromException<T>(new NotSupportedException("Extension UI is not available in this mode."));

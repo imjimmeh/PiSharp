@@ -106,6 +106,9 @@ internal sealed class TuiRenderCoordinator : IDisposable
         var selectionSession = _getSelectionSession();
 
         var suggestionsVisible = prompt.Suggestions.Count > 0;
+
+        var editorComponent = state.BridgeSlots.LastOrDefault(slot => slot.Placement == "editor" && slot.Visible);
+        _shell.SetEditorComponentSlot(editorComponent);
         _shell.PromptTitle.Text = selectionSession is null ? "─ Message" : $"─ {selectionSession.Title}";
 
         _shell.Header.Render(state, _getHeaderExpanded(), _extensionLoadStatus);
@@ -169,8 +172,20 @@ internal sealed class TuiRenderCoordinator : IDisposable
         _shell.ChatScrollBar.VisibleContentSize = _shell.Chat.VisibleRowCount;
         _shell.ChatScrollBar.Position = _shell.Chat.ScrollTop;
         EnsureWorkingAnimation();
-        if (Application.Top == _shell.Window && !prompt.HasFocus && IsInputCaptured?.Invoke() != true) prompt.FocusAtEnd();
+        if (editorComponent is not null)
+        {
+            if (Application.Top == _shell.Window && !_shell.EditorComponent.HasFocus && IsInputCaptured?.Invoke() != true)
+            {
+                _shell.EditorComponent.SetFocus();
+                _shell.EditorComponent.MoveEnd();
+            }
+        }
+        else if (Application.Top == _shell.Window && !prompt.HasFocus && IsInputCaptured?.Invoke() != true)
+        {
+            prompt.FocusAtEnd();
+        }
     }
+
 
     private async Task RefreshModifiedFilesAsync(CancellationToken cancellationToken)
     {

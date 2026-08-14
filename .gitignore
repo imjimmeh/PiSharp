@@ -209,9 +209,9 @@ PublishScripts/
 **/[Pp]ackages/*
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
-# except PiSharp.Cli.Packages/ source directory
-!src/PiSharp.Cli/Packages/
-!src/PiSharp.Cli/Packages/*
+# except PiSharp.Packages/ source directory
+!src/PiSharp.Packages/
+!src/PiSharp.Packages/*
 # except PiSharp.Cli.Tests/Packages/ test directory
 !tests/PiSharp.Cli.Tests/Packages/
 !tests/PiSharp.Cli.Tests/Packages/*

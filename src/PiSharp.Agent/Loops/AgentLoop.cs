@@ -222,9 +222,6 @@ public static class AgentLoop
         Func<AgentEvent, CancellationToken, Task> emitAsync,
         CancellationToken cancellationToken)
     {
-        AssistantMessage? partialMessage = null;
-        var addedPartial = false;
-
         try
         {
             var messages = context.Messages;
@@ -243,35 +240,107 @@ public static class AgentLoop
             }
             options = options with { ApiKey = apiKey, Reasoning = config.ThinkingLevel == Abstractions.Options.ThinkingLevel.Off ? null : config.ThinkingLevel.ToString().ToLowerInvariant() };
 
-            await foreach (var streamEvent in config.StreamAsync(config.Model, context with { Messages = messages }, options, cancellationToken).WithCancellation(cancellationToken))
+            var retriesUsed = 0;
+            var maxRetries = Math.Max(0, config.MaxStreamRetries);
+            var retryReason = string.Empty;
+
+            async Task<AssistantMessage> FinalizeAttemptAsync(AssistantMessage message, bool wasAdded, bool succeeded, string? finalError = null)
             {
-                switch (streamEvent)
+                // A retried attempt closes the retry: Done → success, Error → failure.
+                if (retriesUsed > 0) await emitAsync(new AgentEvent.AutoRetryEnd(succeeded, retriesUsed, finalError), cancellationToken);
+                return await FinalizeAssistantAsync(context, message, wasAdded, emitAsync, cancellationToken);
+            }
+            while (true)
+            {
+                var retryRequested = false;
+
+                string? retryReminder = null;
+                AssistantMessage? partialMessage = null;
+                var addedPartial = false;
+
+                var requestMessages = messages;
+                if (config.PrepareStreamMessages is not null)
+                    requestMessages = await config.PrepareStreamMessages(messages, context, cancellationToken);
+
+                using var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var attemptToken = attemptCts.Token;
+
+                var enumerator = config.StreamAsync(config.Model, context with { Messages = requestMessages }, options, attemptToken)
+                    .WithCancellation(attemptToken)
+                    .GetAsyncEnumerator();
+                await using (enumerator)
                 {
-                    case AssistantMessageEvent.Start start:
-                        partialMessage = start.Partial;
-                        Append(context, partialMessage);
-                        addedPartial = true;
-                        await emitAsync(new AgentEvent.MessageStart(partialMessage), cancellationToken);
-                        break;
-                    case AssistantMessageEvent.Done done:
-                        return await FinalizeAssistantAsync(context, done.Message, addedPartial, emitAsync, cancellationToken);
-                    case AssistantMessageEvent.Error error:
-                        return await FinalizeAssistantAsync(context, NormalizeErrorMessage(config.Model, error.ErrorMessage), addedPartial, emitAsync, cancellationToken);
-                    default:
-                        partialMessage = ApplyAssistantEvent(partialMessage, streamEvent);
-                        if (addedPartial) ReplaceLast(context, partialMessage);
-                        else
+                    while (await enumerator.MoveNextAsync())
+                    {
+                        var streamEvent = enumerator.Current;
+                        switch (streamEvent)
                         {
-                            Append(context, partialMessage);
-                            addedPartial = true;
-                            await emitAsync(new AgentEvent.MessageStart(partialMessage), cancellationToken);
+                            case AssistantMessageEvent.Start start:
+                                partialMessage = start.Partial;
+                                Append(context, partialMessage);
+                                addedPartial = true;
+                                await emitAsync(new AgentEvent.MessageStart(partialMessage), cancellationToken);
+                                break;
+                            case AssistantMessageEvent.Done done:
+                                return await FinalizeAttemptAsync(done.Message, addedPartial, succeeded: true);
+                            case AssistantMessageEvent.Error error:
+                                var errorMessage = NormalizeErrorMessage(config.Model, error.ErrorMessage);
+                                return await FinalizeAttemptAsync(errorMessage, addedPartial, succeeded: false, errorMessage.ErrorMessage);
+                            default:
+                                var beforeDelta = partialMessage ?? streamEvent.Partial;
+                                partialMessage = ApplyAssistantEvent(partialMessage, streamEvent);
+                                if (addedPartial) ReplaceLast(context, partialMessage);
+                                else
+                                {
+                                    Append(context, partialMessage);
+                                    addedPartial = true;
+                                    await emitAsync(new AgentEvent.MessageStart(partialMessage), cancellationToken);
+                                }
+                                await emitAsync(new AgentEvent.MessageUpdate(partialMessage, streamEvent), cancellationToken);
+
+                                if (config.OnStreamDelta is null) break;
+                                var decision = await config.OnStreamDelta(new StreamDeltaContext(streamEvent, beforeDelta, context), attemptToken);
+                                if (decision is null || decision.Action == StreamDeltaAction.Continue) break;
+                                attemptCts.Cancel();
+                                if (decision.Action == StreamDeltaAction.Abort)
+                                {
+                                    // The error message REPLACES the aborted partial (ReplaceLast); the partial
+                                    // never receives its own MessageEnd, so it is never persisted.
+                                    var abortText = string.IsNullOrWhiteSpace(decision.Reason) ? "Stream aborted by an interceptor." : $"Stream aborted: {decision.Reason}";
+                                    return await FinalizeAssistantAsync(context,
+                                        new AssistantMessage([new TextContent(abortText)], Api: config.Model.Api, Provider: config.Model.Provider, Model: config.Model.Id, StopReason: "error", ErrorMessage: decision.Reason ?? "Stream aborted by an interceptor."),
+                                        addedPartial, emitAsync, cancellationToken);
+                                }
+                                DiscardPartial(context, partialMessage, addedPartial);
+                                retryReason = string.IsNullOrWhiteSpace(decision.Reason) ? "Stream retry requested by an interceptor." : decision.Reason;
+                                retryReminder = decision.SystemReminder;
+                                retryRequested = true;
+                                break;
                         }
-                        await emitAsync(new AgentEvent.MessageUpdate(partialMessage, streamEvent), cancellationToken);
-                        break;
+                        if (retryRequested) break;
+                    }
+                }
+
+                if (!retryRequested)
+                {
+                    return await FinalizeAttemptAsync(partialMessage ?? new AssistantMessage([], Api: config.Model.Api, Provider: config.Model.Provider, Model: config.Model.Id), addedPartial, succeeded: true);
+                }
+
+                if (retriesUsed >= maxRetries)
+                {
+                    var finalError = $"Max stream retries exceeded for {retryReason}";
+                    await emitAsync(new AgentEvent.AutoRetryEnd(false, retriesUsed, finalError), cancellationToken);
+                    return await FinalizeAssistantAsync(context,
+                        new AssistantMessage([new TextContent($"Stream aborted after {retriesUsed + 1} attempts: {finalError}")], Api: config.Model.Api, Provider: config.Model.Provider, Model: config.Model.Id, StopReason: "error", ErrorMessage: finalError),
+                        addedPartial: false, emitAsync, cancellationToken);
+                }
+                retriesUsed++;
+                await emitAsync(new AgentEvent.AutoRetryStart(retriesUsed, config.MaxStreamRetries, 0, retryReason), cancellationToken);
+                if (retryReminder is not null)
+                {
+                    messages = [.. messages, AgentMessages.User(retryReminder)];
                 }
             }
-
-            return await FinalizeAssistantAsync(context, partialMessage ?? new AssistantMessage([], Api: config.Model.Api, Provider: config.Model.Provider, Model: config.Model.Id), addedPartial, emitAsync, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -280,7 +349,7 @@ public static class AgentLoop
         catch (Exception exception)
         {
             _logger.LogWarning(exception, "Agent loop failed");
-            return await FinalizeAssistantAsync(context, ProviderErrorMessage(config.Model, exception), addedPartial, emitAsync, cancellationToken);
+            return await FinalizeAssistantAsync(context, ProviderErrorMessage(config.Model, exception), addedPartial: false, emitAsync, cancellationToken);
         }
     }
 
@@ -442,5 +511,12 @@ public static class AgentLoop
     {
         if (context.Messages is List<AgentMessage> list && list.Count > 0) list[^1] = message;
         else throw new InvalidOperationException("AgentLoop requires a mutable context message list.");
+    }
+
+    private static void DiscardPartial(AgentContext context, AssistantMessage partialMessage, bool addedPartial)
+    {
+        if (!addedPartial || partialMessage is null) return;
+        if (context.Messages is List<AgentMessage> list && list.Count > 0 && ReferenceEquals(list[^1], partialMessage))
+            list.RemoveAt(list.Count - 1);
     }
 }

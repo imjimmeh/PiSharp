@@ -16,6 +16,7 @@ internal sealed class TuiInputCoordinator(
     Action<string> reportShortcutError,
     CancellationToken cancellationToken,
     Func<bool>? isInputCaptured = null,
+    Func<bool>? isEditorComponentActive = null,
     ILoggerFactory? loggerFactory = null) : IDisposable
 {
     private bool _disposed;
@@ -49,6 +50,11 @@ internal sealed class TuiInputCoordinator(
     internal bool TryHandleHostInput(Key key)
     {
         if (key.Handled || Application.Top != window) return false;
+
+        // While an editor-placement slot replaces the prompt, its focused TextView handles
+        // navigational and printable keys natively; global shortcuts still dispatch afterwards
+        // in the router. Skip all host-input policy so keys reach the editor.
+        if (isEditorComponentActive?.Invoke() == true) return false;
 
         if (key.KeyCode == KeyCode.PageUp)
         {

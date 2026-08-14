@@ -6,6 +6,7 @@ using PiSharp.Agent.Harness;
 using PiSharp.Agent.Resources.Theme;
 using PiSharp.Extensions;
 using PiSharp.Tui.Interactive.Components;
+using PiSharp.Tui.Interactive.Keybindings;
 using Terminal.Gui;
 
 namespace PiSharp.Tui.Interactive;
@@ -51,6 +52,8 @@ public sealed record TuiHostOptions(
     IReadOnlyList<string>? StartupMessages = null,
     Func<Func<string, Task>, CancellationToken, Task>? PostStartupChecksAsync = null,
     TuiThemeDocument? Theme = null,
+    string? KeybindingsPath = null,
+    IReadOnlyList<TuiKeybinding>? KeybindingsDefaults = null,
     Func<IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>>>? GetExtensionShortcuts = null,
     Func<ExtensionRegistry?>? GetExtensionRegistry = null,
     Func<string, IAgentTool?>? ResolveTool = null,

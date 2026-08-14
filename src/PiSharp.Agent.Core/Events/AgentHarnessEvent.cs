@@ -42,6 +42,8 @@ public sealed class AgentSessionEvent
             AgentEvent.ToolExecutionStart e => new AgentSessionEvent("tool_execution_start", new { toolCallId = e.ToolCallId, toolName = e.ToolName, arguments = e.Arguments }),
             AgentEvent.ToolExecutionUpdate e => new AgentSessionEvent("tool_execution_update", new { toolCallId = e.ToolCallId, toolName = e.ToolName, arguments = e.Arguments, partialResult = e.PartialResult }),
             AgentEvent.ToolExecutionEnd e => new AgentSessionEvent("tool_execution_end", new { toolCallId = e.ToolCallId, toolName = e.ToolName, result = e.Result, isError = e.IsError }),
+            AgentEvent.AutoRetryStart e => new AgentSessionEvent("auto_retry_start", new { attempt = e.Attempt, maxAttempts = e.MaxAttempts, delayMs = e.DelayMs, errorMessage = e.ErrorMessage }),
+            AgentEvent.AutoRetryEnd e => new AgentSessionEvent("auto_retry_end", new { success = e.Success, attempt = e.Attempt, finalError = e.FinalError }),
             _ => throw new NotSupportedException($"Unknown core event: {coreEvent.GetType().Name}")
         };
 
@@ -78,8 +80,40 @@ public sealed class AgentSessionEvent
             AgentHarnessOwnEvent.SessionBeforeTree e => new AgentSessionEvent("session_before_tree", new { preparation = e.Preparation }),
             AgentHarnessOwnEvent.SessionTree e => new AgentSessionEvent("session_tree", new { newLeafId = e.NewLeafId, oldLeafId = e.OldLeafId, summaryEntry = e.SummaryEntry, fromHook = e.FromHook }),
             AgentHarnessOwnEvent.ResourcesUpdate e => new AgentSessionEvent("resources_update", new { resources = e.Resources, previousResources = e.PreviousResources }),
+            AgentHarnessOwnEvent.CustomEvent e => new AgentSessionEvent(e.Name, e.Payload),
             _ => throw new NotSupportedException($"Unknown own event: {ownEvent.GetType().Name}")
         };
+
+    private static readonly System.Text.RegularExpressions.Regex CustomEventNamePattern = new(
+        "^[a-z0-9_]{1,64}$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static readonly HashSet<string> ReservedEventNames = new(StringComparer.Ordinal)
+    {
+        "session_start", "input", "session_before_switch", "session_before_fork", "session_shutdown",
+        "queue_update", "compaction_start", "compaction_end", "auto_retry_start", "auto_retry_end",
+        "session_info_changed", "thinking_level_changed", "model_select", "thinking_level_select",
+        "before_agent_start", "before_prompt_render", "session_before_compact", "session_compact",
+        "before_provider_request", "before_provider_payload", "after_provider_response", "tool_call",
+        "tool_result", "save_point", "settled", "abort", "context", "session_before_tree",
+        "session_tree", "resources_update", "advisor_note"
+    };
+
+    /// <summary>
+    /// Validates a <see cref="AgentHarnessOwnEvent.CustomEvent"/> name at publish time:
+    /// snake_case <c>[a-z0-9_]{1,64}</c> and no collision with a core session event name.
+    /// Throws <see cref="ArgumentException"/> when invalid.
+    /// </summary>
+    public static void ValidateCustomEventName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || !CustomEventNamePattern.IsMatch(name))
+            throw new ArgumentException($"Custom event name '{name}' is invalid: must match [a-z0-9_]{{1,64}}.", nameof(name));
+        if (ReservedEventNames.Contains(name))
+            throw new ArgumentException($"Custom event name '{name}' collides with a core session event name.", nameof(name));
+    }
+
+    public static AgentSessionEvent FromAdvisor(ExtensionAdvisorEvent e)
+        => new AgentSessionEvent("advisor_note", new { sessionId = e.SessionId, turnId = e.TurnId, kind = e.Note.Kind, text = e.Note.Text, toolName = e.Note.ToolName, model = e.Note.Model });
 
     private static string ToJsonValue(ThinkingLevel level) => level.ToString().ToLowerInvariant();
 }
@@ -238,4 +272,31 @@ public abstract record AgentHarnessOwnEvent
     public sealed record ResourcesUpdate(
         object Resources,
         object PreviousResources) : AgentHarnessOwnEvent;
+
+    public sealed record RuntimeEvent(
+        string Name,
+        object? Payload) : AgentHarnessOwnEvent;
+
+    public sealed record SkillExecutionStart(
+        string Name,
+        string? AdditionalInstructions,
+        IReadOnlyList<string> Args) : AgentHarnessOwnEvent;
+
+    public sealed record SkillExecutionEnd(
+        string Name,
+        string? AdditionalInstructions,
+        IReadOnlyList<string> Args,
+        object? Result,
+        bool IsError,
+        string? ErrorMessage = null) : AgentHarnessOwnEvent;
+
+    /// <summary>
+    /// Extension-originated session event pushed to harness subscribers and the
+    /// daemon wire via <c>PublishOwnEventAsync</c>. The name is validated at
+    /// publish time (snake_case <c>[a-z0-9_]{1,64}</c>, no core-event collision)
+    /// and the payload must be JSON-serializable.
+    /// </summary>
+    public sealed record CustomEvent(
+        string Name,
+        object? Payload) : AgentHarnessOwnEvent;
 }

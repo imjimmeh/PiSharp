@@ -96,6 +96,7 @@ public sealed record TuiRenderState(
     public TuiRenderState TriggerSystemMessageEvent(string eventTag, DateTimeOffset now)
         => TuiTranscriptReducer.TriggerSystemMessageEvent(this, eventTag, now);
     public TuiRenderState ToggleThinking() => this with { ShowThinking = !ShowThinking };
+    public TuiRenderState SetToolOutput(bool visible) => this with { ShowToolOutput = visible };
     public TuiRenderState ToggleToolOutput() => this with { ShowToolOutput = !ShowToolOutput };
 
     public TuiRenderState ToggleToolExpanded(string toolCallId)
@@ -144,6 +145,24 @@ public sealed record TuiRenderState(
             BridgeSlots = BridgeSlots.Where(slot => !StringComparer.Ordinal.Equals(slot.SourceId, sourceId)).ToArray(),
             ExtensionStatuses = Statuses.Where(pair => !StringComparer.Ordinal.Equals(pair.Key, sourceId)).ToDictionary(pair => pair.Key, pair => pair.Value)
         };
+
+    /// <summary>
+    /// Upserts or removes the <c>editor:{extensionId}</c> bridge slot that replaces the default
+    /// prompt editor while present (see <c>TuiShellView</c>). A <c>null</c> component restores the
+    /// built-in prompt editor.
+    /// </summary>
+    public TuiRenderState SetEditorComponent(string extensionId, ExtensionWidgetState? component)
+    {
+        if (component is null) return RemoveBridgeSlot($"editor:{extensionId}");
+
+        return UpsertBridgeSlot(new TuiBridgeSlot(
+            $"editor:{extensionId}",
+            component.Kind,
+            component.Title ?? extensionId,
+            component.Content,
+            Placement: "editor",
+            SourceId: extensionId));
+    }
 
     public TuiRenderState AddCustomMenuEntry(TuiMenuEntry entry)
         => this with { CustomMenuEntries = CustomMenus.Append(entry).ToArray() };

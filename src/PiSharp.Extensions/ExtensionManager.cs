@@ -1,6 +1,8 @@
+using PiSharp.Abstractions.Environment;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Agent.Core.Prompting;
+using PiSharp.Agent.Core.Tools;
 using PiSharp.Ai;
 using PiSharp.Ai.Models;
 using PiSharp.Ai.Providers;
@@ -88,11 +90,19 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
         public IExtensionSessionApi Session { get; } = binding.Session;
         public IExtensionToolApi Tools { get; } = new ToolApi(descriptor, registry, binding);
         public IExtensionSkillApi Skills { get; } = new SkillApi(descriptor, registry, binding);
+        public IExtensionPackageApi Packages => binding.Packages;
         public IExtensionModelApi Model { get; } = binding.Model;
         public IExtensionSettingsApi Settings { get; } = new ExtensionScopedSettings(descriptor, binding.RuntimeSettings);
         public IExtensionStateApi State { get; } = new ExtensionScopedState(descriptor, binding.RuntimeState);
         public IExtensionEventBus Events { get; } = new ExtensionEventBus(registry, descriptor.EffectiveSourceId, binding.EmitEventAsync);
         public IExtensionPromptApi Prompt { get; } = new PromptApi(descriptor, registry);
+        public IExtensionCompletionApi Completion { get; } = new CompletionApi(binding);
+        public IExtensionFileApi Files { get; } = new FileApi(binding);
+        public IExtensionSearchApi Search { get; } = new SearchApi(binding);
+        public IExtensionUrlApi Urls { get; } = new UrlApi(binding);
+        public IExtensionRuleApi Rules { get; } = new RuleApi(descriptor, registry, binding);
+        public IExecutionEnv? ExecutionEnv => binding.ExecutionEnv;
+        public IExtensionTelemetryApi Telemetry => binding.Telemetry;
 
         public IDisposable On(string eventName, ExtensionEventHandler handler)
             => registry.RegisterHandler(Descriptor.EffectiveSourceId, eventName, handler);
@@ -103,7 +113,7 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
         public IDisposable RegisterTool(ExtensionToolRegistration registration)
             => registry.RegisterTool(Descriptor.EffectiveSourceId, registration.ToAgentTool(), registration.Override);
 
-        public IDisposable RegisterSkill(ExtensionSkillRegistration registration)
+        public IDisposable RegisterSkill(ExtensionSkillDefinition registration)
             => registry.RegisterSkill(Descriptor.EffectiveSourceId, registration, registration.Override);
 
         public IDisposable RegisterCommand(ExtensionCommandRegistration registration) => registry.RegisterCommand(Descriptor.EffectiveSourceId, registration);
@@ -127,6 +137,81 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
         public IReadOnlyDictionary<string, object?> GetFlags() => binding.FlagValues;
         public Task SendMessageAsync(AgentMessage message, ExtensionMessageDelivery delivery, bool triggerTurn = false, CancellationToken cancellationToken = default)
             => binding.SendMessageAsync(message, delivery, triggerTurn, cancellationToken);
+        public Task<IReadOnlyList<ExtensionCommandInfo>> GetCommandsAsync(CancellationToken cancellationToken = default)
+            => binding.GetCommandsAsync(cancellationToken);
+        public Task EmitClientEventAsync(string eventName, object? payload, CancellationToken cancellationToken = default)
+            => binding.EmitClientEventAsync(eventName, payload, cancellationToken);
+    }
+
+    private sealed class CompletionApi(ExtensionRuntimeBinding binding) : IExtensionCompletionApi
+    {
+        public Task<ExtensionCompletionResult> CompleteSimpleAsync(
+            string provider, string modelId, string prompt,
+            ExtensionCompleteRequest? options = null,
+            CancellationToken cancellationToken = default)
+            => binding.CompleteSimpleAsync(provider, modelId, prompt, options, cancellationToken);
+
+        public Task<ExtensionCompletionResult> CompleteAsync(
+            string provider, string modelId,
+            IReadOnlyList<AgentMessage>? messages, string? systemPrompt = null,
+            ExtensionCompleteRequest? options = null,
+            CancellationToken cancellationToken = default)
+            => binding.CompleteAsync(provider, modelId, messages, systemPrompt, options, false, cancellationToken);
+
+        public IAsyncEnumerable<ExtensionCompletionDelta> StreamAsync(
+            string provider, string modelId,
+            IReadOnlyList<AgentMessage>? messages, string? systemPrompt = null,
+            ExtensionCompleteRequest? options = null,
+            CancellationToken cancellationToken = default)
+            => binding.StreamAsync(provider, modelId, messages, systemPrompt, options, false, cancellationToken);
+    }
+
+    private sealed class UrlApi(ExtensionRuntimeBinding binding) : IExtensionUrlApi
+    {
+        public void RegisterResolver(IInternalUrlResolver resolver, bool overrideExisting = false)
+        {
+            if (binding.UrlRegistry is null) throw new NotSupportedException("This extension host does not provide an internal URL registry.");
+            binding.UrlRegistry.Register(resolver, overrideExisting);
+        }
+
+        public IReadOnlyList<string> Schemes => binding.UrlRegistry?.Schemes ?? [];
+    }
+
+    private sealed class FileApi(ExtensionRuntimeBinding binding) : IExtensionFileApi
+    {
+        public IDisposable RegisterContentExtractor(IFileContentExtractor extractor, bool overrideExisting = false)
+        {
+            if (binding.FileContentExtractors is null) throw new NotSupportedException("This extension host does not provide a file-content extractor registry.");
+            binding.FileContentExtractors.Register(extractor, overrideExisting);
+            return new DisposableAction(() => binding.FileContentExtractors.Unregister(extractor.Id));
+        }
+
+        public IReadOnlyList<IFileContentExtractor> ContentExtractors => binding.FileContentExtractors?.Extractors ?? [];
+    }
+
+    private sealed class SearchApi(ExtensionRuntimeBinding binding) : IExtensionSearchApi
+    {
+        public IDisposable RegisterProvider(ISearchProvider provider, bool overrideExisting = false)
+        {
+            if (binding.SearchProviders is null) throw new NotSupportedException("This extension host does not provide a search provider registry.");
+            binding.SearchProviders.Register(provider, overrideExisting);
+            return new DisposableAction(() => binding.SearchProviders.Unregister(provider.Id));
+        }
+
+        public IReadOnlyList<ISearchProvider> Providers => binding.SearchProviders?.Providers ?? [];
+        public ISearchProvider? GetProvider(string providerId) => binding.SearchProviders?.TryGet(providerId);
+    }
+
+    private sealed class RuleApi(ExtensionDescriptor descriptor, ExtensionRegistry registry, ExtensionRuntimeBinding binding) : IExtensionRuleApi
+    {
+        public IDisposable RegisterProvider(IRuleProvider provider)
+            => registry.RegisterRuleProvider(descriptor.EffectiveSourceId, provider);
+
+        public Task<IReadOnlyList<Rule>> GetAllRulesAsync(CancellationToken cancellationToken = default)
+            => binding.GetAllRulesAsync(cancellationToken);
+
+        public IReadOnlyList<string> GetProviderNames()
+            => binding.GetRuleProviderNamesAsync(CancellationToken.None).GetAwaiter().GetResult();
     }
 
     private sealed class ToolApi(ExtensionDescriptor descriptor, ExtensionRegistry registry, ExtensionRuntimeBinding binding) : IExtensionToolApi
@@ -134,15 +219,26 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
         public IDisposable RegisterTool(ExtensionToolRegistration registration) => registry.RegisterTool(descriptor.EffectiveSourceId, registration.ToAgentTool(), registration.Override);
         public Task<IReadOnlyList<string>> GetActiveToolsAsync(CancellationToken cancellationToken = default) => binding.GetActiveToolsAsync(cancellationToken);
         public Task<IReadOnlyList<string>> GetAllToolsAsync(CancellationToken cancellationToken = default) => binding.GetAllToolsAsync(cancellationToken);
-        public Task SetActiveToolsAsync(IReadOnlyList<string> toolNames, CancellationToken cancellationToken = default) => binding.SetActiveToolsAsync(toolNames, cancellationToken);
+        public Task SetActiveToolsAsync(IReadOnlyList<string>? toolNames, CancellationToken cancellationToken = default) => binding.SetActiveToolsAsync(toolNames, cancellationToken);
     }
 
     private sealed class SkillApi(ExtensionDescriptor descriptor, ExtensionRegistry registry, ExtensionRuntimeBinding binding) : IExtensionSkillApi
     {
-        public IDisposable RegisterSkill(ExtensionSkillRegistration registration) => registry.RegisterSkill(descriptor.EffectiveSourceId, registration, registration.Override);
-        public Task<IReadOnlyList<ExtensionSkillRegistration>> GetAllSkillsAsync(CancellationToken cancellationToken = default) => binding.GetAllSkillsAsync(cancellationToken);
+        public IDisposable RegisterSkill(ExtensionSkillDefinition registration) => registry.RegisterSkill(descriptor.EffectiveSourceId, registration, registration.Override);
+        public IDisposable RegisterSkillProvider(ISkillProvider provider) => registry.RegisterSkillProvider(descriptor.EffectiveSourceId, provider);
+        public Task<IReadOnlyList<ExtensionSkillDefinition>> GetAllSkillsAsync(CancellationToken cancellationToken = default) => binding.GetAllSkillsAsync(cancellationToken);
         public Task<IReadOnlyList<string>> GetSelectedSkillsAsync(CancellationToken cancellationToken = default) => binding.GetSelectedSkillsAsync(cancellationToken);
         public Task SetSelectedSkillsAsync(IReadOnlyList<string> skillNames, CancellationToken cancellationToken = default) => binding.SetSelectedSkillsAsync(skillNames, cancellationToken);
+        public IExtensionManagedSkillApi ManagedSkills { get; } = new BindingManagedSkillApiAccessor(binding);
+    }
+
+    private sealed class BindingManagedSkillApiAccessor(ExtensionRuntimeBinding binding) : IExtensionManagedSkillApi
+    {
+        public Task<ManagedSkillDescriptor> CreateAsync(ManagedSkillCreateRequest request, CancellationToken ct = default) => binding.ManagedSkillCreateAsync(request, ct);
+        public Task<ManagedSkillDescriptor> UpdateAsync(string name, ManagedSkillUpdateRequest request, CancellationToken ct = default) => binding.ManagedSkillUpdateAsync(name, request, ct);
+        public Task<bool> DeleteAsync(string name, CancellationToken ct = default) => binding.ManagedSkillDeleteAsync(name, ct);
+        public Task<IReadOnlyList<ManagedSkillDescriptor>> ListAsync(CancellationToken ct = default) => binding.ManagedSkillListAsync(ct);
+        public Task<ManagedSkillDescriptor> PromoteAsync(string sourceReference, CancellationToken ct = default) => binding.ManagedSkillPromoteAsync(sourceReference, ct);
     }
 
     private sealed class PromptApi(ExtensionDescriptor descriptor, ExtensionRegistry registry) : IExtensionPromptApi

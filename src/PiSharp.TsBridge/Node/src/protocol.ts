@@ -56,7 +56,21 @@ export interface BridgeProtocol {
 		setActiveTools: string;
 		setModel: string;
 		setThinkingLevel: string;
+		modelRolesResolve: string;
+		setModelRole: string;
 		reloadExtensions: string;
+		installExtension: string;
+		updateExtension: string;
+		removeExtension: string;
+		listInstalledExtensions: string;
+		managedSkillCreate: string;
+		managedSkillUpdate: string;
+		managedSkillDelete: string;
+		managedSkillList: string;
+		managedSkillPromote: string;
+		registerSkillProvider: string;
+		discoverSkillProvider: string;
+		getSkillProviderPriorities: string;
 			emitEvent: string;
 			listResources: string;
 			readResource: string;
@@ -134,9 +148,23 @@ const fallbackRuntimeActions = {
 	GetSessionName: "get_session_name",
 	SetSessionName: "set_session_name",
 	SetActiveTools: "set_active_tools",
+	ModelRolesResolve: "model_roles_resolve",
+	SetModelRole: "set_model_role",
 	SetModel: "set_model",
 	SetThinkingLevel: "set_thinking_level",
 	ReloadExtensions: "reload_extensions",
+	InstallExtension: "install_extension",
+	UpdateExtension: "update_extension",
+	RemoveExtension: "remove_extension",
+	ListInstalledExtensions: "list_installed_extensions",
+	ManagedSkillCreate: "managed_skill_create",
+	ManagedSkillUpdate: "managed_skill_update",
+	ManagedSkillDelete: "managed_skill_delete",
+	ManagedSkillList: "managed_skill_list",
+	ManagedSkillPromote: "managed_skill_promote",
+	RegisterSkillProvider: "register_skill_provider",
+	DiscoverSkillProvider: "discover_skill_provider",
+	GetSkillProviderPriorities: "get_skill_provider_priorities",
 	EmitEvent: "emit_event",
 	ListResources: "list_resources",
 	ReadResource: "read_resource",
@@ -216,9 +244,23 @@ export function createBridgeProtocol(manifest?: BridgeManifest | null): BridgePr
 			getSessionName: required(runtimeActions, "GetSessionName"),
 			setSessionName: required(runtimeActions, "SetSessionName"),
 			setActiveTools: required(runtimeActions, "SetActiveTools"),
+			modelRolesResolve: required(runtimeActions, "ModelRolesResolve"),
+			setModelRole: required(runtimeActions, "SetModelRole"),
 			setModel: required(runtimeActions, "SetModel"),
 			setThinkingLevel: required(runtimeActions, "SetThinkingLevel"),
 			reloadExtensions: required(runtimeActions, "ReloadExtensions"),
+			installExtension: required(runtimeActions, "InstallExtension"),
+			updateExtension: required(runtimeActions, "UpdateExtension"),
+			removeExtension: required(runtimeActions, "RemoveExtension"),
+			listInstalledExtensions: required(runtimeActions, "ListInstalledExtensions"),
+			managedSkillCreate: required(runtimeActions, "ManagedSkillCreate"),
+			managedSkillUpdate: required(runtimeActions, "ManagedSkillUpdate"),
+			managedSkillDelete: required(runtimeActions, "ManagedSkillDelete"),
+			managedSkillList: required(runtimeActions, "ManagedSkillList"),
+			managedSkillPromote: required(runtimeActions, "ManagedSkillPromote"),
+			registerSkillProvider: required(runtimeActions, "RegisterSkillProvider"),
+			discoverSkillProvider: required(runtimeActions, "DiscoverSkillProvider"),
+			getSkillProviderPriorities: required(runtimeActions, "GetSkillProviderPriorities"),
 				emitEvent: required(runtimeActions, "EmitEvent"),
 				listResources: required(runtimeActions, "ListResources"),
 				readResource: required(runtimeActions, "ReadResource"),

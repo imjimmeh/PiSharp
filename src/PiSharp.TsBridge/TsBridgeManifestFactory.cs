@@ -7,6 +7,7 @@ public static class TsBridgeMethods
 {
     public const string RegisterTool = "register_tool";
     public const string RegisterSkill = "register_skill";
+    public const string RegisterSkillProvider = "register_skill_provider";
     public const string RegisterProvider = "register_provider";
     public const string UnregisterProvider = "unregister_provider";
     public const string RegisterCommand = "register_command";
@@ -54,8 +55,22 @@ public static class TsBridgeRuntimeActions
     public const string SetActiveTools = "set_active_tools";
     public const string SetModel = "set_model";
     public const string SetThinkingLevel = "set_thinking_level";
+    public const string ModelRolesResolve = "model_roles_resolve";
+    public const string SetModelRole = "set_model_role";
     public const string ReloadExtensions = "reload_extensions";
     public const string EmitEvent = "emit_event";
+    public const string InstallExtension = "install_extension";
+    public const string UpdateExtension = "update_extension";
+    public const string RemoveExtension = "remove_extension";
+    public const string ListInstalledExtensions = "list_installed_extensions";
+    public const string ManagedSkillCreate = "managed_skill_create";
+    public const string ManagedSkillUpdate = "managed_skill_update";
+    public const string ManagedSkillDelete = "managed_skill_delete";
+    public const string ManagedSkillList = "managed_skill_list";
+    public const string ManagedSkillPromote = "managed_skill_promote";
+    public const string RegisterSkillProvider = "register_skill_provider";
+    public const string DiscoverSkillProvider = "discover_skill_provider";
+    public const string GetSkillProviderPriorities = "get_skill_provider_priorities";
     public const string ListResources = "list_resources";
     public const string ReadResource = "read_resource";
     public const string CompleteSimple = "complete_simple";
@@ -157,6 +172,7 @@ public static class TsBridgeManifestFactory
             {
                 [nameof(TsBridgeMethods.RegisterTool)] = TsBridgeMethods.RegisterTool,
                 [nameof(TsBridgeMethods.RegisterSkill)] = TsBridgeMethods.RegisterSkill,
+                [nameof(TsBridgeMethods.RegisterSkillProvider)] = TsBridgeMethods.RegisterSkillProvider,
                 [nameof(TsBridgeMethods.RegisterProvider)] = TsBridgeMethods.RegisterProvider,
                 [nameof(TsBridgeMethods.UnregisterProvider)] = TsBridgeMethods.UnregisterProvider,
                 [nameof(TsBridgeMethods.RegisterCommand)] = TsBridgeMethods.RegisterCommand,
@@ -203,8 +219,22 @@ public static class TsBridgeManifestFactory
                 [nameof(TsBridgeRuntimeActions.SetActiveTools)] = TsBridgeRuntimeActions.SetActiveTools,
                 [nameof(TsBridgeRuntimeActions.SetModel)] = TsBridgeRuntimeActions.SetModel,
                 [nameof(TsBridgeRuntimeActions.SetThinkingLevel)] = TsBridgeRuntimeActions.SetThinkingLevel,
+                [nameof(TsBridgeRuntimeActions.ModelRolesResolve)] = TsBridgeRuntimeActions.ModelRolesResolve,
+                [nameof(TsBridgeRuntimeActions.SetModelRole)] = TsBridgeRuntimeActions.SetModelRole,
                 [nameof(TsBridgeRuntimeActions.ReloadExtensions)] = TsBridgeRuntimeActions.ReloadExtensions,
                 [nameof(TsBridgeRuntimeActions.EmitEvent)] = TsBridgeRuntimeActions.EmitEvent,
+                [nameof(TsBridgeRuntimeActions.InstallExtension)] = TsBridgeRuntimeActions.InstallExtension,
+                [nameof(TsBridgeRuntimeActions.UpdateExtension)] = TsBridgeRuntimeActions.UpdateExtension,
+                [nameof(TsBridgeRuntimeActions.RemoveExtension)] = TsBridgeRuntimeActions.RemoveExtension,
+                [nameof(TsBridgeRuntimeActions.ListInstalledExtensions)] = TsBridgeRuntimeActions.ListInstalledExtensions,
+                [nameof(TsBridgeRuntimeActions.ManagedSkillCreate)] = TsBridgeRuntimeActions.ManagedSkillCreate,
+                [nameof(TsBridgeRuntimeActions.ManagedSkillUpdate)] = TsBridgeRuntimeActions.ManagedSkillUpdate,
+                [nameof(TsBridgeRuntimeActions.ManagedSkillDelete)] = TsBridgeRuntimeActions.ManagedSkillDelete,
+                [nameof(TsBridgeRuntimeActions.ManagedSkillList)] = TsBridgeRuntimeActions.ManagedSkillList,
+                [nameof(TsBridgeRuntimeActions.ManagedSkillPromote)] = TsBridgeRuntimeActions.ManagedSkillPromote,
+                [nameof(TsBridgeRuntimeActions.RegisterSkillProvider)] = TsBridgeRuntimeActions.RegisterSkillProvider,
+                [nameof(TsBridgeRuntimeActions.DiscoverSkillProvider)] = TsBridgeRuntimeActions.DiscoverSkillProvider,
+                [nameof(TsBridgeRuntimeActions.GetSkillProviderPriorities)] = TsBridgeRuntimeActions.GetSkillProviderPriorities,
                 [nameof(TsBridgeRuntimeActions.SettingsGet)] = TsBridgeRuntimeActions.SettingsGet,
                 [nameof(TsBridgeRuntimeActions.SettingsGetCore)] = TsBridgeRuntimeActions.SettingsGetCore,
                 [nameof(TsBridgeRuntimeActions.SettingsSet)] = TsBridgeRuntimeActions.SettingsSet,
@@ -260,6 +290,8 @@ public static class TsBridgeManifestFactory
             Runtime("pi", "setActiveTools", "function", TsBridgeRuntimeActions.SetActiveTools),
             Runtime("pi", "setModel", "function", TsBridgeRuntimeActions.SetModel),
             Runtime("pi", "setThinkingLevel", "function", TsBridgeRuntimeActions.SetThinkingLevel),
+            Runtime("pi", "resolveModelRole", "function", TsBridgeRuntimeActions.ModelRolesResolve),
+            Runtime("pi", "setModelRole", "function", TsBridgeRuntimeActions.SetModelRole),
             Runtime("pi", "reload", "function", TsBridgeRuntimeActions.ReloadExtensions),
             Runtime("pi.resources", "list", "function", TsBridgeRuntimeActions.ListResources),
             Runtime("pi.resources", "read", "function", TsBridgeRuntimeActions.ReadResource),
@@ -292,6 +324,16 @@ public static class TsBridgeManifestFactory
             Runtime("pi.state", "clear", "function", TsBridgeRuntimeActions.StateClear),
             Runtime("pi.state", "getSchemaVersion", "function", TsBridgeRuntimeActions.StateGetSchemaVersion),
             Runtime("pi.state", "setSchemaVersion", "function", TsBridgeRuntimeActions.StateSetSchemaVersion),
+            Runtime("pi.packages", "install", "function", TsBridgeRuntimeActions.InstallExtension),
+            Runtime("pi.packages", "update", "function", TsBridgeRuntimeActions.UpdateExtension),
+            Runtime("pi.packages", "remove", "function", TsBridgeRuntimeActions.RemoveExtension),
+            Runtime("pi.packages", "list", "function", TsBridgeRuntimeActions.ListInstalledExtensions),
+            Runtime("pi.skills.managed", "create", "function", TsBridgeRuntimeActions.ManagedSkillCreate),
+            Runtime("pi.skills.managed", "update", "function", TsBridgeRuntimeActions.ManagedSkillUpdate),
+            Runtime("pi.skills.managed", "delete", "function", TsBridgeRuntimeActions.ManagedSkillDelete),
+            Runtime("pi.skills.managed", "list", "function", TsBridgeRuntimeActions.ManagedSkillList),
+            Runtime("pi.skills.managed", "promote", "function", TsBridgeRuntimeActions.ManagedSkillPromote),
+            Runtime("pi.skillProviders", "register", "function", TsBridgeRuntimeActions.RegisterSkillProvider),
             Snapshot("ctx", "modelRegistry", "property", snapshotField: "modelRegistry"),
             Snapshot("ctx", "model", "property", snapshotField: "model"),
             Runtime("ctx", "isIdle", "function", TsBridgeRuntimeActions.IsIdle),

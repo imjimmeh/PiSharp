@@ -2,15 +2,19 @@ using System.Text.Json;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
+using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Core.Tools;
 using PiSharp.Agent.Harness;
 using PiSharp.Agent.Resources;
+using PiSharp.Agent.Resources.Theme;
 using PiSharp.Agent.Serialization;
 using PiSharp.Ai.Models;
 using PiSharp.Compatibility.Resources;
 using PiSharp.Extensions;
+using PiSharp.Compatibility.Settings;
 using PiSharp.Runtime.Subagents;
+using PiSharp.Packages;
 using ModelDescriptor = PiSharp.Agent.Core.Models.ModelDescriptor;
 
 namespace PiSharp.Runtime;
@@ -22,6 +26,11 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
     private SubagentSessionService? _subagentService;
     private readonly Dictionary<string, IDisposable> _subagentEventSubscriptions = new(StringComparer.Ordinal);
     private RuntimeSessionSnapshotCacheEntry? _sessionSnapshotCache;
+    private readonly Dictionary<string, IAgentTool> _toolsByName = new(StringComparer.Ordinal);
+    private int _evalLoopbackCallCounter;
+    private RuntimePackageService? _packageService;
+    private ManagedSkillStore? _managedSkillStore;
+    private Task? _managedSkillLoadTask;
 
     public void BindRuntimeActions(SessionRuntime runtime)
     {
@@ -32,8 +41,8 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
 
         var binding = runtime.ExtensionBinding;
         binding.RuntimeSettings = runtime.SettingsService;
-        binding.RuntimeState = runtime.StateService;
         binding.SendMessageAsync = runtime.SendExtensionMessageAsync;
+        binding.RuntimeAuthStorage = runtime.AuthStorage;
         binding.SendUserMessageAsync = (content, delivery, token) =>
             runtime.SendExtensionMessageAsync(AgentMessages.User(content), delivery, triggerTurn: delivery == ExtensionMessageDelivery.NextTurn, token);
         binding.GetSessionIdAsync = _ => Task.FromResult<string?>(runtime.Session.Metadata.Id);
@@ -48,8 +57,18 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
         binding.SetLabelAsync = async (entryId, label, token) => { await runtime.Session.AppendLabelAsync(entryId, label, token); };
         binding.ReloadExtensionsAsync = runtime.ReloadExtensionsAsync;
         binding.WaitForIdleAsync = token => runtime.Harness.WaitForIdleAsync().WaitAsync(token);
-        binding.NewSessionAsync = async token => ToExtensionSessionReplacementResult(await runtime.NewSessionAsync(token));
-        binding.ForkSessionAsync = async (entryId, position, token) => ToExtensionSessionReplacementResult(await runtime.ForkAsync(runtime.Session.Metadata, new SessionForkOptions(entryId, position ?? "before"), token));
+        binding.NewSessionAsync = async (withSession, token) =>
+        {
+            var result = ToExtensionSessionReplacementResult(await runtime.NewSessionAsync(token));
+            await InvokeWithSessionAsync(binding, runtime, result, withSession, token);
+            return result;
+        };
+        binding.ForkSessionAsync = async (entryId, position, withSession, token) =>
+        {
+            var result = ToExtensionSessionReplacementResult(await runtime.ForkAsync(runtime.Session.Metadata, new SessionForkOptions(entryId, position ?? "before"), token));
+            await InvokeWithSessionAsync(binding, runtime, result, withSession, token);
+            return result;
+        };
         binding.CreateAgentSessionAsync = async (optionsObj, token) =>
         {
             var options = ParseSubagentOptions(optionsObj);
@@ -111,13 +130,15 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
             return new { ok = true, sessionId };
         };
         binding.NavigateTreeAsync = async (targetId, token) => await runtime.Harness.NavigateTreeAsync(targetId, cancellationToken: token);
-        binding.SwitchSessionAsync = async (sessionPath, token) =>
+        binding.SwitchSessionAsync = async (sessionPath, withSession, token) =>
         {
             var sessions = await runtime.ListSessionsAsync(cancellationToken: token);
             var target = sessions.FirstOrDefault(session => string.Equals(session.Path, sessionPath, StringComparison.OrdinalIgnoreCase) || string.Equals(session.Id, sessionPath, StringComparison.OrdinalIgnoreCase));
-            return target is null
+            var result = target is null
                 ? new ExtensionSessionReplacementResult(true, $"Session '{sessionPath}' was not found.")
                 : ToExtensionSessionReplacementResult(await runtime.SwitchSessionAsync(target, token));
+            await InvokeWithSessionAsync(binding, runtime, result, withSession, token);
+            return result;
         };
         binding.IsIdleAsync = _ => Task.FromResult(runtime.Harness.Phase == AgentHarnessPhase.Idle);
         binding.HasPendingMessagesAsync = _ => Task.FromResult(false);
@@ -127,18 +148,66 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
         binding.ShutdownAsync = runtime.ShutdownFromExtensionAsync;
         binding.GetAllToolsAsync = _ => Task.FromResult<IReadOnlyList<string>>(runtime.Harness.AllToolNames);
         binding.GetActiveToolsAsync = _ => Task.FromResult<IReadOnlyList<string>>(runtime.Harness.ActiveToolNames);
-        binding.SetActiveToolsAsync = (names, _) => { runtime.Harness.SetActiveTools(names); return Task.CompletedTask; };
-        binding.GetAllSkillsAsync = _ => Task.FromResult<IReadOnlyList<ExtensionSkillRegistration>>(
-            runtime.Harness.Skills.Select(ToExtensionSkillRegistration).ToArray());
+        binding.ExecuteToolByNameAsync = ExecuteToolByNameAsync;
+        var completionService = new ExtensionCompletionService();
+        binding.CompleteSimpleAsync = (provider, modelId, prompt, options, token) => completionService.CompleteSimpleAsync(provider, modelId, prompt, options, token);
+        binding.CompleteAsync = (provider, modelId, messages, systemPrompt, options, streamFullOnTimeout, token) => completionService.CompleteAsync(provider, modelId, messages, systemPrompt, options, streamFullOnTimeout, token);
+        binding.StreamAsync = (provider, modelId, messages, systemPrompt, options, streamFullOnTimeout, token) => completionService.StreamAsync(provider, modelId, messages, systemPrompt, options, streamFullOnTimeout, token);
+        binding.SetActiveToolsAsync = (names, _) => { runtime.Harness.SetActiveTools(names ?? []); return Task.CompletedTask; };
+        binding.GetAllSkillsAsync = _ => Task.FromResult<IReadOnlyList<ExtensionSkillDefinition>>(
+            runtime.Harness.Skills.Select(ToExtensionSkillDefinition).ToArray());
         binding.GetSelectedSkillsAsync = _ => Task.FromResult<IReadOnlyList<string>>(runtime.Harness.SelectedSkillNames);
         binding.SetSelectedSkillsAsync = (names, _) => { runtime.Harness.SetSelectedSkills(names); return Task.CompletedTask; };
+        binding.RegisterSkillProviderAsync = (provider, ct) => Task.FromResult<IDisposable>(
+            extensionManager is null
+                ? new NoopDisposable()
+                : extensionManager.Registry.RegisterSkillProvider("runtime", provider));
+        binding.GetSkillProviderPrioritiesAsync = _ => Task.FromResult<IReadOnlyDictionary<string, int>>(
+            extensionManager is null
+                ? new Dictionary<string, int>()
+                : extensionManager.Registry.SkillProviders.ToDictionary(provider => provider.Value.Name, provider => provider.Value.Priority));
+        var packageService = new RuntimePackageService(
+            runnerFactory: CreatePackageRunnerFactory(runtime),
+            reloadExtensionsAsync: runtime.ReloadExtensionsAsync,
+            emitEventAsync: runtime.EmitRuntimeExtensionEventAsync);
+        _packageService = packageService;
+        binding.InstallExtensionAsync = (reference, local, force, offline, ct) => packageService.InstallAsync(reference, local, force, offline, ct);
+        binding.UpdateExtensionAsync = (request, ct) => packageService.UpdateAsync(request, ct);
+        binding.RemoveExtensionAsync = (reference, local, ct) => packageService.RemoveAsync(reference, local, ct);
+        binding.ListInstalledExtensionsAsync = (ct) => packageService.ListAsync(ct);
+        var managedRoot = Path.Combine(
+            (runtime.SettingsSnapshot?.Paths ?? PiAgentPaths.FromCwd(binding.Cwd)).GlobalPiSharpDirectory,
+            "managed-skills");
+        var managedSkillStore = new ManagedSkillStore(
+            managedRoot,
+            extensionManager?.Registry,
+            runtime.EmitRuntimeExtensionEventAsync,
+            loggerFactory: null);
+        _managedSkillStore = managedSkillStore;
+        _managedSkillLoadTask = managedSkillStore.LoadAsync();
+        binding.ManagedSkillCreateAsync = (request, ct) => managedSkillStore.CreateAsync(request, ct);
+        binding.ManagedSkillUpdateAsync = (name, request, ct) => managedSkillStore.UpdateAsync(name, request, ct);
+        binding.ManagedSkillDeleteAsync = (name, ct) => managedSkillStore.DeleteAsync(name, ct);
+        binding.ManagedSkillListAsync = (ct) => managedSkillStore.ListAsync(ct);
+        binding.ManagedSkillPromoteAsync = (reference, ct) => managedSkillStore.PromoteAsync(reference, ct);
         binding.GetCommandsAsync = _ => Task.FromResult(BuildCommandInfos(runtime));
         binding.SetModelAsync = async (model, token) => { await runtime.SetModelAsync(model, "extension", token); return true; };
+        binding.GetModelAsync = _ => Task.FromResult<ModelDescriptor?>(runtime.Harness.Model);
         binding.GetThinkingLevelAsync = _ => Task.FromResult<ThinkingLevel?>(runtime.Harness.ThinkingLevel);
         binding.SetThinkingLevelAsync = runtime.SetThinkingLevelAsync;
+        binding.ResolveModelRoleAsync = (role, token) => runtime.ResolveRoleAsync(role, token);
+        binding.EmitClientEventAsync = (eventName, payload, token) =>
+            runtime.Harness.PublishOwnEventAsync(new AgentHarnessOwnEvent.CustomEvent(eventName, payload), token);
+        binding.SetModelByRoleAsync = (role, token) => runtime.SetModelByRoleAsync(role, token);
+        binding.GetAllThemesAsync = _ => Task.FromResult(LoadAllThemes(runtime));
+        binding.GetThemeAsync = _ => Task.FromResult<ExtensionThemeInfo?>(ToExtensionThemeInfo(runtime.Theme));
+        binding.SetThemeAsync = async (name, token) => await runtime.SetThemeByNameAsync(name, token);
+        runtime.ThemeChanged += OnRuntimeThemeChanged;
+        foreach (var tool in runtime.Tools) _toolsByName[tool.Name] = tool;
 
         if (extensionManager is not null)
         {
+            foreach (var registration in extensionManager.Registry.Tools) _toolsByName[registration.Value.Name] = registration.Value;
             ReplayTools(runtime.Harness);
             ReplaySkills(runtime.Harness);
             extensionManager.Registry.Changed += ApplyExtensionRegistryChangeAsync;
@@ -180,9 +249,15 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
         if (change.Category == "tool" && change.Value is IAgentTool tool)
         {
             if (change.Kind is ExtensionRegistryChangeKind.Added or ExtensionRegistryChangeKind.Replaced or ExtensionRegistryChangeKind.Restored)
+            {
+                _toolsByName[tool.Name] = tool;
                 _runtime.Harness.RegisterTool(change.SourceId, tool);
+            }
             else if (change.Kind == ExtensionRegistryChangeKind.Removed)
+            {
+                _toolsByName.Remove(tool.Name);
                 _runtime.Harness.UnregisterTool(change.SourceId, tool.Name);
+            }
         }
 
         if (change.Category == "skill" && change.Value is ExtensionSkillRegistration skill)
@@ -457,7 +532,8 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
 
     private static IReadOnlyList<ExtensionCommandInfo> ApplyInvocationSuffixes(IReadOnlyList<ExtensionCommandInfo> commands)
     {
-        var groups = commands.GroupBy(command => command.Name, StringComparer.OrdinalIgnoreCase)
+        var groups = commands
+            .GroupBy(command => command.Name)
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var result = new List<ExtensionCommandInfo>();
@@ -470,12 +546,46 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
         return result;
     }
 
+    private static ExtensionSkillDefinition ToExtensionSkillDefinition(Skill skill)
+        => new(skill.Name, skill.Description, skill.Content, skill.FilePath, skill.DisableModelInvocation,
+            Override: ExtensionOverridePolicy.Reject,
+            skill.Globs, skill.AlwaysApply, skill.Hide, skill.Source, skill.SourcePriority, skill.Runner);
+
+    private static Func<CancellationToken, Task<IPackageCommandRunner>> CreatePackageRunnerFactory(SessionRuntime runtime)
+        => async ct =>
+        {
+            var store = new PiSettingsStore();
+            var snapshot = runtime.SettingsSnapshot ?? await store.LoadAsync(runtime.ExtensionBinding.Cwd, cancellationToken: ct);
+            var settingsService = new PiPackageSettingsService(store, snapshot);
+            var packageRoot = Path.Combine(snapshot.Paths.GlobalAgentDirectory, "packages");
+            var packageManager = new PiPackageManager(packageRoot, new SystemProcessRunner());
+            var nativeInstaller = new NativeExtensionInstaller(snapshot.Paths.HomeDirectory, snapshot.Paths.Cwd);
+            return new PiPackageCommandRunner(settingsService, packageManager, nativeInstaller);
+        };
+
     private static ExtensionSessionReplacementResult ToExtensionSessionReplacementResult(SessionRuntime.RuntimeSessionChangeResult result)
         => new(result.Cancelled, result.Reason, result.Session?.Id, result.Session?.Path);
 
-    private static ExtensionSkillRegistration ToExtensionSkillRegistration(Skill skill)
-        => new(skill.Name, skill.Description, skill.Content, skill.FilePath, skill.DisableModelInvocation);
+    private static async Task InvokeWithSessionAsync(ExtensionRuntimeBinding binding, SessionRuntime runtime, ExtensionSessionReplacementResult result, Func<ExtensionSessionReplacementResult, IExtensionReplacementSessionApi?, CancellationToken, Task>? withSession, CancellationToken token)
+    {
+        if (result.Cancelled) return;
+        var replacement = binding.CreateReplacementSessionApi(
+            result,
+            (message, delivery, triggerTurn, ct) => runtime.SendExtensionMessageAsync(message, delivery, triggerTurn, ct),
+            (content, delivery, ct) => runtime.SendExtensionMessageAsync(AgentMessages.User(content), delivery, triggerTurn: delivery == ExtensionMessageDelivery.NextTurn, ct));
+        if (withSession is not null) await withSession(result, replacement, token);
+        if (binding.WithSessionCallback is not null) await binding.WithSessionCallback(result, replacement, token);
+    }
 
+    private Task<AgentToolResult<object?>> ExecuteToolByNameAsync(string toolName, JsonElement parameters, CancellationToken cancellationToken)
+    {
+        if (!_toolsByName.TryGetValue(toolName, out var tool))
+            return Task.FromResult(new AgentToolResult<object?>([new TextContent($"Tool '{toolName}' was not found.")], null));
+        var callId = $"eval-loopback:{Interlocked.Increment(ref _evalLoopbackCallCounter)}";
+        return tool.ExecuteAsync(callId, parameters, cancellationToken);
+    }
+
+    private void ReplaceSubagentEventSubscription(string sessionId, IDisposable subscription)
     private void ReplaceSubagentEventSubscription(string sessionId, IDisposable subscription)
     {
         lock (_subagentEventSubscriptions)
@@ -493,18 +603,55 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
         }
     }
 
+    private static IReadOnlyList<ExtensionThemeInfo> LoadAllThemes(SessionRuntime runtime)
+    {
+        var paths = runtime.Resources?.ThemePaths;
+        if (paths is null || paths.Count == 0) return [];
+        var documents = TuiThemeDocument.LoadAllAsync(paths, CancellationToken.None).GetAwaiter().GetResult();
+        return documents.Select(ToExtensionThemeInfo).OfType<ExtensionThemeInfo>().ToList();
+    }
+
+    private static ExtensionThemeInfo? ToExtensionThemeInfo(TuiThemeDocument? document)
+    {
+        if (document is null) return null;
+        return new ExtensionThemeInfo(document.Name, ToExtensionThemeDocument(document));
+    }
+
+    private static ExtensionThemeDocument ToExtensionThemeDocument(TuiThemeDocument document)
+        => new(
+            document.Name,
+            document.Tokens,
+            ToExtensionColorScheme(document.Default),
+            ToExtensionColorScheme(document.Dialog),
+            ToExtensionColorScheme(document.Menu));
+
+    private static ExtensionThemeColorScheme? ToExtensionColorScheme(TuiColorSchemeDocument? scheme)
+        => scheme is null ? null : new ExtensionThemeColorScheme(
+            scheme.NormalForeground, scheme.NormalBackground,
+            scheme.FocusForeground, scheme.FocusBackground,
+            scheme.HotNormalForeground, scheme.HotNormalBackground,
+            scheme.HotFocusForeground, scheme.HotFocusBackground,
+            scheme.DisabledForeground, scheme.DisabledBackground);
+    private void OnRuntimeThemeChanged(object? sender, EventArgs args)
+        => _runtime?.ExtensionBinding.RaiseThemeChanged();
+
     public void Dispose()
     {
         if (extensionManager is not null) extensionManager.Registry.Changed -= ApplyExtensionRegistryChangeAsync;
+        if (_runtime is not null) _runtime.ThemeChanged -= OnRuntimeThemeChanged;
         DisposeSubagentEventSubscriptions();
         if (_subagentService is not null) _subagentService.DisposeAllAsync(CancellationToken.None).GetAwaiter().GetResult();
+        _packageService?.Dispose();
     }
 
     public async ValueTask DisposeAsync()
     {
         if (extensionManager is not null) extensionManager.Registry.Changed -= ApplyExtensionRegistryChangeAsync;
+        if (_runtime is not null) _runtime.ThemeChanged -= OnRuntimeThemeChanged;
         DisposeSubagentEventSubscriptions();
         if (_subagentService is not null) await _subagentService.DisposeAllAsync(CancellationToken.None);
+        _packageService?.Dispose();
+        if (_managedSkillLoadTask is not null) await _managedSkillLoadTask.ConfigureAwait(false);
     }
 
     private void DisposeSubagentEventSubscriptions()
@@ -514,5 +661,9 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
             foreach (var subscription in _subagentEventSubscriptions.Values) subscription.Dispose();
             _subagentEventSubscriptions.Clear();
         }
+    }
+    private sealed class NoopDisposable : IDisposable
+    {
+        public void Dispose() { }
     }
 }

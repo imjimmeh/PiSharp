@@ -36,7 +36,8 @@ public static class PiRuntimeBootstrap
 
         var settingsStore = new PiSettingsStore();
         var settings = await startupContext.MeasureAsync("settings.load", () => settingsStore.LoadAsync(options.Env.Cwd, options.HomeDirectory, cancellationToken: cancellationToken));
-        var credentialResolver = options.CredentialResolver ?? new ProviderCredentialResolver(new FileOAuthStorage(settings.Paths.AuthPath));
+        var authStorage = new FileOAuthStorage(settings.Paths.AuthPath);
+        var credentialResolver = options.CredentialResolver ?? new ProviderCredentialResolver(authStorage);
         RegisterBuiltInOAuthProviders();
         startupContext.Measure("providers.register", () =>
         {
@@ -73,7 +74,10 @@ public static class PiRuntimeBootstrap
         var repo = new JsonlSessionRepo(options.Env, sessionRoot, writeLeafEntries: !options.CompatibilityMode, loggerFactory: loggerFactory);
         var createOptions = new JsonlSessionCreateOptions(options.Env.Cwd, sessionOptions.NewSessionId);
         var session = await startupContext.MeasureAsync("session.resolve", () => ResolveSessionAsync(repo, createOptions, sessionOptions, cancellationToken));
-        var tools = startupContext.Measure("tools.resolve", () => RuntimeToolSelector.Create(options.Env, options.Tools));
+        var urlRegistry = new InternalUrlRegistry();
+        var fileContentExtractorRegistry = new FileContentExtractorRegistry();
+        var searchProviderRegistry = new SearchProviderRegistry();
+        var tools = startupContext.Measure("tools.resolve", () => RuntimeToolSelector.Create(options.Env, options.Tools, urlRegistry: urlRegistry, contentExtractors: fileContentExtractorRegistry));
 
         var extensions = new ExtensionRegistry { BuiltInToolNames = tools.Tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal) };
         var manager = new ExtensionManager(extensions);
@@ -82,6 +86,10 @@ public static class PiRuntimeBootstrap
             => tools.Tools.Select(tool => tool.Name).Concat(extensions.Tools.Select(tool => tool.Value.Name)).Distinct(StringComparer.Ordinal).ToArray();
         var extensionBinding = new ExtensionRuntimeBinding(options.Env.Cwd, false, NoExtensionUi.Instance)
         {
+            ExecutionEnv = options.Env,
+            UrlRegistry = urlRegistry,
+            FileContentExtractors = fileContentExtractorRegistry,
+            SearchProviders = searchProviderRegistry,
             GetSessionIdAsync = _ => Task.FromResult<string?>(session.Metadata.Id),
             GetAllToolsAsync = _ => Task.FromResult(StartupAllToolNames()),
             GetActiveToolsAsync = _ => Task.FromResult(startupActiveToolNames ?? StartupAllToolNames()),
@@ -314,7 +322,7 @@ public static class PiRuntimeBootstrap
             loggerFactory);
 
         var runtime = startupContext.Measure("runtime.compose", () =>
-            new SessionRuntime(repo, createOptions, Factory, session, manager, pluginHost, tsHost, settingsStore, settings, selection, resources, promptOptionsWithSkills, loadedSkills, extensionBinding, flagDiagnostics, promptTemplateCatalog, themeDocument, benchmark?.Build(), extensionLoadCoordinator, loggerFactory)
+            new SessionRuntime(repo, createOptions, Factory, session, manager, pluginHost, tsHost, settingsStore, settings, selection, resources, promptOptionsWithSkills, loadedSkills, extensionBinding, flagDiagnostics, promptTemplateCatalog, themeDocument, benchmark?.Build(), extensionLoadCoordinator, loggerFactory, tools: registeredTools, authStorage: authStorage)
             {
                 CachedBackgroundExtensionPaths = backgroundExtensionPaths.ToArray()
             });

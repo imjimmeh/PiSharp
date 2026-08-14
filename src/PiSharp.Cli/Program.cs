@@ -6,7 +6,7 @@ using PiSharp.Cli.Files;
 using PiSharp.Cli.IO;
 using PiSharp.Cli.Logging;
 using PiSharp.Cli.Modes;
-using PiSharp.Cli.Packages;
+using PiSharp.Packages;
 using PiSharp.Cli.Runtime;
 using PiSharp.Cli.Parsing;
 using PiSharp.Compatibility.Settings;
