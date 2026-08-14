@@ -14,6 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PiSharp.Server\PiSharp.Server.csproj" />
+    <ProjectReference Include="..\PiSharp.Tui\PiSharp.Tui.csproj" />
   </ItemGroup>
+
 
 </Project>
