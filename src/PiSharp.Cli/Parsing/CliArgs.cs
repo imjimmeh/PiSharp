@@ -70,6 +70,7 @@ public sealed record CliArgs(
     bool Offline = false,
     bool Verbose = false,
     bool BenchmarkStartup = false,
+    bool Local = false,
     IReadOnlyList<string>? Messages = null,
     IReadOnlyList<string>? FileArgs = null,
     IReadOnlyDictionary<string, object?>? UnknownFlags = null,

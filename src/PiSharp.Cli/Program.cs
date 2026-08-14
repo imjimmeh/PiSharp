@@ -122,7 +122,7 @@ public static class Program
             AppMode.SubagentJson => await SubagentJsonMode.RunAsync(runtime, new SubagentJsonModeOptions(InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty), console, cancellationToken),
             AppMode.PrintJson => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Json, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
             AppMode.PrintText => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Text, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
-            AppMode.Interactive => await InteractiveMode.RunAsync(runtime, cancellationToken),
+            AppMode.Interactive => await InteractiveMode.RunAsync(runtime, cancellationToken, parsed.Local),
             _ => 2
         };
     }

@@ -73,6 +73,7 @@ public static class CliParser
                 case "--offline": b.Offline = true; break;
                 case "--verbose": b.Verbose = true; break;
                 case "--benchmark-startup": b.BenchmarkStartup = true; break;
+                case "--local": b.Local = true; break;
                 default:
                     if (arg.StartsWith("--", StringComparison.Ordinal)) CaptureUnknownLong(arg, args, ref i, b);
                     else if (arg.StartsWith("-", StringComparison.Ordinal)) b.Error($"Unknown option: {arg}");
@@ -404,7 +405,7 @@ public static class CliParser
         public string? Provider, Model, ApiKey, SystemPrompt, Session, Fork, SessionDir, Export, Import, Share, LoginProvider, ListModels;
         public ThinkingLevel? Thinking;
         public CliMode? Mode;
-        public bool Continue, Resume, Help, Version, NoSession, NoTools, NoBuiltinTools, NoExtensions, Print, Logout, Reload, CompatibilityMode = true, NoSkills, NoPromptTemplates, NoThemes, NoContextFiles, NoResources, ListAllModels, Offline, Verbose, BenchmarkStartup;
+        public bool Continue, Resume, Help, Version, NoSession, NoTools, NoBuiltinTools, NoExtensions, Print, Logout, Reload, CompatibilityMode = true, NoSkills, NoPromptTemplates, NoThemes, NoContextFiles, NoResources, ListAllModels, Offline, Verbose, BenchmarkStartup, Local;
         public List<string> AppendSystemPrompt { get; } = [];
         public List<string> Models { get; } = [];
         public List<string> Tools { get; } = [];
@@ -421,7 +422,7 @@ public static class CliParser
         public T WarningAndReturn<T>(string message) { Warning(message); return default!; }
         public T ErrorAndReturn<T>(string message) { Error(message); return default!; }
 
-        public CliArgs Build() => new(PackageCommand, DaemonCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
+        public CliArgs Build() => new(PackageCommand, DaemonCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Local, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
     }
 }
 

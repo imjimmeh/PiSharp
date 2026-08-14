@@ -232,4 +232,20 @@ public sealed class CliParserTests
         Assert.Equal("7878", parsed.DaemonCommand.Port);
         Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--api-key"));
     }
+
+    [Fact]
+    public void Parse_LocalFlag_SetsLocal()
+    {
+        var parsed = CliParser.Parse(["--local"]);
+
+        Assert.True(parsed.Local);
+    }
+
+    [Fact]
+    public void Parse_NoLocalFlag_DefaultsFalse()
+    {
+        var parsed = CliParser.Parse([]);
+
+        Assert.False(parsed.Local);
+    }
 }
