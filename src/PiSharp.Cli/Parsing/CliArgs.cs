@@ -133,6 +133,8 @@ Options:
       --no-tools, -nt          Disable all tools.
       --no-builtin-tools, -nbt Disable built-in tools.
   -e, --extension <path>       Load extension path.
+      --no-extensions, -ne      Disable all extensions (native and TypeScript).
+      --no-ts-extensions        Disable TypeScript extensions only; native extensions still load.
       --no-resources           Disable resource-loaded extensions, skills, prompt templates, themes, and context files.
       --benchmark-startup      Print startup benchmark timings to stderr.
       --profile <name>         Select a profile (relocates user state under ~/.pi/PiSharp/profiles/<name>).
