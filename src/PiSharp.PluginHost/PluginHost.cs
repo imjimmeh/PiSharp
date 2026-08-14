@@ -13,7 +13,8 @@ public sealed class NativePluginHost(PluginHostOptions options)
         var explicitPaths = options.ExplicitPluginPaths ?? [];
         var discovered = options.PluginDirectories
             .Where(Directory.Exists)
-            .SelectMany(dir => Directory.EnumerateFiles(dir, "*.dll", SearchOption.AllDirectories));
+            .SelectMany(dir => Directory.EnumerateFiles(dir, "*.dll", SearchOption.AllDirectories))
+            .Where(ExtensionMetadataProbe.HasExtensionMetadata);
         return explicitPaths.Concat(discovered).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 

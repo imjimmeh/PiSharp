@@ -8,10 +8,15 @@ Native plugins are loaded by `PiSharp.PluginHost.NativePluginHost`.
 
 Discovery includes:
 
-- Explicit `--extension <path>` entries ending in `.dll`.
+- Explicit `--extension <path>` entries ending in `.dll` (validated strictly; a path that is not a loadable plugin fails startup).
 - Any `.dll` under `~/.pi/extensions`.
 - Any `.dll` under `<cwd>/plugins`.
 - Any `.dll` under `<cwd>/.pi/extensions`.
+
+Directory scans are recursive and filter to assemblies that carry `ExtensionMetadataAttribute`
+(read without executing code). Support DLLs that ship next to a plugin — dependencies such as
+`PiSharp.Plugins.ProtocolJsonRpc.dll` — are skipped, so a plugin may be installed as a folder of
+multiple DLLs without breaking startup.
 
 Each plugin is loaded into a collectible `PluginLoadContext`. The host validates metadata, finds the first concrete `IExtension` implementation, creates it with `Activator.CreateInstance()`, and initializes it through `ExtensionManager`.
 
@@ -32,6 +37,24 @@ pisharp install path/to/MyExtension.dll --local
 ```
 
 This copies the DLL to `<cwd>/.pi/extensions/`. Existing destination DLLs are not replaced unless `--force` is provided.
+
+### Install a plugin with dependencies
+
+`pisharp install` copies a single DLL, so plugins whose dependencies are not part of the PiSharp
+app base (for example `pisharp-lsp` and `pisharp-debug` needing `PiSharp.Plugins.ProtocolJsonRpc`,
+or `pisharp-mcp` needing `ModelContextProtocol`) are installed by copying the plugin's build
+output — entry DLL plus its dependencies — into its own folder under the extension directory:
+
+```text
+~/.pi/extensions/
+  pisharp-lsp/
+    PiSharp.Plugins.Lsp.dll
+    PiSharp.Plugins.ProtocolJsonRpc.dll
+    ...
+```
+
+Discovery is recursive and ignores DLLs without `ExtensionMetadataAttribute`, so only the entry
+assembly is loaded; the entry's load context resolves its dependencies from the same folder.
 
 ## Minimal extension
 
