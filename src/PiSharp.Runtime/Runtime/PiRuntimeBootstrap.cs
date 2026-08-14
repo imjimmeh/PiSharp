@@ -97,7 +97,9 @@ public static class PiRuntimeBootstrap
             {
                 startupActiveToolNames = names.Count == 0 ? null : names.ToArray();
                 return Task.CompletedTask;
-            }
+            },
+            GetAllRulesAsync = ct => extensions.GetAllRulesAsync(ct),
+            GetRuleProviderNamesAsync = _ => Task.FromResult(extensions.GetRuleProviderNames()),
         };
         var pluginHost = new NativePluginHost(PluginHostOptions.FromCwd(
             options.Env.Cwd,

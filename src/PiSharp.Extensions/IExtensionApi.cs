@@ -101,6 +101,12 @@ public interface IExtensionApi
         => throw new NotSupportedException("This extension host does not provide a rules API.");
 
     /// <summary>
+    /// Stream-delta interception registration surface (P10 TTSR). Null when the host
+    /// does not wire a registry; extensions fall back to their own registration seam.
+    /// </summary>
+    IStreamDeltaInterceptorApi? StreamDelta => null;
+
+    /// <summary>
     /// Runtime package management surface (install/update/remove/list
     /// installed extension packages, GAP-55). Defaults to a throwing no-op so
     /// existing implementors and in-memory fakes are not forced to implement

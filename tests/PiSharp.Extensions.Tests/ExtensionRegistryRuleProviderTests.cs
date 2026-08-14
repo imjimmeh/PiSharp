@@ -110,6 +110,51 @@ public sealed class ExtensionRegistryRuleProviderTests
         Assert.Contains("extension:engine", sources);
     }
 
+    [Fact]
+    public async Task GetAllRulesAsyncDedupsByNameKeepingHigherProviderPriority()
+    {
+        var registry = new ExtensionRegistry();
+        registry.RegisterRuleProvider("extension:low", new FakeRuleProvider("rules-dir", 100, [
+            new Rule("shared", "low-content", Priority: 10),
+            new Rule("only-low", "low-only", Priority: 5)
+        ]));
+        registry.RegisterRuleProvider("extension:high", new FakeRuleProvider("rules-sticky", 1000, [
+            new Rule("shared", "high-content", Priority: 1)
+        ]));
+
+        var rules = await registry.GetAllRulesAsync();
+
+        Assert.Equal(2, rules.Count);
+        Assert.Equal("high-content", Assert.Single(rules, rule => rule.Name == "shared").Content);
+        Assert.Equal("low-only", Assert.Single(rules, rule => rule.Name == "only-low").Content);
+    }
+
+    [Fact]
+    public async Task GetAllRulesAsyncOrdersByRulePriorityDescending()
+    {
+        var registry = new ExtensionRegistry();
+        registry.RegisterRuleProvider("extension:rules", new FakeRuleProvider("rules-dir", 100, [
+            new Rule("low", "low", Priority: 10),
+            new Rule("high", "high", Priority: 50),
+            new Rule("mid", "mid", Priority: 30)
+        ]));
+
+        var rules = await registry.GetAllRulesAsync();
+
+        Assert.Equal(["high", "mid", "low"], rules.Select(rule => rule.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task GetRuleProviderNamesReturnsDistinctNames()
+    {
+        var registry = new ExtensionRegistry();
+        registry.RegisterRuleProvider("extension:a", new FakeRuleProvider("rules-dir", 100, []));
+        registry.RegisterRuleProvider("extension:b", new FakeRuleProvider("rules-dir", 200, []));
+        registry.RegisterRuleProvider("extension:c", new FakeRuleProvider("cursor", 300, []));
+
+        Assert.Equal(["cursor", "rules-dir"], registry.GetRuleProviderNames().OrderBy(name => name).ToArray());
+    }
+
     private sealed class FakeRuleProvider(string name, int priority, IReadOnlyList<Rule> rules) : IRuleProvider
     {
         public string Name { get; } = name;

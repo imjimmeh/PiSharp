@@ -102,6 +102,7 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
         public IExtensionSearchApi Search { get; } = new SearchApi(binding);
         public IExtensionUrlApi Urls { get; } = new UrlApi(binding);
         public IExtensionRuleApi Rules { get; } = new RuleApi(descriptor, registry, binding);
+        public IStreamDeltaInterceptorApi? StreamDelta { get; } = new StreamDeltaApi(descriptor, registry);
         public IExecutionEnv? ExecutionEnv => binding.ExecutionEnv;
         public IExtensionTelemetryApi Telemetry => binding.Telemetry;
 
@@ -213,6 +214,12 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
 
         public IReadOnlyList<string> GetProviderNames()
             => binding.GetRuleProviderNamesAsync(CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    private sealed class StreamDeltaApi(ExtensionDescriptor descriptor, ExtensionRegistry registry) : IStreamDeltaInterceptorApi
+    {
+        public IDisposable RegisterInterceptor(IStreamDeltaInterceptor interceptor)
+            => registry.RegisterStreamDeltaInterceptor(descriptor.EffectiveSourceId, interceptor);
     }
 
     private sealed class ToolApi(ExtensionDescriptor descriptor, ExtensionRegistry registry, ExtensionRuntimeBinding binding) : IExtensionToolApi

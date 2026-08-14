@@ -248,6 +248,47 @@ public sealed class ExtensionRegistry
         return SetOwned(_streamDeltaInterceptors, $"stream-delta:{sourceId}", sourceId, interceptor, "stream-delta");
     }
 
+    /// <summary>
+    /// All rules across registered providers — deduped on <see cref="Rule.Name"/>
+    /// (higher provider <see cref="IRuleProvider.Priority"/> wins, ties keep first
+    /// discovery order) and ordered by <see cref="Rule.Priority"/> descending.
+    /// </summary>
+    public async Task<IReadOnlyList<Rule>> GetAllRulesAsync(CancellationToken cancellationToken = default)
+    {
+        var discovered = new List<(int ProviderPriority, Rule Rule)>();
+        foreach (var registration in RuleProviders)
+        {
+            foreach (var rule in await registration.Value.DiscoverAsync(cancellationToken).ConfigureAwait(false))
+            {
+                discovered.Add((registration.Value.Priority, rule));
+            }
+        }
+
+        var byName = new Dictionary<string, (int ProviderPriority, Rule Rule)>(StringComparer.Ordinal);
+        foreach (var entry in discovered)
+        {
+            if (byName.TryGetValue(entry.Rule.Name, out var existing))
+            {
+                if (entry.ProviderPriority > existing.ProviderPriority)
+                {
+                    byName[entry.Rule.Name] = entry;
+                }
+            }
+            else
+            {
+                byName[entry.Rule.Name] = entry;
+            }
+        }
+
+        return byName.Values
+            .OrderByDescending(entry => entry.Rule.Priority)
+            .Select(entry => entry.Rule)
+            .ToArray();
+    }
+
+    public IReadOnlyList<string> GetRuleProviderNames()
+        => RuleProviders.Select(registration => registration.Value.Name).Distinct(StringComparer.Ordinal).ToArray();
+
     public int UnregisterBySource(string sourceId)
     {
         var changes = new List<ExtensionRegistryChange>();
