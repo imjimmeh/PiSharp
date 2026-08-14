@@ -85,11 +85,81 @@ public static class CliParser
                     else if (arg.StartsWith("@", StringComparison.Ordinal)) b.FileArgs.Add(arg[1..]);
                     else if (TryParsePackageCommand(arg, args, ref i, b)) { /* consumed */ }
                     else if (TryParseDaemonCommand(arg, args, ref i, b)) { /* consumed */ }
+                    else if (TryParseStatsCommand(arg, args, ref i, b)) { /* consumed */ }
                     else b.Messages.Add(arg);
                     break;
             }
         }
         return b.Build();
+    }
+
+    private static bool TryParseStatsCommand(string arg, IReadOnlyList<string> args, ref int i, Builder b)
+    {
+        if (!string.Equals(arg, "stats", StringComparison.Ordinal)) return false;
+
+        TimeSpan? since = null;
+        var json = false;
+        var live = false;
+        while (i + 1 < args.Count)
+        {
+            var next = args[i + 1];
+            if (next.StartsWith("@", StringComparison.Ordinal) || !next.StartsWith("-", StringComparison.Ordinal)) break;
+
+            i++;
+            switch (next)
+            {
+                case "--json":
+                    json = true;
+                    break;
+                case "--live":
+                    live = true;
+                    break;
+                case "--since":
+                    if (i + 1 >= args.Count)
+                    {
+                        b.Error("Missing value for --since.");
+                        continue;
+                    }
+                    if (args[i + 1].StartsWith("-", StringComparison.Ordinal))
+                    {
+                        b.Error("Missing value for --since.");
+                        continue;
+                    }
+                    var duration = args[++i];
+                    if (ParseDuration(duration) is not { } parsed)
+                    {
+                        b.Error($"Invalid --since duration '{duration}'.");
+                        continue;
+                    }
+                    since = parsed;
+                    break;
+                default:
+                    b.Error($"Unknown option for stats: {next}");
+                    break;
+            }
+        }
+
+        b.StatsCommand = new StatsCommandArgs(since, json, live);
+        return true;
+    }
+
+    /// <summary>Accepts <see cref="TimeSpan"/> syntax ("1.00:00:00", "06:00:00") and compact d/h/m/s suffixes ("30d", "6h").</summary>
+    internal static TimeSpan? ParseDuration(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (TimeSpan.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, out var span)) return span;
+        if (value.Length > 1 && double.TryParse(value[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var amount))
+        {
+            return value[^1] switch
+            {
+                'd' => TimeSpan.FromDays(amount),
+                'h' => TimeSpan.FromHours(amount),
+                'm' => TimeSpan.FromMinutes(amount),
+                's' => TimeSpan.FromSeconds(amount),
+                _ => null
+            };
+        }
+        return null;
     }
 
     private static bool TryParsePackageCommand(string arg, IReadOnlyList<string> args, ref int i, Builder b)
@@ -427,6 +497,7 @@ public static class CliParser
     {
         public PackageCommandArgs? PackageCommand;
         public DaemonCommandArgs? DaemonCommand;
+        public StatsCommandArgs? StatsCommand;
         public string? Provider, Model, ApiKey, SystemPrompt, Session, Fork, SessionDir, Export, Import, Share, LoginProvider, ListModels, Attach;
         public ThinkingLevel? Thinking;
         public CliMode? Mode;
@@ -450,8 +521,8 @@ public static class CliParser
         public T WarningAndReturn<T>(string message) { Warning(message); return default!; }
         public T ErrorAndReturn<T>(string message) { Error(message); return default!; }
 
-        public CliArgs Build() => new(PackageCommand, DaemonCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Attach, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Profile, ApprovalMode, CheckUpdates, NoCheckUpdates, Local, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
-    }
+        public CliArgs Build() => new(PackageCommand, DaemonCommand, StatsCommand, Provider, Model, ApiKey, SystemPrompt, AppendSystemPrompt, Thinking, Continue, Resume, Attach, Help, Version, Mode, NoSession, Session, Fork, SessionDir, Models, Tools, NoTools, NoBuiltinTools, Extensions, NoExtensions, Print, Export, Import, Share, LoginProvider, Logout, Reload, CompatibilityMode, NoSkills, Skills, PromptTemplates, NoPromptTemplates, Themes, NoThemes, NoContextFiles, NoResources, ListModels, ListAllModels, Offline, Verbose, BenchmarkStartup, Profile, ApprovalMode, CheckUpdates, NoCheckUpdates, Local, Messages, FileArgs, UnknownFlags, ExtensionFlagValues: null, HelpOnly: false, Diagnostics);
+}
 }
 
 internal static class ListExtensions

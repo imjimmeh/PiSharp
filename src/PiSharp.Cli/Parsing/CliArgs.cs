@@ -27,9 +27,20 @@ public sealed record DaemonCommandArgs(
     bool Foreground = false,
     string? ApiKey = null);
 
+/// <summary>
+/// <c>pisharp stats</c> dashboard options: default reads the local metrics + journal files;
+/// <c>--live</c> queries the daemon over WS; <c>--json</c> emits the raw
+/// <see cref="PiSharp.Server.Contracts.MetricsSnapshot"/> document; <c>--since</c> filters by age.
+/// </summary>
+public sealed record StatsCommandArgs(
+    TimeSpan? Since = null,
+    bool Json = false,
+    bool Live = false);
+
 public sealed record CliArgs(
     PackageCommandArgs? PackageCommand = null,
     DaemonCommandArgs? DaemonCommand = null,
+    StatsCommandArgs? StatsCommand = null,
     string? Provider = null,
     string? Model = null,
     string? ApiKey = null,
@@ -143,5 +154,11 @@ Package Commands:
   update <source>              Update a specific package.
   list                         List installed packages.
   config                       Show package configuration.
+
+Stats Commands:
+  stats                        Show local observability aggregates (metrics + journal files).
+  stats --live                 Query the running daemon's live aggregates over WS.
+  stats --json                 Emit the raw metrics document (JSON).
+  stats --since <duration>     Filter records newer than <duration> (e.g. 30d, 6h, 1.00:00:00).
 """;
 }

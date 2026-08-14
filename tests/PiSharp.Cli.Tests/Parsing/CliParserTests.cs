@@ -336,4 +336,69 @@ public sealed class CliParserTests
         Assert.True(parsed.Resume);
         Assert.Empty(parsed.DiagnosticsOrEmpty);
     }
+
+    [Fact]
+    public void Parse_Stats_BareKeyword()
+    {
+        var parsed = CliParser.Parse(["stats"]);
+
+        Assert.NotNull(parsed.StatsCommand);
+        Assert.Null(parsed.StatsCommand.Since);
+        Assert.False(parsed.StatsCommand.Json);
+        Assert.False(parsed.StatsCommand.Live);
+        Assert.Empty(parsed.DiagnosticsOrEmpty);
+    }
+    [Theory]
+    [InlineData("stats --json", true, false)]
+    [InlineData("stats --live", false, true)]
+    [InlineData("stats --json --live", true, true)]
+    public void Parse_Stats_Flags(string commandLine, bool json, bool live)
+    {
+        var parsed = CliParser.Parse(commandLine.Split(' '));
+
+        Assert.NotNull(parsed.StatsCommand);
+        Assert.Equal(json, parsed.StatsCommand.Json);
+        Assert.Equal(live, parsed.StatsCommand.Live);
+        Assert.Empty(parsed.DiagnosticsOrEmpty);
+    }
+
+    [Theory]
+    [InlineData("stats --since 6h", "06:00:00")]
+    [InlineData("stats --since 30d", "30.00:00:00")]
+    [InlineData("stats --since 00:05:00", "00:05:00")]
+    public void Parse_Stats_SinceDuration(string commandLine, string expected)
+    {
+        var parsed = CliParser.Parse(commandLine.Split(' '));
+
+        Assert.NotNull(parsed.StatsCommand);
+        Assert.Equal(TimeSpan.Parse(expected, System.Globalization.CultureInfo.InvariantCulture), parsed.StatsCommand.Since);
+    }
+
+
+    [Fact]
+    public void Parse_Stats_UnknownFlagEmitsDiagnostic()
+    {
+        var parsed = CliParser.Parse(["stats", "--bogus"]);
+
+        Assert.NotNull(parsed.StatsCommand);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--bogus"));
+    }
+
+    [Fact]
+    public void Parse_Stats_InvalidSinceEmitsDiagnostic()
+    {
+        var parsed = CliParser.Parse(["stats", "--since", "nonsense"]);
+
+        Assert.NotNull(parsed.StatsCommand);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--since"));
+    }
+
+    [Fact]
+    public void Parse_Stats_DoesNotEatFollowingPositionalPrompt()
+    {
+        var parsed = CliParser.Parse(["stats", "hello world"]);
+
+        Assert.NotNull(parsed.StatsCommand);
+        Assert.Equal(["hello world"], parsed.MessagesOrEmpty);
+    }
 }
