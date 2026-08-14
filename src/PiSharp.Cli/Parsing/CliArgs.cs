@@ -22,7 +22,8 @@ public enum DaemonCommandKind { Start, Stop, Status }
 public sealed record DaemonCommandArgs(
     DaemonCommandKind Kind,
     string? Port = null,
-    bool Foreground = false);
+    bool Foreground = false,
+    string? ApiKey = null);
 
 public sealed record CliArgs(
     PackageCommandArgs? PackageCommand = null,

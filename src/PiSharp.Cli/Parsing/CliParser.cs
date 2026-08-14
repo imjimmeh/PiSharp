@@ -153,6 +153,7 @@ public static class CliParser
         }
 
         string? port = null;
+        string? apiKey = null;
         while (i + 1 < args.Count)
         {
             var next = args[i + 1];
@@ -177,13 +178,26 @@ public static class CliParser
                     }
                     port = args[++i];
                     break;
+                case "--api-key":
+                    if (i + 1 >= args.Count)
+                    {
+                        b.Error("Missing value for --api-key.");
+                        continue;
+                    }
+                    if (args[i + 1].StartsWith("-", StringComparison.Ordinal))
+                    {
+                        b.Error("Missing value for --api-key.");
+                        continue;
+                    }
+                    apiKey = args[++i];
+                    break;
                 default:
                     b.Error($"Unknown option for daemon: {next}");
                     break;
             }
         }
 
-        b.DaemonCommand = new DaemonCommandArgs(kind, port, foreground);
+        b.DaemonCommand = new DaemonCommandArgs(kind, port, foreground, apiKey);
         return true;
     }
 

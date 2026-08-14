@@ -210,4 +210,26 @@ public sealed class CliParserTests
         Assert.NotNull(parsed.DaemonCommand);
         Assert.Equal(DaemonCommandKind.Status, parsed.DaemonCommand.Kind);
     }
+
+    [Fact]
+    public void Parse_DaemonStartApiKey_ProducesApiKey()
+    {
+        var parsed = CliParser.Parse(["daemon", "start", "--api-key", "abc123"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Start, parsed.DaemonCommand.Kind);
+        Assert.Equal("abc123", parsed.DaemonCommand.ApiKey);
+    }
+
+    [Fact]
+    public void Parse_DaemonStartApiKeyRejectsFlagLikeValue()
+    {
+        var parsed = CliParser.Parse(["daemon", "start", "--api-key", "--port", "7878"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Start, parsed.DaemonCommand.Kind);
+        Assert.Null(parsed.DaemonCommand.ApiKey);
+        Assert.Equal("7878", parsed.DaemonCommand.Port);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--api-key"));
+    }
 }
