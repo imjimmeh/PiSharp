@@ -1,16 +1,23 @@
-using PiSharp.Server.Authentication;
-using PiSharp.Server.Runtime;
-using PiSharp.Server.WebSockets;
+using PiSharp.Server.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton<ApiKeyValidator>();
-builder.Services.AddSingleton<ServerSessionRegistry>();
-builder.Services.AddSingleton<PiServerWebSocketHandler>();
+var apiKey = builder.Configuration["PiSharp:Server:ApiKey"] ?? Environment.GetEnvironmentVariable("PISHARP_SERVER_API_KEY");
+var host = new PiServerHost(new PiServerHostOptions { ApiKey = apiKey ?? string.Empty });
+await host.StartAsync();
 
-var app = builder.Build();
+var cts = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+};
 
-app.UseWebSockets();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-app.Map("/ws", async (HttpContext context, PiServerWebSocketHandler handler) => await handler.HandleHttpAsync(context));
+try
+{
+    await Task.Delay(Timeout.Infinite, cts.Token);
+}
+catch (OperationCanceledException)
+{
+}
 
-app.Run();
+await host.StopAsync();

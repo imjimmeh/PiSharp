@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Sessions;
@@ -116,10 +115,7 @@ public sealed class PiServerWebSocketHandlerTests
     }
 
     private static PiServerWebSocketHandler CreateHandler(ServerSessionRegistry registry)
-    {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["PiSharp:Server:ApiKey"] = "secret" }).Build();
-        return new PiServerWebSocketHandler(registry, new ApiKeyValidator(config), NullLogger<PiServerWebSocketHandler>.Instance);
-    }
+        => new(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance);
 
     private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeAsync(string root)
     {

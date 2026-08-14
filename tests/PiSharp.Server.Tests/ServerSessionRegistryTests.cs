@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core;
@@ -23,8 +22,7 @@ public sealed class ServerSessionRegistryTests
     [Fact]
     public void ApiKeyValidatorAcceptsBearerAndQueryToken()
     {
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["PiSharp:Server:ApiKey"] = "secret" }).Build();
-        var validator = new ApiKeyValidator(config);
+        var validator = new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" });
         var bearer = new DefaultHttpContext();
         bearer.Request.Headers.Authorization = "Bearer secret";
         var query = new DefaultHttpContext();
@@ -96,7 +94,7 @@ public sealed class ServerSessionRegistryTests
         var serverRegistry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd, manager));
         var created = await serverRegistry.CreateAsync(new CreateServerSessionRequest(TempRoot()));
         Assert.True(serverRegistry.TryGet(created.ServerSessionId, out var live));
-        var handler = new PiSharp.Server.WebSockets.PiServerWebSocketHandler(serverRegistry, new ApiKeyValidator(new ConfigurationBuilder().Build()), Microsoft.Extensions.Logging.Abstractions.NullLogger<PiSharp.Server.WebSockets.PiServerWebSocketHandler>.Instance);
+        var handler = new PiSharp.Server.WebSockets.PiServerWebSocketHandler(serverRegistry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = string.Empty }), Microsoft.Extensions.Logging.Abstractions.NullLogger<PiSharp.Server.WebSockets.PiServerWebSocketHandler>.Instance);
         var json = System.Text.Json.JsonSerializer.Serialize(new { type = ServerCommandTypes.Prompt, id = "p1", serverSessionId = created.ServerSessionId, message = "original" }, ServerJsonSerializer.Options);
         await handler.DispatchTextCommandAsync(json, cancellationToken: CancellationToken.None);
         var deadline = DateTimeOffset.UtcNow.AddSeconds(3);
