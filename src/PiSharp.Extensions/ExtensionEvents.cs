@@ -204,6 +204,7 @@ public static class ExtensionEventMapper
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.RuntimeEvent runtimeEvent } => runtimeEvent.Name,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionStart } => ExtensionEventNames.SkillExecutionStart,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionEnd } => ExtensionEventNames.SkillExecutionEnd,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.AdvisorNote } => ExtensionEventNames.AdvisorNote,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CustomEvent customEvent } => customEvent.Name,
         _ => throw new NotSupportedException($"Unsupported extension event '{evt.GetType().Name}'.")
     };

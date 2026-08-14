@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PiSharp.Abstractions.Environment;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
@@ -219,6 +220,8 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
         public IDisposable RegisterTool(ExtensionToolRegistration registration) => registry.RegisterTool(descriptor.EffectiveSourceId, registration.ToAgentTool(), registration.Override);
         public Task<IReadOnlyList<string>> GetActiveToolsAsync(CancellationToken cancellationToken = default) => binding.GetActiveToolsAsync(cancellationToken);
         public Task<IReadOnlyList<string>> GetAllToolsAsync(CancellationToken cancellationToken = default) => binding.GetAllToolsAsync(cancellationToken);
+        public Task<AgentToolResult<object?>> ExecuteToolAsync(string toolName, JsonElement parameters, CancellationToken cancellationToken = default)
+            => binding.ExecuteToolByNameAsync(toolName, parameters, cancellationToken);
         public Task SetActiveToolsAsync(IReadOnlyList<string>? toolNames, CancellationToken cancellationToken = default) => binding.SetActiveToolsAsync(toolNames, cancellationToken);
     }
 
