@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -56,7 +57,7 @@ public sealed class PiServerWebSocketHandler(
     {
         using var sendGate = new SemaphoreSlim(1, 1);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var eventPumps = new Dictionary<string, Task>(StringComparer.Ordinal);
+        var eventPumps = new ConcurrentDictionary<string, Task>(StringComparer.Ordinal);
 
         async Task SendAsync(object payload, CancellationToken token)
         {
@@ -87,16 +88,24 @@ public sealed class PiServerWebSocketHandler(
             {
                 var message = await ReceiveTextAsync(socket, cancellationToken);
                 if (message is null) break;
-                var responseSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                var response = await DispatchTextCommandAsync(message, EnsureEventPumpAsync, SendAsync, responseSent.Task, cancellationToken);
-                try
+                _ = Task.Run(async () =>
                 {
-                    await SendAsync(response, cancellationToken);
-                }
-                finally
-                {
-                    responseSent.TrySetResult();
-                }
+                    var responseSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    try
+                    {
+                        var response = await DispatchTextCommandAsync(message, EnsureEventPumpAsync, SendAsync, responseSent.Task, linked.Token);
+                        try
+                        {
+                            await SendAsync(response, linked.Token);
+                        }
+                        finally
+                        {
+                            responseSent.TrySetResult();
+                        }
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (Exception ex) { logger.LogWarning(ex, "Command dispatch failed"); }
+                }, CancellationToken.None);
             }
         }
         finally
