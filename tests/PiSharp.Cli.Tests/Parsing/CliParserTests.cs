@@ -248,4 +248,41 @@ public sealed class CliParserTests
 
         Assert.False(parsed.Local);
     }
+
+    [Fact]
+    public void Parse_AttachFlag_ParsesSessionId()
+    {
+        var parsed = CliParser.Parse(["--attach", "sess-123"]);
+
+        Assert.Equal("sess-123", parsed.Attach);
+        Assert.Empty(parsed.DiagnosticsOrEmpty);
+    }
+
+    [Fact]
+    public void Parse_AttachWithoutValue_ProducesDiagnostic()
+    {
+        var parsed = CliParser.Parse(["--attach"]);
+
+        Assert.Null(parsed.Attach);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--attach"));
+    }
+
+    [Fact]
+    public void Parse_AttachAndLocal_Coexist()
+    {
+        var parsed = CliParser.Parse(["--attach", "sess-123", "--local"]);
+
+        Assert.Equal("sess-123", parsed.Attach);
+        Assert.True(parsed.Local);
+    }
+
+    [Fact]
+    public void Parse_AttachAndResume_Coexist()
+    {
+        var parsed = CliParser.Parse(["--attach", "sess-123", "--resume"]);
+
+        Assert.Equal("sess-123", parsed.Attach);
+        Assert.True(parsed.Resume);
+        Assert.Empty(parsed.DiagnosticsOrEmpty);
+    }
 }

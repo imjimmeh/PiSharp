@@ -260,8 +260,53 @@ public static class InteractiveMode
 
         await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}"), lease.ApiKey, cancellationToken);
 
-        var created = await CreateRemoteSessionAsync(connection, runtimeArgs, cancellationToken);
-        var sessionId = created.ServerSessionId;
+        var cwd = Directory.GetCurrentDirectory();
+        var attachId = runtimeArgs.Attach;
+        ServerSessionCreated? created = null;
+        string? attachedServerSessionId = null;
+        if (!string.IsNullOrWhiteSpace(attachId))
+        {
+            var listResponse = await connection.SendAsync(
+                new ServerCommandEnvelope(ServerCommandTypes.ListSessions),
+                new ListSessionsCommand(Type: ServerCommandTypes.ListSessions, Cwd: cwd),
+                cancellationToken);
+            if (!listResponse.Success)
+            {
+                throw new InvalidOperationException($"list_sessions failed: {listResponse.Error?.Code}: {listResponse.Error?.Message}");
+            }
+
+            var listed = FromPayload<ServerSessionListResult>(listResponse.Data)
+                ?? throw new InvalidOperationException("list_sessions returned no session list.");
+
+            var live = listed.Sessions.FirstOrDefault(session => string.Equals(session.Id, attachId, StringComparison.Ordinal) && session.IsLive);
+            if (live is not null)
+            {
+                var sinceSequence = ReadCursorSequence(attachId, cwd) + 1;
+                var attachResponse = await connection.SendAsync(
+                    new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: live.ServerSessionId),
+                    new { sinceSequence },
+                    cancellationToken);
+                if (!attachResponse.Success)
+                {
+                    throw new InvalidOperationException($"attach failed: {attachResponse.Error?.Code}: {attachResponse.Error?.Message}");
+                }
+
+                attachedServerSessionId = live.ServerSessionId;
+                await console.Out.WriteLineAsync($"attached to live session {attachId}".AsMemory(), cancellationToken);
+            }
+            else
+            {
+                await console.Error.WriteLineAsync($"session {attachId} is not live; starting a new session".AsMemory(), cancellationToken);
+            }
+        }
+
+        if (attachedServerSessionId is null)
+        {
+            created = await CreateRemoteSessionAsync(connection, runtimeArgs, cancellationToken);
+        }
+
+        var sessionId = (attachedServerSessionId ?? created!.ServerSessionId)!;
+        var runtimeSessionId = attachedServerSessionId is null ? created!.State.RuntimeSessionId : attachId!;
         backend.ServerSessionId = sessionId;
 
         var startupMessages = await backend.GetStartupMessagesAsync(cancellationToken);
@@ -306,10 +351,16 @@ public static class InteractiveMode
             LoggerFactory: null);
 
         var host = new TuiHost(options);
-        var exit = await host.RunAsync(cancellationToken);
-
-        await backend.DisposeAsync();
-        return exit;
+        try
+        {
+            return await host.RunAsync(cancellationToken);
+        }
+        finally
+        {
+            var lastAppliedSequence = connection.LastAppliedSequence;
+            await backend.DisposeAsync();
+            WriteCursorSequence(runtimeSessionId, cwd, lastAppliedSequence);
+        }
     }
 
     private static async Task<ServerSessionCreated> CreateRemoteSessionAsync(ClientSessionConnection connection, CliArgs runtimeArgs, CancellationToken cancellationToken)
@@ -348,6 +399,66 @@ public static class InteractiveMode
     /// </summary>
     private static T? FromPayload<T>(object? data)
         => data is null ? default : JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(data, ServerJsonSerializer.Options), ServerJsonSerializer.Options);
+
+    /// <summary>
+    /// Reads the last-applied event sequence recorded for a daemon session, or 0 when no cursor
+    /// exists or it cannot be parsed. The re-attach cursor is this value + 1.
+    /// </summary>
+    internal static long ReadCursorSequence(string sessionId, string cwd)
+        => ReadCursorSequence(sessionId, cwd, homeDirectory: null);
+
+    internal static long ReadCursorSequence(string sessionId, string cwd, string? homeDirectory)
+    {
+        var path = CursorPath(sessionId, cwd, homeDirectory);
+        try
+        {
+            if (!File.Exists(path)) return 0;
+            return long.TryParse(File.ReadAllText(path).Trim(), out var sequence) ? sequence : 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Records the last-applied event sequence for a daemon session so a later client can resume
+    /// from the watermark via <c>--attach</c>. Written atomically (temp file + rename).
+    /// </summary>
+    internal static void WriteCursorSequence(string sessionId, string cwd, long sequence)
+        => WriteCursorSequence(sessionId, cwd, sequence, homeDirectory: null);
+
+    internal static void WriteCursorSequence(string sessionId, string cwd, long sequence, string? homeDirectory)
+    {
+        var directory = Path.Combine(PiAgentPaths.FromCwd(cwd, homeDirectory).GlobalPiSharpDirectory, "sessions");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, $"{sessionId}.cursor");
+        var tempPath = path + ".tmp";
+        try
+        {
+            File.WriteAllText(tempPath, sequence.ToString());
+            File.Move(tempPath, path, overwrite: true);
+        }
+        finally
+        {
+            DeleteTempFileIfPresent(tempPath);
+        }
+    }
+
+    private static string CursorPath(string sessionId, string cwd, string? homeDirectory)
+        => Path.Combine(PiAgentPaths.FromCwd(cwd, homeDirectory).GlobalPiSharpDirectory, "sessions", $"{sessionId}.cursor");
+
+    private static void DeleteTempFileIfPresent(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Best-effort cleanup; never mask the original write failure.
+        }
+    }
 
     private static SlashCommandRegistry BuildCommandRegistry(SessionRuntime runtime)
         => SlashCommandRegistryFactory.Create(runtime);

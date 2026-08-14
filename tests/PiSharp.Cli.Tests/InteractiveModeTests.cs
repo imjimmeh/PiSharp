@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using PiSharp.Client;
 using PiSharp.Cli.Modes;
+using PiSharp.Compatibility.Settings;
 using Xunit;
 
 namespace PiSharp.Cli.Tests;
@@ -88,6 +89,41 @@ public sealed class InteractiveModeTests
 
         Assert.Null(lease);
     }
+
+    [Fact]
+    public void WriteThenReadCursorSequence_RoundTrips()
+    {
+        using var tempDir = TempDirectory.Create();
+
+        InteractiveMode.WriteCursorSequence("sess-1", tempDir.Path, 42, tempDir.Path);
+
+        Assert.Equal(42, InteractiveMode.ReadCursorSequence("sess-1", tempDir.Path, tempDir.Path));
+        var cursorPath = CursorFilePath("sess-1", tempDir.Path);
+        Assert.True(File.Exists(cursorPath));
+        Assert.Equal("42", File.ReadAllText(cursorPath));
+    }
+
+    [Fact]
+    public void ReadCursorSequence_MissingFile_ReturnsZero()
+    {
+        using var tempDir = TempDirectory.Create();
+
+        Assert.Equal(0, InteractiveMode.ReadCursorSequence("sess-missing", tempDir.Path, tempDir.Path));
+    }
+
+    [Fact]
+    public void ReadCursorSequence_GarbageFile_ReturnsZero()
+    {
+        using var tempDir = TempDirectory.Create();
+        var cursorPath = CursorFilePath("sess-garbage", tempDir.Path);
+        Directory.CreateDirectory(Path.GetDirectoryName(cursorPath)!);
+        File.WriteAllText(cursorPath, "not-a-number");
+
+        Assert.Equal(0, InteractiveMode.ReadCursorSequence("sess-garbage", tempDir.Path, tempDir.Path));
+    }
+
+    private static string CursorFilePath(string sessionId, string home)
+        => Path.Combine(PiAgentPaths.FromCwd(home, home).GlobalPiSharpDirectory, "sessions", $"{sessionId}.cursor");
 
     private sealed class TempDirectory : IDisposable
     {

@@ -36,6 +36,7 @@ public sealed record CliArgs(
     ThinkingLevel? Thinking = null,
     bool Continue = false,
     bool Resume = false,
+    string? Attach = null,
     bool Help = false,
     bool Version = false,
     CliMode? Mode = null,
