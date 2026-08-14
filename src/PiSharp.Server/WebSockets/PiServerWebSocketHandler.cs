@@ -789,7 +789,7 @@ public sealed class PiServerWebSocketHandler(
             toolResults.Length,
             toolResults.Count(result => result.IsError),
             retries,
-            messages.FirstOrDefault()?.Timestamp,
+            messages.FirstOrDefault()?.Timestamp ?? live.Runtime.Session.Metadata.CreatedAt,
             live.LastActivityUtc);
         return ServerResponse.Ok(envelope.Id, envelope.Type, stats);
     }

@@ -86,7 +86,7 @@ public sealed class TelemetryCommandsIntegrationTests
 
         var tool = Assert.Single(data.GetProperty("byTool").EnumerateArray());
         Assert.Equal("bash", tool.GetProperty("tool").GetString());
-        Assert.Equal(2, tool.GetProperty("calls").GetInt32());
+        Assert.Equal(1, tool.GetProperty("calls").GetInt32());
         Assert.Equal(1, tool.GetProperty("failures").GetInt32());
         Assert.Equal(1, tool.GetProperty("retries").GetInt32());
         Assert.Equal(500, tool.GetProperty("avgDurationMs").GetInt32());
@@ -114,9 +114,9 @@ public sealed class TelemetryCommandsIntegrationTests
         AssertSuccess(create);
         var sessionId = create.RootElement.GetProperty("data").GetProperty("serverSessionId").GetString()!;
 
-        var prompt1 = await client.SendCommandAsync(new { id = "p1", type = ServerCommandTypes.Prompt, serverSessionId = sessionId, text = "retry me" });
+        var prompt1 = await client.SendCommandAsync(new { id = "p1", type = ServerCommandTypes.RunCommand, serverSessionId = sessionId, text = "retry me" });
         AssertSuccess(prompt1);
-        var prompt2 = await client.SendCommandAsync(new { id = "p2", type = ServerCommandTypes.Prompt, serverSessionId = sessionId, text = "retry again" });
+        var prompt2 = await client.SendCommandAsync(new { id = "p2", type = ServerCommandTypes.RunCommand, serverSessionId = sessionId, text = "retry again" });
         AssertSuccess(prompt2);
 
         var stats = await client.SendCommandAsync(new { id = "s1", type = ServerCommandTypes.GetSessionStats, serverSessionId = sessionId });

@@ -39,13 +39,17 @@ public sealed class RetainedEventLog(int capacity)
         {
             var oldest = _head - _count + 1;
             var gap = _count > 0 && sinceSequence >= _firstSequence && sinceSequence < oldest;
+            // Clamp the reported FromSequence to the oldest retained sequence when the request
+            // falls inside the evicted range; fresh attaches at/before the first sequence stay
+            // unclamped and gap-free (the client replays everything retained).
+            var fromSequence = gap ? oldest : sinceSequence;
             var events = new List<ServerEventEnvelope>();
             for (var i = 0; i < _count; i++)
             {
                 var envelope = _buffer[(_start + i) % capacity];
                 if (envelope.Sequence >= sinceSequence) events.Add(envelope);
             }
-            return new ReplayResult(sinceSequence, _head, gap, events);
+            return new ReplayResult(fromSequence, _head, gap, events);
         }
     }
 }
