@@ -511,12 +511,18 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
     /// Publishes a harness-owned event through the loop-event pipeline
     /// (extension dispatch + listener notification), making it visible to
     /// in-process extension handlers and harness subscribers (the daemon wire
-    /// and TS bridge). Custom events are validated before dispatch.
+    /// and TS bridge). Custom events are validated before dispatch; names reserved for a
+    /// dedicated session event (e.g. <c>advisor_note</c>) are mapped to their typed variant
+    /// instead of being rejected (see <see cref="AgentSessionEvent.MapReservedCustomEvent"/>).
     /// </summary>
     public async Task PublishOwnEventAsync(AgentHarnessOwnEvent ownEvent, CancellationToken cancellationToken)
     {
         if (ownEvent is AgentHarnessOwnEvent.CustomEvent customEvent)
-            ValidateCustomEvent(customEvent);
+        {
+            var mapped = AgentSessionEvent.MapReservedCustomEvent(customEvent);
+            if (mapped is not null) ownEvent = mapped;
+            else ValidateCustomEvent(customEvent);
+        }
 
         var context = CreateEventContext(new AgentHarnessEvent.Own(ownEvent), HarnessEventKind.Own);
         if (context.IsThinkingLevelOwnEvent)

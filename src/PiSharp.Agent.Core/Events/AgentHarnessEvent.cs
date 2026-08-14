@@ -80,6 +80,7 @@ public sealed class AgentSessionEvent
             AgentHarnessOwnEvent.SessionBeforeTree e => new AgentSessionEvent("session_before_tree", new { preparation = e.Preparation }),
             AgentHarnessOwnEvent.SessionTree e => new AgentSessionEvent("session_tree", new { newLeafId = e.NewLeafId, oldLeafId = e.OldLeafId, summaryEntry = e.SummaryEntry, fromHook = e.FromHook }),
             AgentHarnessOwnEvent.ResourcesUpdate e => new AgentSessionEvent("resources_update", new { resources = e.Resources, previousResources = e.PreviousResources }),
+            AgentHarnessOwnEvent.AdvisorNote e => FromAdvisor(e.Event),
             AgentHarnessOwnEvent.CustomEvent e => new AgentSessionEvent(e.Name, e.Payload),
             _ => throw new NotSupportedException($"Unknown own event: {ownEvent.GetType().Name}")
         };
@@ -110,6 +111,30 @@ public sealed class AgentSessionEvent
             throw new ArgumentException($"Custom event name '{name}' is invalid: must match [a-z0-9_]{{1,64}}.", nameof(name));
         if (ReservedEventNames.Contains(name))
             throw new ArgumentException($"Custom event name '{name}' collides with a core session event name.", nameof(name));
+    }
+
+    /// <summary>
+    /// Maps a custom event whose name is reserved for a dedicated session event onto that
+    /// event's typed variant, so reserved names can ride the custom-event lane without
+    /// colliding (e.g. <c>advisor_note</c> → <see cref="AgentHarnessOwnEvent.AdvisorNote"/>,
+    /// flattened via <see cref="FromAdvisor(ExtensionAdvisorEvent)"/>). Returns <c>null</c>
+    /// for non-reserved names, which proceed through normal custom-event validation. Throws
+    /// <see cref="ArgumentException"/> when the name is reserved but has no dedicated mapping,
+    /// or when its payload does not match the mapped variant's payload type.
+    /// </summary>
+    public static AgentHarnessOwnEvent? MapReservedCustomEvent(AgentHarnessOwnEvent.CustomEvent customEvent)
+    {
+        if (!ReservedEventNames.Contains(customEvent.Name)) return null;
+
+        return customEvent.Name switch
+        {
+            "advisor_note" => customEvent.Payload is ExtensionAdvisorEvent advisorEvent
+                ? new AgentHarnessOwnEvent.AdvisorNote(advisorEvent)
+                : throw new ArgumentException(
+                    $"Custom event 'advisor_note' requires an {nameof(ExtensionAdvisorEvent)} payload.", nameof(customEvent)),
+            _ => throw new ArgumentException(
+                $"Custom event name '{customEvent.Name}' collides with a core session event name.", nameof(customEvent))
+        };
     }
 
     public static AgentSessionEvent FromAdvisor(ExtensionAdvisorEvent e)
@@ -297,10 +322,22 @@ public abstract record AgentHarnessOwnEvent
         string? ErrorMessage = null) : AgentHarnessOwnEvent;
 
     /// <summary>
+    /// Dedicated variant for the reserved <c>advisor_note</c> event name: produced when the
+    /// custom-event lane carries an <see cref="ExtensionAdvisorEvent"/> payload under the
+    /// <c>advisor_note</c> name (see <see cref="AgentSessionEvent.MapReservedCustomEvent"/>).
+    /// Flattened to the daemon/client stream via
+    /// <see cref="AgentSessionEvent.FromAdvisor(ExtensionAdvisorEvent)"/>.
+    /// </summary>
+    public sealed record AdvisorNote(
+        ExtensionAdvisorEvent Event) : AgentHarnessOwnEvent;
+
+    /// <summary>
     /// Extension-originated session event pushed to harness subscribers and the
     /// daemon wire via <c>PublishOwnEventAsync</c>. The name is validated at
     /// publish time (snake_case <c>[a-z0-9_]{1,64}</c>, no core-event collision)
-    /// and the payload must be JSON-serializable.
+    /// and the payload must be JSON-serializable. Names reserved for a dedicated
+    /// session event are mapped to their typed variant instead of being rejected
+    /// (see <see cref="AgentSessionEvent.MapReservedCustomEvent"/>).
     /// </summary>
     public sealed record CustomEvent(
         string Name,
