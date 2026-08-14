@@ -195,9 +195,9 @@ public static class DaemonMode
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    private sealed class DaemonLock(string path) : IDisposable
+    internal sealed class DaemonLock(string path) : IDisposable
     {
-        private readonly FileStream _stream = new(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        private readonly FileStream _stream = new(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
 
         public static DaemonLock? TryAcquire(string path)
         {

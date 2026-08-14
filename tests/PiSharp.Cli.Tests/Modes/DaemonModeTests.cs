@@ -10,10 +10,23 @@ namespace PiSharp.Cli.Tests.Modes;
 public sealed class DaemonModeTests
 {
     [Fact]
-    public async Task Start_WhenLockFileExists_ReportsAlreadyRunning()
+    public void StaleLockFile_CanBeAcquiredForNewDaemon()
     {
         using var tempDir = TempDirectory.Create();
-        await File.WriteAllTextAsync(Path.Combine(tempDir.Path, "daemon.lock"), "locked");
+        var lockPath = Path.Combine(tempDir.Path, "daemon.lock");
+        File.WriteAllText(lockPath, "stale");
+
+        using var daemonLock = DaemonMode.DaemonLock.TryAcquire(lockPath);
+
+        Assert.NotNull(daemonLock);
+    }
+
+    [Fact]
+    public async Task Start_WhenLockIsHeld_ReportsAlreadyRunning()
+    {
+        using var tempDir = TempDirectory.Create();
+        using var heldLock = DaemonMode.DaemonLock.TryAcquire(Path.Combine(tempDir.Path, "daemon.lock"));
+        Assert.NotNull(heldLock);
         var console = new TestConsoleIO();
 
         var exitCode = await DaemonMode.RunAsync(
