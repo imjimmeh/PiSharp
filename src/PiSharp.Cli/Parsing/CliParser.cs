@@ -140,19 +140,19 @@ public static class CliParser
         }
 
         DaemonCommandKind kind;
+        var foreground = false;
         switch (args[++i])
         {
             case "start": kind = DaemonCommandKind.Start; break;
             case "stop": kind = DaemonCommandKind.Stop; break;
             case "status": kind = DaemonCommandKind.Status; break;
-            case "foreground": kind = DaemonCommandKind.Foreground; break;
+            case "foreground": kind = DaemonCommandKind.Start; foreground = true; break;
             default:
                 b.Error($"Unknown daemon subcommand: {args[i]}");
                 return true;
         }
 
         string? port = null;
-        var foreground = false;
         while (i + 1 < args.Count)
         {
             var next = args[i + 1];
@@ -166,6 +166,11 @@ public static class CliParser
                     break;
                 case "--port":
                     if (i + 1 >= args.Count)
+                    {
+                        b.Error("Missing value for --port.");
+                        continue;
+                    }
+                    if (args[i + 1].StartsWith("-", StringComparison.Ordinal))
                     {
                         b.Error("Missing value for --port.");
                         continue;

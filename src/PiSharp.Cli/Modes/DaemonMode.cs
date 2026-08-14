@@ -10,7 +10,7 @@ public static class DaemonMode
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(console);
 
-        await console.Error.WriteLineAsync("not implemented");
+        await console.Error.WriteLineAsync("not implemented".AsMemory(), cancellationToken);
         return 1;
     }
 }

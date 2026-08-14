@@ -120,4 +120,94 @@ public sealed class CliParserTests
         Assert.NotNull(parsed.DaemonCommand);
         Assert.Equal(DaemonCommandKind.Status, parsed.DaemonCommand.Kind);
     }
+
+    [Fact]
+    public void Parse_DaemonStartWithForegroundFlag_SetsForeground()
+    {
+        var parsed = CliParser.Parse(["daemon", "start", "--foreground"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Start, parsed.DaemonCommand.Kind);
+        Assert.True(parsed.DaemonCommand.Foreground);
+    }
+
+    [Fact]
+    public void Parse_DaemonForegroundKind_NormalizesToStartWithForeground()
+    {
+        var parsed = CliParser.Parse(["daemon", "foreground"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Start, parsed.DaemonCommand.Kind);
+        Assert.True(parsed.DaemonCommand.Foreground);
+        Assert.Null(parsed.DaemonCommand.Port);
+    }
+
+    [Fact]
+    public void Parse_DaemonStop_ProducesStopArgs()
+    {
+        var parsed = CliParser.Parse(["daemon", "stop"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Stop, parsed.DaemonCommand.Kind);
+    }
+
+    [Fact]
+    public void Parse_DaemonAlone_ProducesErrorAndNoDaemonCommand()
+    {
+        var parsed = CliParser.Parse(["daemon"]);
+
+        Assert.Null(parsed.DaemonCommand);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("Missing subcommand"));
+    }
+
+    [Fact]
+    public void Parse_DaemonUnknownKind_ProducesErrorAndNoDaemonCommand()
+    {
+        var parsed = CliParser.Parse(["daemon", "foo"]);
+
+        Assert.Null(parsed.DaemonCommand);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("foo"));
+    }
+
+    [Fact]
+    public void Parse_DaemonFlagBeforeKind_ProducesErrorAndNoDaemonCommand()
+    {
+        var parsed = CliParser.Parse(["daemon", "--port", "5"]);
+
+        Assert.Null(parsed.DaemonCommand);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--port"));
+    }
+
+    [Fact]
+    public void Parse_DaemonStartMissingPortValue_ProducesError()
+    {
+        var parsed = CliParser.Parse(["daemon", "start", "--port"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Start, parsed.DaemonCommand.Kind);
+        Assert.Null(parsed.DaemonCommand.Port);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--port"));
+    }
+
+    [Fact]
+    public void Parse_DaemonStartPortRejectsFlagLikeValue()
+    {
+        var parsed = CliParser.Parse(["daemon", "start", "--port", "--foreground"]);
+
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Start, parsed.DaemonCommand.Kind);
+        Assert.Null(parsed.DaemonCommand.Port);
+        Assert.True(parsed.DaemonCommand.Foreground);
+        Assert.Contains(parsed.DiagnosticsOrEmpty, d => d.Type == CliDiagnosticType.Error && d.Message.Contains("--port"));
+    }
+
+    [Fact]
+    public void Parse_DaemonAfterOtherFlags_StillParsesAsDaemonCommand()
+    {
+        var parsed = CliParser.Parse(["--verbose", "daemon", "status"]);
+
+        Assert.True(parsed.Verbose);
+        Assert.NotNull(parsed.DaemonCommand);
+        Assert.Equal(DaemonCommandKind.Status, parsed.DaemonCommand.Kind);
+    }
 }

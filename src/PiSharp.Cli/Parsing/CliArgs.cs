@@ -18,7 +18,7 @@ public sealed record PackageCommandArgs(
     bool Extensions = false,
     string? ExtensionSource = null);
 
-public enum DaemonCommandKind { Start, Stop, Status, Foreground }
+public enum DaemonCommandKind { Start, Stop, Status }
 public sealed record DaemonCommandArgs(
     DaemonCommandKind Kind,
     string? Port = null,
