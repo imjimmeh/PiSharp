@@ -130,7 +130,8 @@ public sealed class LiveServerSession : IAsyncDisposable
             harness.ThinkingLevel,
             harness.Phase == AgentHarnessPhase.Turn,
             harness.Phase == AgentHarnessPhase.Compaction,
-            context.Messages.Count);
+            context.Messages.Count,
+            EventLog.HeadSequence);
     }
 
     private void ResetAbortIfNeeded()

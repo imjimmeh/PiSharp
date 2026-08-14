@@ -89,7 +89,8 @@ public sealed record ServerSessionState(
     ThinkingLevel ThinkingLevel,
     bool IsBusy,
     bool IsCompacting,
-    int MessageCount);
+    int MessageCount,
+    long HighWatermark = 0);
 
 public sealed record ServerSessionCreated(string ServerSessionId, ServerSessionState State);
 public sealed record ServerMessagesResult(string ServerSessionId, IReadOnlyList<AgentMessage> Messages);

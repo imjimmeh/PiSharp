@@ -176,6 +176,39 @@ public sealed class PiServerWebSocketHandlerTests
         Assert.Equal("command_failed", response.Error?.Code);
     }
 
+    [Fact]
+    public async Task GetStateCommand_ReturnsHeadSequence()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+
+        await EmitTurnAsync(live);
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "s", type = ServerCommandTypes.GetState, serverSessionId = created.ServerSessionId
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(response.Success);
+        var state = Assert.IsType<ServerSessionState>(response.Data);
+        Assert.Equal(live.EventLog.HeadSequence, state.HighWatermark);
+    }
+
+    [Fact]
+    public async Task GetStateCommand_WithoutSession_Fails()
+    {
+        var handler = CreateHandler(new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd)));
+        var command = JsonSerializer.Serialize(new { id = "s", type = ServerCommandTypes.GetState, serverSessionId = "missing" }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+    }
+
     private static PiServerWebSocketHandler CreateHandler(ServerSessionRegistry registry)
         => new(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance);
 
