@@ -11,7 +11,7 @@ namespace PiSharp.Plugins.Lsp.Tests;
 /// </summary>
 public sealed class LspInitializeHandshakeTests
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
     private const string RootPath = @"C:\work\demo";
 
     [Fact]

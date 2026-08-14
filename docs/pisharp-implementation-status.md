@@ -45,11 +45,12 @@ Legend: ✅ done · 🟡 partially done (deviations recorded in the plan/plugin 
 | P29 permissions gating | `PiSharp.Permissions` | ✅ | Permissions 91/91 |
 | P30 AST/hashline | AST structural editing + hashline registry | ✅ | Ast 68/68 |
 | P31 distribution | self-update dispatch + `VersionInfo` | ✅ | Cli 342/342 |
-
 ## Verify gate
 
-Full-union `dotnet build PiSharp.sln` + `dotnet test PiSharp.sln` — the authoritative gate
-(see the final union run; per-project counts above are the individual gates).
+Full-union `dotnet build PiSharp.sln` (96 projects): 0 errors. Full-union `dotnet test PiSharp.sln`:
+all 42 test projects green except the pre-existing Tui integration timing flakes
+(`InlineSelection*` / `DeferredStartup*` — pass in isolation; established pre-existing, not
+regressions). Verified 2026-08-14.
 
 ## Known deferred (outside this portfolio's scope)
 

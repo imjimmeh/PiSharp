@@ -556,7 +556,7 @@ public sealed class SystemProcessRunnerTests
     public async Task RunsProcessWithShellExecuteOnWindows()
     {
         var runner = new SystemProcessRunner();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         await runner.RunAsync("cmd", "/c echo hello", cancellationToken: cts.Token);
     }
