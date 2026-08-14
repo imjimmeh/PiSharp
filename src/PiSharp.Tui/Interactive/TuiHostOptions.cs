@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core.Tools;
-using PiSharp.Agent.Harness;
 using PiSharp.Agent.Resources.Theme;
 using PiSharp.Extensions;
 using PiSharp.Tui.Interactive.Components;
@@ -39,7 +38,7 @@ internal sealed record TuiHostRunContext(
     Action<string> InvokeCommand);
 
 public sealed record TuiHostOptions(
-    AgentHarness<JsonlSessionMetadata> Harness,
+    ITuiRuntimeFacade Runtime,
     string SessionId,
     string? SessionFile,
     Func<CancellationToken, Task<string?>> GetSessionNameAsync,
@@ -55,7 +54,6 @@ public sealed record TuiHostOptions(
     Func<ExtensionRegistry?>? GetExtensionRegistry = null,
     Func<string, IAgentTool?>? ResolveTool = null,
     Func<CancellationToken, Task>? CycleThinkingLevelAsync = null,
-    Func<AgentHarness<JsonlSessionMetadata>>? GetCurrentHarness = null,
     Func<string, string, CancellationToken, Task<(string Text, IReadOnlyList<ImageContent> Images)>>? ProcessFileReferencesAsync = null,
     Func<string, IReadOnlyList<ImageContent>?, string, CancellationToken, Task<TuiInputHookResult>>? ProcessInputAsync = null,
     Func<CancellationToken, Task<TuiSessionSnapshot>>? GetSessionSnapshotAsync = null,

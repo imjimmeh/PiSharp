@@ -134,7 +134,7 @@ public sealed class TuiHostIntegrationTests
         var promptText = "hello from integration";
         var assistantText = "assistant integration reply";
         var harness = TuiIntegrationTestHost.CreateHarness(assistantText);
-        await using var running = await TuiIntegrationTestHost.StartAsync(harness: harness);
+        await using var running = await TuiIntegrationTestHost.StartAsync(runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness));
 
         await running.SubmitPromptAsync(promptText);
 
@@ -181,7 +181,7 @@ public sealed class TuiHostIntegrationTests
             BlockingStream,
             TuiIntegrationTestHost.FakeCompletion,
             []));
-        await using var running = await TuiIntegrationTestHost.StartAsync(harness: harness);
+        await using var running = await TuiIntegrationTestHost.StartAsync(runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness));
 
         await running.SubmitPromptAsync("cancel this request");
         await streamStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -219,7 +219,7 @@ public sealed class TuiHostIntegrationTests
 
         var harness = TuiIntegrationTestHost.CreateHarness(assistantText);
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harness, processInputAsync: processInputAsync);
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness), processInputAsync: processInputAsync);
         var submitStarted = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         Application.Invoke(() =>
@@ -521,7 +521,7 @@ public sealed class TuiHostIntegrationTests
             []));
 
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harness,
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness),
             onBeforeRun: (context, _) =>
             {
                 context.Prompt.FocusAtEnd();
@@ -848,14 +848,7 @@ public sealed class TuiHostIntegrationTests
         var dispatchTcs = new TaskCompletionSource<TuiCommandDispatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var dispatchStartedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var initialHarness = TuiIntegrationTestHost.CreateHarness("initial");
-        var newHarness = TuiIntegrationTestHost.CreateHarness("new");
-
-        var useNewHarness = 0;
         var snapshotCallCount = 0;
-
-        Func<AgentHarness<JsonlSessionMetadata>> getCurrentHarness = () =>
-            Volatile.Read(ref useNewHarness) == 1 ? newHarness : initialHarness;
 
         Func<CancellationToken, Task<TuiSessionSnapshot>> getSessionSnapshotAsync = _ =>
         {
@@ -868,13 +861,11 @@ public sealed class TuiHostIntegrationTests
         Func<TuiCommandDispatchRequest, CancellationToken, Task<TuiCommandDispatchResult>> dispatchCommandAsync = async (request, ct) =>
         {
             dispatchStartedTcs.TrySetResult();
-            Interlocked.Exchange(ref useNewHarness, 1);
             return await dispatchTcs.Task.WaitAsync(ct);
         };
 
         await using var running = await TuiIntegrationTestHost.StartAsync(
             dispatchCommandAsync: dispatchCommandAsync,
-            getCurrentHarness: getCurrentHarness,
             getSessionSnapshotAsync: getSessionSnapshotAsync);
 
         Assert.Equal("test-session", running.Context.GetState().SessionId);
@@ -947,7 +938,7 @@ public sealed class TuiHostIntegrationTests
 
         var harne = TuiIntegrationTestHost.CreateHarness("reply");
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harne, processFileReferencesAsync: processFileRefsAsync);
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harne), processFileReferencesAsync: processFileRefsAsync);
 
         await running.SubmitPromptAsync(filePath);
         await hookTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -984,7 +975,7 @@ public sealed class TuiHostIntegrationTests
 
         var harne = TuiIntegrationTestHost.CreateHarness("ok");
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harne, processInputAsync: processInputAsync);
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harne), processInputAsync: processInputAsync);
 
         var originalText = "hello world";
         await running.SubmitPromptAsync(originalText);
@@ -1101,7 +1092,7 @@ public sealed class TuiHostIntegrationTests
             => new(Total: 3, Active: 3, BlockingActive: 0, Ready: 0, Failed: 0);
 
         await using var running = await TuiIntegrationTestHost.StartAsync(
-            harness: harness,
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness),
             getExtensionLoadStatus: GetExtensionLoadStatus,
             commandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" });
 
@@ -1274,7 +1265,7 @@ public sealed class TuiHostIntegrationTests
             TuiIntegrationTestHost.FakeCompletion,
             []));
 
-        await using var running = await TuiIntegrationTestHost.StartAsync(harness: harness);
+        await using var running = await TuiIntegrationTestHost.StartAsync(runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harness));
         await running.WaitUntilAsync(text => text.Length > 0);
 
         await running.SubmitPromptAsync("test prompt");

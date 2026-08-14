@@ -19,11 +19,10 @@ public static class InteractiveMode
 {
     private static ILogger? _footerLogger;
 
-    public static async Task<int> RunAsync(SessionRuntime runtime, CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(SessionRuntime runtime, CancellationToken cancellationToken = default, bool local = false)
     {
         var options = CreateTuiHostOptions(runtime);
         var host = new TuiHost(options);
-        runtime.SetRebindSession((_, ct) => options.OnHarnessReplaced?.Invoke(ct) ?? Task.CompletedTask);
         return await host.RunAsync(cancellationToken);
     }
 
@@ -117,7 +116,7 @@ public static class InteractiveMode
             => await runtime.ForkAsync(runtime.Session.Metadata, new SessionForkOptions(entryId, "at"), token);
 
         return new TuiHostOptions(
-            runtime.Harness,
+            new InProcessTuiFacade(runtime),
             runtime.Session.Metadata.Id,
             runtime.Session.Metadata.Path,
             token => runtime.Session.GetSessionNameAsync(token),
@@ -183,7 +182,6 @@ public static class InteractiveMode
             GetExtensionRegistry: () => runtime.ExtensionManager?.Registry,
             ResolveTool: ResolveExtensionTool,
             CycleThinkingLevelAsync: CycleThinkingLevelAsync,
-            GetCurrentHarness: () => runtime.Harness,
             ProcessFileReferencesAsync: async (text, cwd, token) =>
             {
                 var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, cwd, token);

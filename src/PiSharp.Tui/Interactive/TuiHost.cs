@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
-using PiSharp.Agent.Harness;
 using PiSharp.Agent.Resources.Theme;
 using PiSharp.Extensions;
 using PiSharp.Tui.Interactive.Components;
@@ -60,10 +59,10 @@ public sealed class TuiHost(TuiHostOptions options)
         TuiShortcutRegistrar.LoggerFactory = options.LoggerFactory;
         var appContext = new TerminalGuiApplicationContext();
 
-        var startupHarness = options.GetCurrentHarness?.Invoke() ?? options.Harness;
+        var runtime = options.Runtime;
         var state = TuiRenderState.Empty(
             options.SessionId, options.SessionFile,
-            startupHarness.Model, startupHarness.ThinkingLevel,
+            runtime.Model, runtime.ThinkingLevel,
             await options.GetSessionNameAsync(cancellationToken));
         if (options.GetSessionSnapshotAsync is not null)
         {
@@ -106,7 +105,7 @@ public sealed class TuiHost(TuiHostOptions options)
             renderFrameInterval: timingOptions.RenderFrameInterval,
             getHeaderExpanded: () => headerExpanded,
             getExtensionLoadStatus: () => options.GetExtensionLoadStatus?.Invoke(),
-            getActiveTools: () => (options.GetCurrentHarness?.Invoke() ?? options.Harness).ActiveToolNames,
+            getActiveTools: () => runtime.ActiveToolNames,
             invokeCommand: InvokeMenuCommand,
             cancellationToken: cancellationToken,
             loggerFactory: options.LoggerFactory);
@@ -151,7 +150,7 @@ public sealed class TuiHost(TuiHostOptions options)
         var commandController = new TuiCommandController(new TuiCommandControllerOptions(
             () => state,
             next => { state = next; renderCoordinator.RequestRender(); },
-            () => (options.GetCurrentHarness?.Invoke() ?? startupHarness).Abort(),
+            () => runtime.Abort(),
             () => appContext.Post(() => appContext.RequestStop(shell.Window)),
             () => TuiHotkeyText.Render(TuiKeybindings.Defaults, options.GetExtensionShortcuts?.Invoke() ?? []),
             commandText => new TuiCommandDispatchRequest(commandText, SelectInlineWithLoggingAsync,
@@ -165,11 +164,11 @@ public sealed class TuiHost(TuiHostOptions options)
                 (a, b, c, d) => SessionSelectorDialog.SelectAsync(a, b, c, d, appContext: appContext)),
             options.DispatchCommandAsync,
             token => sessionRefresh?.Invoke(token) ?? Task.CompletedTask,
-            () => (options.GetCurrentHarness?.Invoke() ?? startupHarness).Phase,
+            () => runtime.Phase,
             OnAbortRequested: () => onAbortRequested?.Invoke()),
             options.LoggerFactory);
 
-        var sessionContext = new TuiSessionContext { CurrentHarness = startupHarness, HeaderExpanded = headerExpanded };
+        var sessionContext = new TuiSessionContext { CurrentRuntime = runtime, HeaderExpanded = headerExpanded };
         var stateGateway = new TuiStateGateway(() => state, s => state = s, renderCoordinator, appContext, cancellationToken);
         var harnessLifecycle = new TuiHarnessLifecycleCoordinator(
             sessionContext, options, appContext, renderCoordinator,
@@ -193,7 +192,7 @@ public sealed class TuiHost(TuiHostOptions options)
 
         sessionRefresh = harnessLifecycle.RefreshAfterPossibleSessionChangeAsync;
         onAbortRequested = () => sessionContext.AbortPending = true;
-        options.OnHarnessReplaced = harnessLifecycle.RefreshAfterPossibleSessionChangeAsync;
+        options.Runtime.OnHarnessReplaced = harnessLifecycle.RefreshAfterPossibleSessionChangeAsync;
 
         var shortcutDispatcher = TuiShortcutDispatcher.CreateDefaultAppDispatcher();
         var shortcutContext = new TuiShortcutContext(

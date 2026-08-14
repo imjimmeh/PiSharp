@@ -63,7 +63,7 @@ internal sealed class TuiTranscriptInteractionController
         var item = _gateway.State.FindTranscriptItemByEntryId(hit.Target.Id);
         if (item is null) return;
 
-        var canFork = _options.ForkFromEntryAsync is not null && _session.CurrentHarness.Phase == AgentHarnessPhase.Idle;
+        var canFork = _options.ForkFromEntryAsync is not null && _session.CurrentRuntime.Phase == AgentHarnessPhase.Idle;
         var copyItem = new MenuItem("_Copy message", "Copy message text", () => CopyMessageToClipboard(item));
         var forkItem = new MenuItem("_Fork from message", "Fork conversation from this message", () =>
         {
@@ -114,9 +114,9 @@ internal sealed class TuiTranscriptInteractionController
             await _options.ForkFromEntryAsync(entryId, _cancellationToken);
             var snapshot = await _loadSessionSnapshotAsync(_cancellationToken);
             // RefreshAfterPossibleSessionChangeAsync (called via _rebind during ForkAsync) already
-            // handles CurrentHarness update and RebindHarnessSubscription. We just apply the
-            // snapshot and show the confirmation — avoiding a redundant rebind that could throw
-            // inside Application.Invoke and silently prevent the state update from running.
+            // refreshes the session snapshot and requests a render; the runtime facade handles
+            // resubscription on session rebind. We just apply the snapshot and show the
+            // confirmation here.
             _appContext.Post(() =>
             {
                 if (snapshot is not null) _applySessionSnapshot(snapshot, false);
