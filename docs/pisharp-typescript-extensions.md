@@ -18,6 +18,18 @@ TypeScript extension discovery uses Pi-compatible locations:
 
 Non-`.dll` extension paths are treated as TypeScript/JavaScript bridge candidates.
 
+## Disabling TypeScript extensions
+
+Run native-only with `--no-ts-extensions`:
+
+```powershell
+pisharp --no-ts-extensions
+```
+
+This skips every `.ts`/`.js` extension location above plus `.ts`/`.js` entries from `settings.extensions`, CLI `--extension`, and package extension resources. The TypeScript bridge is never started, so `node` is not required and no bridge diagnostics or startup phase are produced. Native `.dll` extensions keep loading from explicit paths and the conventional plugin directories.
+
+`--no-extensions` / `--no-resources` remain the all-extension kill switches and disable native extensions too.
+
 ## Bridge startup
 
 At runtime startup, PiSharp:

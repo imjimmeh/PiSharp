@@ -153,6 +153,14 @@ When extensions are enabled, PiSharp loads:
 
 Disable with `--no-extensions` or `noExtensions`.
 
+Disable only the TypeScript/JavaScript extensions with `--no-ts-extensions`. Native `.dll` extensions, including conventional discovery under `<cwd>/plugins` and `<cwd>/.pi/extensions`, remain enabled and the Node bridge is not started:
+
+```powershell
+pisharp --no-ts-extensions
+```
+
+`--no-ts-extensions` also drops `.ts`/`.js` entries from `settings.extensions`, CLI `--extension`, and package extension resources; explicit non-`.dll` paths that survive the filter still never start the bridge while the flag is set.
+
 For debugging, `--no-resources` also disables extensions as part of a single resource-loading umbrella switch.
 
 ### Skills

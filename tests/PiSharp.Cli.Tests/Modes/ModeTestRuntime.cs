@@ -41,7 +41,8 @@ internal static class ModeTestRuntime
             effectiveArgs.NoSkills,
             effectiveArgs.NoPromptTemplates,
             effectiveArgs.NoThemes,
-            effectiveArgs.NoContextFiles));
+            effectiveArgs.NoContextFiles,
+            effectiveArgs.NoTsExtensions));
         var tools = RuntimeToolSelector.Create(env, new RuntimeToolOptions(effectiveArgs.Tools, effectiveArgs.NoTools, effectiveArgs.NoBuiltinTools));
         var loadedSkills = skills ?? [];
         var (promptTemplateCatalog, _) = await PromptTemplateCatalog.LoadAsync(env, resources.PromptTemplatePaths);
