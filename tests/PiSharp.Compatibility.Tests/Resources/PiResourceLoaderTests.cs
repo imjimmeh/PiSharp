@@ -163,4 +163,27 @@ public sealed class PiResourceLoaderTests
 
         Assert.Contains(resources.Diagnostics, diagnostic => diagnostic.Type == "package" && diagnostic.Code == "missing");
     }
+    [Fact]
+    public async Task NoTsExtensionsSuppressesScriptEntriesButKeepsNativeDll()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-resources-" + Guid.NewGuid().ToString("N"));
+        var home = Path.Combine(root, "home");
+        var repo = Path.Combine(root, "repo");
+        Directory.CreateDirectory(Path.Combine(home, ".pi", "agent"));
+        Directory.CreateDirectory(repo);
+        Directory.CreateDirectory(Path.Combine(repo, ".pi", "extensions"));
+        var tsFile = Path.Combine(repo, ".pi", "extensions", "plugin.ts");
+        var jsFile = Path.Combine(repo, ".pi", "extensions", "plugin.js");
+        var nativeDll = Path.Combine(repo, "native-plugin.dll");
+        await File.WriteAllTextAsync(tsFile, "export default {};");
+        await File.WriteAllTextAsync(jsFile, "export default {};");
+        await File.WriteAllTextAsync(nativeDll, "not-a-real-dll");
+        var settings = await new PiSettingsStore().LoadAsync(repo, home);
+
+        var resources = await new PiResourceLoader().LoadAsync(new PiResourceLoadRequest(settings, repo, [nativeDll], [], [], [], false, false, false, false, false, NoTsExtensions: true));
+
+        Assert.Contains(nativeDll, resources.ExtensionPaths);
+        Assert.DoesNotContain(resources.ExtensionPaths, path => path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(resources.ExtensionPaths, path => path.EndsWith(".js", StringComparison.OrdinalIgnoreCase));
+    }
 }

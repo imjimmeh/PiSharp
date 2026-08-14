@@ -40,6 +40,7 @@ public sealed record RuntimeResourceOptions(
     IReadOnlyList<string>? PromptTemplatePaths = null,
     IReadOnlyList<string>? ThemePaths = null,
     bool DisableExtensions = false,
+    bool DisableTypeScriptExtensions = false,
     bool DisableSkills = false,
     bool DisablePromptTemplates = false,
     bool DisableThemes = false,

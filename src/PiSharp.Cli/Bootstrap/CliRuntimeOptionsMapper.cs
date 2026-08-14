@@ -21,6 +21,7 @@ public static class CliRuntimeOptionsMapper
                 args.PromptTemplates,
                 args.Themes,
                 args.NoResources || args.NoExtensions,
+                args.NoTsExtensions,
                 args.NoResources || args.NoSkills,
                 args.NoResources || args.NoPromptTemplates,
                 args.NoResources || args.NoThemes,

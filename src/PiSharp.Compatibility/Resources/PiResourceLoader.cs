@@ -15,7 +15,8 @@ public sealed record PiResourceLoadRequest(
     bool NoSkills,
     bool NoPromptTemplates,
     bool NoThemes,
-    bool NoContextFiles);
+    bool NoContextFiles,
+    bool NoTsExtensions = false);
 
 public sealed record PiResourceDiagnostic(string Type, string Code, string Message, string Path);
 
@@ -55,6 +56,12 @@ public sealed class PiResourceLoader(PiPackageResolver? packageResolver = null)
                     .Concat(settings.Extensions)
                     .Concat(request.CliExtensions)
                     .Concat(PackageResources(packageRoots, "extensions", "extensions")));
+        if (request.NoTsExtensions)
+        {
+            extensions = extensions.Where(path =>
+                !path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase) &&
+                !path.EndsWith(".js", StringComparison.OrdinalIgnoreCase)).ToArray();
+        }
         var skillsDisabled = request.NoSkills || settings.NoSkills == true;
         var skills = ResolveConfigured("skill", request.Cwd, diagnostics,
             (skillsDisabled

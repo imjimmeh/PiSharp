@@ -57,7 +57,8 @@ public static class PiRuntimeBootstrap
             resourcesOptions.DisableSkills,
             resourcesOptions.DisablePromptTemplates,
             resourcesOptions.DisableThemes,
-            resourcesOptions.DisableContextFiles), cancellationToken));
+            resourcesOptions.DisableContextFiles,
+            resourcesOptions.DisableTypeScriptExtensions), cancellationToken));
 
         var extensionDiagnostics = new List<RuntimeDiagnostic>();
         var (promptTemplateCatalog, promptTemplateDiagnostics) =
