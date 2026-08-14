@@ -153,6 +153,7 @@ public sealed class PiServerWebSocketHandler(
                 ServerCommandTypes.GetLastAssistantText => await GetLastAssistantTextAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetStartupMessages => await GetStartupMessagesAsync(envelope, cancellationToken),
                 ServerCommandTypes.PostStartupChecks => await PostStartupChecksAsync(envelope, cancellationToken),
+                ServerCommandTypes.Shutdown => await ShutdownAsync(json, envelope, responseSent ?? Task.CompletedTask),
                 _ => ServerResponse.Fail(envelope.Id, envelope.Type, "unknown_command", $"Unknown command '{envelope.Type}'.")
             };
         }
@@ -477,6 +478,30 @@ public sealed class PiServerWebSocketHandler(
         if (delegates?.PostStartupChecksAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
         await delegates.PostStartupChecksAsync(message => live.EmitEvent(AgentSessionEvent.FromServer("system_message", new { text = message })), cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type);
+    }
+
+    private Task<ServerResponse> ShutdownAsync(string json, ServerCommandEnvelope envelope, Task responseSent)
+    {
+        _ = JsonSerializer.Deserialize<ShutdownRequest>(json, ServerJsonSerializer.Options); // validate request shape; confirmation token is optional
+        var onShutdown = delegates?.OnShutdown;
+        if (onShutdown is null)
+            return Task.FromResult(ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "Shutdown is not available on this server."));
+
+        // Respond first, then stop the host once the response has been flushed to the client.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await responseSent;
+                await onShutdown(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Graceful shutdown failed");
+            }
+        }, CancellationToken.None);
+
+        return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type, new ShutdownResult(true)));
     }
 
     private LiveServerSession RequireSession(string serverSessionId)

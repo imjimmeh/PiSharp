@@ -1,10 +1,12 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using PiSharp.Cli.IO;
 using PiSharp.Cli.Parsing;
 using PiSharp.Client;
 using PiSharp.Compatibility.Settings;
+using PiSharp.Server.Contracts;
 using PiSharp.Server.Hosting;
 
 namespace PiSharp.Cli.Modes;
@@ -27,8 +29,8 @@ public static class DaemonMode
         return command.Kind switch
         {
             DaemonCommandKind.Start => await StartAsync(command, console, store, cancellationToken),
-            DaemonCommandKind.Stop => await NotImplementedAsync(console, cancellationToken),
-            DaemonCommandKind.Status => await NotImplementedAsync(console, cancellationToken),
+            DaemonCommandKind.Stop => await StopAsync(console, store, cancellationToken),
+            DaemonCommandKind.Status => await StatusAsync(console, store, cancellationToken),
             _ => 2
         };
     }
@@ -84,7 +86,7 @@ public static class DaemonMode
         await store.WriteAsync(new DaemonLease(Environment.ProcessId, host.Port, apiKey, DateTimeOffset.UtcNow, version), cancellationToken);
         await console.Out.WriteLineAsync($"daemon listening on http://127.0.0.1:{host.Port}".AsMemory(), cancellationToken);
 
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, host.ShutdownToken);
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
@@ -103,10 +105,52 @@ public static class DaemonMode
         return 0;
     }
 
-    private static async Task<int> NotImplementedAsync(IConsoleIO console, CancellationToken cancellationToken)
+    private static async Task<int> StopAsync(IConsoleIO console, DaemonLeaseStore store, CancellationToken cancellationToken)
     {
-        await console.Error.WriteLineAsync("not implemented".AsMemory(), cancellationToken);
+        var lease = await store.TryReadAsync(cancellationToken);
+        if (lease is null)
+        {
+            await console.Error.WriteLineAsync("No daemon running.".AsMemory(), cancellationToken);
+            return 1;
+        }
+
+        var stopped = false;
+        try
+        {
+            await using var transport = new ClientWebSocketTransport();
+            await transport.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}"), lease.ApiKey, cancellationToken);
+            var response = await transport.SendCommandAsync(new ServerCommandEnvelope(ServerCommandTypes.Shutdown, Id: Guid.NewGuid().ToString("N")), cancellationToken);
+            stopped = response.Success;
+        }
+        catch (Exception ex) when (ex is WebSocketException or IOException or InvalidOperationException or OperationCanceledException)
+        {
+            stopped = false; // daemon is not reachable — treat the leftover lease as dead
+        }
+
+        await store.ClearAsync(cancellationToken);
+
+        if (stopped)
+        {
+            await console.Out.WriteLineAsync("Daemon stopped.".AsMemory(), cancellationToken);
+            return 0;
+        }
+
+        await console.Error.WriteLineAsync("daemon is not running".AsMemory(), cancellationToken);
         return 1;
+    }
+
+    private static async Task<int> StatusAsync(IConsoleIO console, DaemonLeaseStore store, CancellationToken cancellationToken)
+    {
+        var lease = await store.TryReadAsync(cancellationToken);
+        if (lease is null)
+        {
+            await console.Error.WriteLineAsync("No daemon running.".AsMemory(), cancellationToken);
+            return 1;
+        }
+
+        var alive = DaemonLeaseStore.ProcessAlive(lease.Pid);
+        await console.Out.WriteLineAsync($"http://127.0.0.1:{lease.Port} pid={lease.Pid} {(alive ? "alive" : "dead")}".AsMemory(), cancellationToken);
+        return alive ? 0 : 1;
     }
 
     private static int? ResolvePort(string? portValue)

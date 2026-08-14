@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using PiSharp.Client;
 using PiSharp.Cli.IO;
 using PiSharp.Cli.Modes;
 using PiSharp.Cli.Parsing;
@@ -21,6 +23,55 @@ public sealed class DaemonModeTests
 
         Assert.Equal(1, exitCode);
         Assert.Contains("already running", console.ErrorOutput.ToString());
+    }
+
+    [Fact]
+    public async Task Stop_WithNoDaemonRunning_ReturnsError()
+    {
+        using var tempDir = TempDirectory.Create();
+        var console = new TestConsoleIO();
+
+        var exitCode = await DaemonMode.RunAsync(
+            new DaemonCommandArgs(DaemonCommandKind.Stop),
+            console,
+            leaseDirectory: tempDir.Path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("No daemon running", console.ErrorOutput.ToString());
+    }
+
+    [Fact]
+    public async Task Status_WithStaleLease_ReportsDead()
+    {
+        using var tempDir = TempDirectory.Create();
+        var store = new DaemonLeaseStore(tempDir.Path);
+        await store.WriteAsync(new DaemonLease(Pid: int.MaxValue, Port: 7878, ApiKey: "k", StartedAt: DateTimeOffset.UtcNow, Version: "1.0.0"));
+        var console = new TestConsoleIO();
+
+        var exitCode = await DaemonMode.RunAsync(
+            new DaemonCommandArgs(DaemonCommandKind.Status),
+            console,
+            leaseDirectory: tempDir.Path);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("dead", console.Output.ToString());
+    }
+
+    [Fact]
+    public async Task Status_WithLiveLease_ReportsAlive()
+    {
+        using var tempDir = TempDirectory.Create();
+        var store = new DaemonLeaseStore(tempDir.Path);
+        await store.WriteAsync(new DaemonLease(Pid: Process.GetCurrentProcess().Id, Port: 7878, ApiKey: "k", StartedAt: DateTimeOffset.UtcNow, Version: "1.0.0"));
+        var console = new TestConsoleIO();
+
+        var exitCode = await DaemonMode.RunAsync(
+            new DaemonCommandArgs(DaemonCommandKind.Status),
+            console,
+            leaseDirectory: tempDir.Path);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("alive", console.Output.ToString());
     }
 
     private sealed class TempDirectory : IDisposable

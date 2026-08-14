@@ -24,6 +24,7 @@ public static class ServerCommandTypes
     public const string Compact = "compact";
     public const string NewSession = "new_session";
     public const string SwitchSession = "switch_session";
+    public const string Shutdown = "shutdown";
     public const string Fork = "fork";
     public const string SetSessionName = "set_session_name";
     public const string Attach = "attach";
@@ -88,6 +89,8 @@ public sealed record SwitchSessionCommand(string Type, string? Id, string Server
 public sealed record ForkSessionCommand(string Type, string? Id, string ServerSessionId, string? EntryId = null, string? NewSessionId = null);
 public sealed record SetSessionNameCommand(string Type, string? Id, string ServerSessionId, string Name);
 public sealed record AttachCommand(string Type, string? Id, string ServerSessionId, long SinceSequence = 0);
+public sealed record ShutdownRequest(string? ConfirmationToken = null);
+public sealed record ShutdownResult(bool Stopped);
 public sealed record AttachResult(string ServerSessionId, long FromSequence, long HeadSequence, bool Gap, int ReplayedCount);
 
 public sealed record ServerResponse(string Type, string? Id, string Command, bool Success, object? Data = null, ServerError? Error = null)
@@ -171,10 +174,10 @@ public sealed record PiServerHostContext(LiveServerSession Session, IServerUiBri
 /// Host-wired command delegates consumed by <c>PiServerWebSocketHandler</c>. Each member mirrors the
 /// corresponding <see cref="PiSharp.Server.Hosting.PiServerHostOptions"/> delegate; a null delegate
 /// makes the command respond <c>not_available</c>.
-/// </summary>
 public sealed record PiServerCommandDelegates(
     Func<PiServerHostContext, string, SlashCommandExecutionOptions?, CancellationToken, Task<ServerCommandResult>>? RunCommandAsync = null,
     Func<string, CancellationToken, Task<IReadOnlyList<string>>>? CompleteCommandAsync = null,
     Func<ProcessInputRequest, CancellationToken, Task<ProcessInputResult>>? ProcessInputAsync = null,
     Func<CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync = null,
-    Func<Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null);
+    Func<Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null,
+    Func<CancellationToken, Task>? OnShutdown = null);

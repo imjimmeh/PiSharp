@@ -10,8 +10,12 @@ namespace PiSharp.Server.Hosting;
 public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
 {
     private WebApplication? _app;
+    private readonly CancellationTokenSource _stopCts = new();
 
     public int Port { get; private set; }
+
+    /// <summary>Fires when <see cref="StopAsync"/> is invoked. The foreground daemon waits on this to exit.</summary>
+    public CancellationToken ShutdownToken => _stopCts.Token;
 
     public async Task StartAsync(int port = 0)
     {
@@ -25,9 +29,11 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
             options.CompleteCommandAsync,
             options.ProcessInputAsync,
             options.GetStartupMessagesAsync,
-            options.PostStartupChecksAsync));
+            options.PostStartupChecksAsync,
+            OnShutdown: _ => StopAsync()));
         builder.Services.AddSingleton<IServerUiBridge, ServerUiBridge>();
         builder.Services.AddSingleton<PiServerWebSocketHandler>();
+        builder.Services.AddSingleton<IHostedService>(_ => new StopOnShutdownService(_stopCts.Token, StopAsync));
 
         _app = builder.Build();
         _app.UseWebSockets();
@@ -37,9 +43,47 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
         Port = _app.Urls.Select(ParsePort).First();
     }
 
-    public async Task StopAsync() => await (_app?.StopAsync() ?? Task.CompletedTask);
+    public async Task StopAsync()
+    {
+        _stopCts.Cancel();
+        await (_app?.StopAsync() ?? Task.CompletedTask);
+    }
 
-    public async ValueTask DisposeAsync() => await StopAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await StopAsync();
+        _stopCts.Dispose();
+    }
 
     private static int ParsePort(string url) => new Uri(url).Port;
+
+    /// <summary>Stops the Kestrel host when the shutdown token fires, so cancellation alone triggers graceful teardown.</summary>
+    private sealed class StopOnShutdownService(CancellationToken shutdown, Func<Task> stopHost) : IHostedService
+    {
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, shutdown);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+
+                try
+                {
+                    await stopHost();
+                }
+                catch (Exception)
+                {
+                    // Best-effort: the host is already stopping via StopAsync/DisposeAsync.
+                }
+            }, CancellationToken.None);
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
 }
