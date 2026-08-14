@@ -1,3 +1,4 @@
+using PiSharp.Extensions;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.UiBridge;
 
@@ -6,11 +7,16 @@ using PiSharp.Server.Runtime;
 using PiSharp.Server.WebSockets;
 
 namespace PiSharp.Server.Hosting;
-
 public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
 {
     private WebApplication? _app;
     private readonly CancellationTokenSource _stopCts = new();
+
+    /// <summary>
+    /// The daemon-shared telemetry aggregator backing <c>get_metrics</c>. Always present; reports
+    /// <see cref="MetricsSnapshot.Disabled"/> when <see cref="PiServerHostOptions.TelemetryEnabled"/> is false.
+    /// </summary>
+    public TelemetryMetricsAggregator Metrics { get; } = new(options.TelemetryEnabled);
 
     public int Port { get; private set; }
 
@@ -23,14 +29,18 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
         builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
         builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
         builder.Services.AddSingleton(new ApiKeyValidator(new ApiKeyOptions { ApiKey = options.ApiKey }));
-        builder.Services.AddSingleton(new ServerSessionRegistry(idleTimeout: options.IdleTimeout));
+        var metricsAggregator = Metrics;
+        builder.Services.AddSingleton(metricsAggregator);
+        builder.Services.AddSingleton(new ServerSessionRegistry(CreateRuntimeFactory(options, Metrics), options.IdleTimeout));
         builder.Services.AddSingleton(new PiServerCommandDelegates(
             options.RunCommandAsync,
             options.CompleteCommandAsync,
             options.ProcessInputAsync,
             options.GetStartupMessagesAsync,
             options.PostStartupChecksAsync,
+            GetMcpStatusAsync: options.GetMcpStatusAsync,
             OnShutdown: _ => StopAsync()));
+        builder.Services.AddSingleton(new ThemeRegistry());
         builder.Services.AddSingleton<IServerUiBridge, ServerUiBridge>();
         builder.Services.AddSingleton<PiServerWebSocketHandler>();
         builder.Services.AddSingleton<IHostedService>(_ => new StopOnShutdownService(_stopCts.Token, StopAsync));
@@ -56,6 +66,23 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
     }
 
     private static int ParsePort(string url) => new Uri(url).Port;
+
+    /// <summary>
+    /// Runtime factory used by the host's registry. With telemetry disabled the default
+    /// telemetry-free factory is used; with telemetry enabled each runtime receives its own
+    /// <see cref="PiSharp.Runtime.Telemetry.TelemetryService"/> feeding the shared aggregator
+    /// (plus any host-configured sinks), and its harness instrumentor is bound.
+    /// </summary>
+    private static Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> CreateRuntimeFactory(PiServerHostOptions options, TelemetryMetricsAggregator metrics)
+        => async (request, cancellationToken) =>
+        {
+            if (!options.TelemetryEnabled) return await ServerSessionRegistry.CreateRuntimeAsync(request, cancellationToken);
+
+            var sinks = new List<ITelemetrySink> { metrics };
+            if (options.TelemetrySinks is not null) sinks.AddRange(options.TelemetrySinks);
+            var telemetry = new PiSharp.Runtime.Telemetry.TelemetryService(enabled: true, sinks: sinks);
+            return await ServerSessionRegistry.CreateRuntimeAsync(request, telemetry, cancellationToken);
+        };
 
     /// <summary>Stops the Kestrel host when the shutdown token fires, so cancellation alone triggers graceful teardown.</summary>
     private sealed class StopOnShutdownService(CancellationToken shutdown, Func<Task> stopHost) : IHostedService

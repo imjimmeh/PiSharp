@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PiSharp.Runtime\PiSharp.Runtime.csproj" />
+    <ProjectReference Include="..\PiSharp.Continuity.Contracts\PiSharp.Continuity.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

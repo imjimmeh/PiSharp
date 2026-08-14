@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Agent.Core.Events;
@@ -19,15 +20,22 @@ public sealed class ServerUiBridge : IServerUiBridge
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerUiResponse>> _pending = new(StringComparer.Ordinal);
     private readonly ServerSessionRegistry _registry;
     private readonly ILogger<ServerUiBridge> _logger;
+    private readonly ThemeRegistry _themes;
 
-    public ServerUiBridge(ServerSessionRegistry registry, ILogger<ServerUiBridge>? logger = null)
+    public ServerUiBridge(ServerSessionRegistry registry, ILogger<ServerUiBridge>? logger = null, ThemeRegistry? themeRegistry = null)
     {
         _registry = registry;
         _logger = logger ?? NullLogger<ServerUiBridge>.Instance;
+        _themes = themeRegistry ?? new ThemeRegistry();
     }
 
     public async Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
     {
+        // Theme UI kinds are answered daemon-side from the ThemeRegistry (plan C8) — never
+        // forwarded to an attached client, because themes are daemon-resident.
+        var intercepted = await TryInterceptThemeRequestAsync(intent, cancellationToken);
+        if (intercepted is not null) return intercepted;
+
         var tcs = new TaskCompletionSource<ServerUiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[intent.RequestId] = tcs;
         try
@@ -84,4 +92,55 @@ public sealed class ServerUiBridge : IServerUiBridge
     /// specific session's binding.
     /// </summary>
     private LiveServerSession? SelectSession() => _registry.Sessions.MaxBy(session => session.Id, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Answers theme UI kinds daemon-side (plan C8) or returns <c>null</c> so the request falls
+    /// through to the client round-trip. <c>get_all_themes</c> and <c>get_theme</c> respond from
+    /// the registry; <c>set_theme</c> activates the named theme, applies it to every live runtime
+    /// and broadcasts <c>theme_changed</c> exactly like the <c>set_theme</c> command.
+    /// </summary>
+    private async Task<ServerUiResponse?> TryInterceptThemeRequestAsync(ServerUiIntent intent, CancellationToken cancellationToken)
+    {
+        switch (intent.Kind)
+        {
+            case "get_all_themes":
+                return new ServerUiResponse(
+                    intent.RequestId,
+                    _themes.Documents
+                        .Select(document => new { name = document.Name, document })
+                        .ToArray());
+            case "get_theme":
+                var active = _themes.ActiveDocument;
+                return new ServerUiResponse(
+                    intent.RequestId,
+                    active is null ? null : new { name = active.Name, document = active });
+            case "set_theme":
+                var name = ExtractThemeName(intent);
+                if (name is null || !_themes.TrySetActive(name))
+                    return new ServerUiResponse(intent.RequestId, null, Cancelled: true);
+                await ThemeRegistry.ApplyToSessionsAsync(_themes, _registry.Sessions, name, cancellationToken);
+                return new ServerUiResponse(intent.RequestId);
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>
+    /// Extracts the theme name from a <c>set_theme</c> intent: the structured <c>Component</c>
+    /// payload's <c>name</c> or <c>theme</c> property (TS-bridge parity sends <c>{ theme }</c>),
+    /// falling back to the raw <c>Message</c> as the plain name.
+    /// </summary>
+    private static string? ExtractThemeName(ServerUiIntent intent)
+    {
+        if (intent.Component is JsonElement element && element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in new[] { "name", "theme" })
+            {
+                if (element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()))
+                    return value.GetString();
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(intent.Message) ? null : intent.Message;
+    }
 }

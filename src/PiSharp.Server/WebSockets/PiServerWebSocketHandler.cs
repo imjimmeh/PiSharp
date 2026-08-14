@@ -9,7 +9,9 @@ using PiSharp.Ai;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Runtime;
 using PiSharp.Server.Authentication;
+using PiSharp.Continuity.Contracts;
 using PiSharp.Server.Contracts;
+using PiSharp.Extensions;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.Serialization;
 using PiSharp.Server.UiBridge;
@@ -21,9 +23,12 @@ public sealed class PiServerWebSocketHandler(
     ApiKeyValidator apiKeys,
     ILogger<PiServerWebSocketHandler> logger,
     IServerUiBridge? uiBridge = null,
-    PiServerCommandDelegates? delegates = null)
+    PiServerCommandDelegates? delegates = null,
+    ThemeRegistry? themeRegistry = null,
+    TelemetryMetricsAggregator? metrics = null)
 {
     private IServerUiBridge Bridge => uiBridge ?? NoOpServerUiBridge.Instance;
+    private ThemeRegistry Themes => themeRegistry ?? new ThemeRegistry();
 
     private sealed class NoOpServerUiBridge : IServerUiBridge
     {
@@ -162,7 +167,27 @@ public sealed class PiServerWebSocketHandler(
                 ServerCommandTypes.GetLastAssistantText => await GetLastAssistantTextAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetStartupMessages => await GetStartupMessagesAsync(envelope, cancellationToken),
                 ServerCommandTypes.PostStartupChecks => await PostStartupChecksAsync(envelope, cancellationToken),
-                ServerCommandTypes.Shutdown => await ShutdownAsync(json, envelope, responseSent ?? Task.CompletedTask),
+                ServerCommandTypes.McpStatus => await GetMcpStatusAsync(envelope, cancellationToken),
+                ServerCommandTypes.InstallExtension => await InstallExtensionAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.UpdateExtension => await UpdateExtensionAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.RemoveExtension => await RemoveExtensionAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.ListInstalledExtensions => await ListInstalledExtensionsAsync(envelope, cancellationToken),
+                ServerCommandTypes.ManageSkill => await ManageSkillAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.GetSkills => await GetSkillsAsync(envelope, cancellationToken),
+                ServerCommandTypes.ListThemes => await ListThemesAsync(envelope),
+                ServerCommandTypes.SetTheme => await SetThemeAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.SetPlanMode => await SetPlanModeAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.GetPlanMode => await GetPlanModeAsync(envelope, cancellationToken),
+                ServerCommandTypes.GetMetrics => await GetMetricsAsync(envelope),
+                ServerCommandTypes.GetSessionStats => await GetSessionStatsAsync(envelope, cancellationToken),
+                // --- P23: continuity daemon wire surface (plan C5 §4.9) ---
+                ServerCommandTypes.SetGoal => await SetGoalAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.GetGoal => await GetGoalAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.ScheduleJob => await ScheduleJobAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.ListJobs => await ListJobsAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.CancelJob => await CancelJobAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.Autonomous => await AutonomousAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.GetContinuityState => await GetContinuityStateAsync(json, envelope, cancellationToken),
                 _ => ServerResponse.Fail(envelope.Id, envelope.Type, "unknown_command", $"Unknown command '{envelope.Type}'.")
             };
         }
@@ -182,7 +207,14 @@ public sealed class PiServerWebSocketHandler(
     {
         var request = JsonSerializer.Deserialize<CreateServerSessionRequest>(json, ServerJsonSerializer.Options)!;
         var created = await registry.CreateAsync(request, cancellationToken);
-        if (ensureEventPump is not null && registry.TryGet(created.ServerSessionId, out var live)) await ensureEventPump(live, 0);
+        if (registry.TryGet(created.ServerSessionId, out var live))
+        {
+            // Feed the daemon theme registry from this session's theme resources so list_themes/
+            // get_theme can answer before any explicit set_theme.
+            await Themes.MergeAsync(live.Runtime.Resources?.ThemePaths, cancellationToken);
+            if (ensureEventPump is not null) await ensureEventPump(live, 0);
+        }
+
         return ServerResponse.Ok(envelope.Id, envelope.Type, created);
     }
 
@@ -386,12 +418,136 @@ public sealed class PiServerWebSocketHandler(
 
     private Task<ServerResponse> GetThemeAsync(ServerCommandEnvelope envelope)
     {
-        var live = RequireSession(RequiredSessionId(envelope));
-        var theme = live.Runtime.Theme;
-        return Task.FromResult(theme is null
-            ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No theme is configured for this session.")
-            : ServerResponse.Ok(envelope.Id, envelope.Type, theme));
+        RequireSession(RequiredSessionId(envelope));
+        var document = Themes.ActiveDocument;
+        return Task.FromResult(document is null
+            ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No theme is configured on this daemon.")
+            : ServerResponse.Ok(envelope.Id, envelope.Type, document));
     }
+
+    private Task<ServerResponse> ListThemesAsync(ServerCommandEnvelope envelope)
+    {
+        if (!string.IsNullOrWhiteSpace(envelope.ServerSessionId)) RequireSession(envelope.ServerSessionId);
+        var names = Themes.Documents.Select(document => new ServerThemeSummary(document.Name)).ToArray();
+        return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type, names));
+    }
+
+    private async Task<ServerResponse> SetThemeAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<SetThemeCommand>(json, ServerJsonSerializer.Options)!;
+        if (!string.IsNullOrWhiteSpace(command.ServerSessionId)) RequireSession(command.ServerSessionId);
+        if (!Themes.TrySetActive(command.Name))
+            return ServerResponse.Fail(command.Id ?? envelope.Id, command.Type, "theme_not_found", $"Unknown theme '{command.Name}'.");
+
+        await ThemeRegistry.ApplyToSessionsAsync(Themes, registry.Sessions, command.Name!, cancellationToken);
+        return ServerResponse.Ok(command.Id ?? envelope.Id, command.Type);
+
+    }
+
+    private async Task<ServerResponse> SetPlanModeAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<SetPlanModeCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetPlanModeControl(live) is not { } control)
+            return ServerResponse.Fail(command.Id, command.Type, "plan_mode_unavailable", "The plan-mode extension is not loaded in this session.");
+        var state = await live.RunExclusiveAsync((runtime, token) => control.ApplyPhaseAsync(command.Phase, token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, ToPlanModeState(state));
+    }
+
+    private Task<ServerResponse> GetPlanModeAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        if (TryGetPlanModeControl(live) is not { } control)
+            return Task.FromResult(ServerResponse.Fail(envelope.Id, envelope.Type, "plan_mode_unavailable", "The plan-mode extension is not loaded in this session."));
+        return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type, ToPlanModeState(control.Current)));
+    }
+
+    /// <summary>Resolves the plan-mode extension's daemon bridge from the session runtime's loaded extensions.</summary>
+    private static IPlanModeDaemonSurface? TryGetPlanModeControl(LiveServerSession live)
+        => live.Runtime.ExtensionManager?.Loaded.FirstOrDefault(extension => extension.Descriptor.Id == "plan-mode")?.Instance as IPlanModeDaemonSurface;
+
+    private static ServerPlanModeState ToPlanModeState(ExtensionPlanModeState state)
+        => new(state.Phase, state.RestrictedToolNames, state.PlanningModel, state.PlanFile);
+
+    // --- P23: continuity daemon wire handlers (plan C5 §4.9) ---
+    // Each handler resolves the session's IContinuitySessionService (the extension implements the
+    // interface, mirroring the IPlanModeDaemonSurface pattern) and delegates inside RunExclusiveAsync.
+    // When the continuity extension is not loaded, the response code is "continuity_unavailable".
+
+    private async Task<ServerResponse> SetGoalAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<SetGoalCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetContinuityService(live) is not { } service)
+            return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
+        var result = await live.RunExclusiveAsync((runtime, token) => service.SetGoalAsync(command.Objective, command.MaxTokens, token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    private async Task<ServerResponse> GetGoalAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<GetGoalCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetContinuityService(live) is not { } service)
+            return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
+        var result = await live.RunExclusiveAsync((runtime, token) => service.GetGoalAsync(token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    private async Task<ServerResponse> ScheduleJobAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<ScheduleJobCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetContinuityService(live) is not { } service)
+            return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
+        var result = await live.RunExclusiveAsync((runtime, token) => service.ScheduleJobAsync(command.Name, command.Cron, command.Prompt, command.Enabled, token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    private async Task<ServerResponse> ListJobsAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<ListJobsCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetContinuityService(live) is not { } service)
+            return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
+        var result = await live.RunExclusiveAsync((runtime, token) => service.ListJobsAsync(token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    private async Task<ServerResponse> CancelJobAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<CancelJobCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetContinuityService(live) is not { } service)
+            return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
+        var result = await live.RunExclusiveAsync((runtime, token) => service.CancelJobAsync(command.JobId, token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    private async Task<ServerResponse> AutonomousAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<AutonomousCommandRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetContinuityService(live) is not { } service)
+            return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
+        var autonomousCmd = new AutonomousCommand(command.Message, command.MaxTurns, command.MaxTokens, command.TimeoutMinutes, command.Gates);
+        var result = await live.RunExclusiveAsync((runtime, token) => service.StartAutonomousAsync(autonomousCmd, token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    private async Task<ServerResponse> GetContinuityStateAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<GetContinuityStateCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        if (TryGetContinuityService(live) is not { } service)
+            return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
+        var result = await live.RunExclusiveAsync((runtime, token) => service.GetStateAsync(token), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, result);
+    }
+
+    /// <summary>Resolves the continuity extension's service facade from the session runtime's loaded extensions.</summary>
+    private static IContinuitySessionService? TryGetContinuityService(LiveServerSession live)
+        => live.Runtime.ExtensionManager?.Loaded.FirstOrDefault(extension => extension.Descriptor.Id == "pisharp-continuity")?.Instance as IContinuitySessionService;
 
     private async Task<ServerResponse> GetSessionSnapshotAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
@@ -487,6 +643,155 @@ public sealed class PiServerWebSocketHandler(
         if (delegates?.PostStartupChecksAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
         await delegates.PostStartupChecksAsync(message => live.EmitEvent(AgentSessionEvent.FromServer("system_message", new { text = message })), cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type);
+    }
+
+    private async Task<ServerResponse> GetMcpStatusAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        if (delegates?.GetMcpStatusAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
+        var status = await delegates.GetMcpStatusAsync(cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, status);
+    }
+
+    // --- P04: extension package + managed-skill daemon commands (GAP-55/GAP-56) ---
+
+    private async Task<ServerResponse> InstallExtensionAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<InstallExtensionCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
+        var binding = live.Runtime.ExtensionBinding;
+        var result = await live.RunExclusiveAsync((runtime, token) => binding.InstallExtensionAsync(command.Reference ?? string.Empty, command.Local, command.Force, command.Offline, token), cancellationToken);
+        if (result.Success) EmitPackagesChanged(live, added: [command.Reference ?? string.Empty]);
+        return ServerResponse.Ok(command.Id, envelope.Type, result);
+    }
+
+    private async Task<ServerResponse> UpdateExtensionAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<UpdateExtensionCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
+        var binding = live.Runtime.ExtensionBinding;
+        var request = new ExtensionPackageUpdateRequest(command.Source, command.Extensions, command.ExtensionSource, command.Force, command.Offline);
+        var result = await live.RunExclusiveAsync((runtime, token) => binding.UpdateExtensionAsync(request, token), cancellationToken);
+        if (result.Success) EmitPackagesChanged(live, updated: [request.Source ?? request.ExtensionSource ?? "*"]);
+        return ServerResponse.Ok(command.Id, envelope.Type, result);
+    }
+
+    private async Task<ServerResponse> RemoveExtensionAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<RemoveExtensionCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
+        var binding = live.Runtime.ExtensionBinding;
+        var removed = await live.RunExclusiveAsync((runtime, token) => binding.RemoveExtensionAsync(command.Reference ?? string.Empty, command.Local, token), cancellationToken);
+        if (removed) EmitPackagesChanged(live, removed: [command.Reference ?? string.Empty]);
+        return ServerResponse.Ok(command.Id, envelope.Type, removed);
+    }
+
+    private async Task<ServerResponse> ListInstalledExtensionsAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var packages = await live.RunExclusiveAsync((runtime, token) => runtime.ExtensionBinding.ListInstalledExtensionsAsync(token), cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, packages);
+    }
+
+    private async Task<ServerResponse> ManageSkillAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<ManageSkillCommand>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
+        var binding = live.Runtime.ExtensionBinding;
+        switch (command.Op)
+        {
+            case "create":
+            {
+                var request = new ManagedSkillCreateRequest(command.Name ?? string.Empty, command.Description ?? string.Empty, command.Content ?? string.Empty, command.DisableModelInvocation ?? false);
+                var created = await live.RunExclusiveAsync((runtime, token) => binding.ManagedSkillCreateAsync(request, token), cancellationToken);
+                EmitSkillsChanged(live, added: [created.Name]);
+                return ServerResponse.Ok(command.Id, envelope.Type, created);
+            }
+            case "update":
+            {
+                var request = new ManagedSkillUpdateRequest(command.Description, command.Content, command.DisableModelInvocation);
+                var updated = await live.RunExclusiveAsync((runtime, token) => binding.ManagedSkillUpdateAsync(command.Name ?? string.Empty, request, token), cancellationToken);
+                EmitSkillsChanged(live, updated: [updated.Name]);
+                return ServerResponse.Ok(command.Id, envelope.Type, updated);
+            }
+            case "delete":
+            {
+                var deleted = await live.RunExclusiveAsync((runtime, token) => binding.ManagedSkillDeleteAsync(command.Name ?? string.Empty, token), cancellationToken);
+                if (deleted) EmitSkillsChanged(live, removed: [command.Name ?? string.Empty]);
+                return ServerResponse.Ok(command.Id, envelope.Type, deleted);
+            }
+            case "list":
+            {
+                var skills = await live.RunExclusiveAsync((runtime, token) => binding.ManagedSkillListAsync(token), cancellationToken);
+                return ServerResponse.Ok(command.Id, envelope.Type, skills);
+            }
+            case "promote":
+            {
+                var promoted = await live.RunExclusiveAsync((runtime, token) => binding.ManagedSkillPromoteAsync(command.SourceReference ?? string.Empty, token), cancellationToken);
+                EmitSkillsChanged(live, added: [promoted.Name]);
+                return ServerResponse.Ok(command.Id, envelope.Type, promoted);
+            }
+            default:
+                return ServerResponse.Fail(command.Id, envelope.Type, "invalid_command", $"Unknown manage_skill op '{command.Op}'. Expected create|update|delete|list|promote.");
+        }
+    }
+
+    private async Task<ServerResponse> GetSkillsAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var definitions = await live.RunExclusiveAsync((runtime, token) => runtime.ExtensionBinding.GetAllSkillsAsync(token), cancellationToken);
+        var skills = definitions
+            .Select(skill => new ServerSkillInfo(skill.Name, skill.Description, skill.Source, skill.SourcePriority, skill.Hide, skill.AlwaysApply, skill.DisableModelInvocation, skill.Globs))
+            .ToArray();
+        return ServerResponse.Ok(envelope.Id, envelope.Type, skills);
+    }
+
+    private void EmitPackagesChanged(LiveServerSession live, IReadOnlyList<string>? added = null, IReadOnlyList<string>? removed = null, IReadOnlyList<string>? updated = null)
+        => live.EmitEvent(AgentSessionEvent.FromServer(ExtensionEventNames.PackagesChanged, new { added = added ?? [], removed = removed ?? [], updated = updated ?? [] }));
+
+    private void EmitSkillsChanged(LiveServerSession live, IReadOnlyList<string>? added = null, IReadOnlyList<string>? removed = null, IReadOnlyList<string>? updated = null)
+        => live.EmitEvent(AgentSessionEvent.FromServer(ExtensionEventNames.SkillsChanged, new { added = added ?? [], removed = removed ?? [], updated = updated ?? [] }));
+
+    /// <summary>
+    /// P25 C6: pull-based daemon-global telemetry aggregate. With telemetry disabled (no
+    /// aggregator wired) the canonical <see cref="MetricsSnapshot.Disabled"/> payload is returned.
+    /// </summary>
+    private Task<ServerResponse> GetMetricsAsync(ServerCommandEnvelope envelope)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return Task.FromResult(metrics is null
+            ? ServerResponse.Ok(envelope.Id, envelope.Type, MetricsSnapshot.Disabled(now))
+            : ServerResponse.Ok(envelope.Id, envelope.Type, metrics.BuildSnapshot(now)));
+    }
+
+    /// <summary>
+    /// P25 C6: per-session counters computed from the live session's message context and
+    /// retained event log (typed, no telemetry dependency). Reads ride the operation gate exactly
+    /// like <c>get_messages</c> because building the message context is a session-scoped read.
+    /// </summary>
+    private async Task<ServerResponse> GetSessionStatsAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        var messages = await live.RunExclusiveAsync(async (runtime, token) => (await runtime.Session.BuildContextAsync(token)).Messages, cancellationToken);
+        var snapshot = await live.SnapshotAsync(cancellationToken);
+        var replay = live.EventLog.ReplayFrom(0);
+        var retries = replay.Events.Count(env => string.Equals(env.Event.Type, "auto_retry_start", StringComparison.Ordinal));
+        var assistants = messages.OfType<AssistantMessage>().ToArray();
+        var toolResults = messages.OfType<ToolResultMessage>().ToArray();
+
+        var stats = new SessionStats(
+            live.Id,
+            live.RuntimeSessionId,
+            assistants.LastOrDefault()?.Model ?? snapshot.Model.Id,
+            snapshot.MessageCount,
+            assistants.Length,
+            assistants.Sum(message => message.Usage?.Input ?? 0),
+            assistants.Sum(message => message.Usage?.Output ?? 0),
+            toolResults.Length,
+            toolResults.Count(result => result.IsError),
+            retries,
+            messages.FirstOrDefault()?.Timestamp,
+            live.LastActivityUtc);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, stats);
     }
 
     private Task<ServerResponse> ShutdownAsync(string json, ServerCommandEnvelope envelope, Task responseSent)

@@ -2,6 +2,7 @@ using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
+using PiSharp.Continuity.Contracts;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.UiBridge;
 
@@ -45,6 +46,27 @@ public static class ServerCommandTypes
     public const string GetStartupMessages = "get_startup_messages";
     public const string PostStartupChecks = "post_startup_checks";
     public const string UiResponse = "ui_response";
+    public const string ListThemes = "list_themes";
+    public const string SetTheme = "set_theme";
+    public const string McpStatus = "mcp_status";
+    public const string InstallExtension = "install_extension";
+    public const string UpdateExtension = "update_extension";
+    public const string RemoveExtension = "uninstall_extension";
+    public const string ListInstalledExtensions = "list_installed_extensions";
+    public const string ManageSkill = "manage_skill";
+    public const string GetSkills = "get_skills";
+    public const string SetPlanMode = "set_plan_mode";
+    public const string GetPlanMode = "get_plan_mode";
+    public const string GetMetrics = "get_metrics";
+    public const string GetSessionStats = "get_session_stats";
+    // --- P23: continuity daemon wire surface (plan C5 §4.9) ---
+    public const string SetGoal = "set_goal";
+    public const string GetGoal = "get_goal";
+    public const string ScheduleJob = "schedule_job";
+    public const string ListJobs = "list_jobs";
+    public const string CancelJob = "cancel_job";
+    public const string Autonomous = "autonomous";
+    public const string GetContinuityState = "get_continuity_state";
 }
 
 public sealed record ServerCommandEnvelope(string Type, string? Id = null, string? ServerSessionId = null);
@@ -145,6 +167,81 @@ public sealed record ProcessInputResult(bool Handled, string Text, IReadOnlyList
 public sealed record ResolveToolRequest(string Type, string? Id, string ServerSessionId, string Name);
 public sealed record UiResponseCommand(string Type, string? Id, string ServerSessionId, string RequestId, string? Value = null, bool Cancelled = false);
 
+/// <summary>Request for the <see cref="ServerCommandTypes.McpStatus"/> command (read-only, session-independent).</summary>
+public sealed record McpStatusCommand(string Type, string? Id = null);
+
+/// <summary>Server-side mirror of <c>PiSharp.Mcp.McpServerStatus</c> (the plugin lives in an app-base assembly the server cannot reference).</summary>
+public sealed record McpServerStatusEntry(
+    string Name,
+    string Source,
+    string State,
+    int ToolCount = 0,
+    string? LastError = null,
+    string? ServerInfo = null,
+    int? ReconnectAttempt = null);
+
+/// <summary>Response payload for <see cref="ServerCommandTypes.McpStatus"/>: <c>{ servers: [...] }</c>.</summary>
+public sealed record McpStatusResult(IReadOnlyList<McpServerStatusEntry> Servers);
+
+// --- P04: extension package + managed-skill daemon command surface (GAP-55/GAP-56) ---
+
+/// <summary>Request for <see cref="ServerCommandTypes.InstallExtension"/>: installs a package and hot-reloads extensions.</summary>
+public sealed record InstallExtensionCommand(
+    string Type,
+    string? Id = null,
+    string? ServerSessionId = null,
+    string? Reference = null,
+    bool Local = false,
+    bool Force = false,
+    bool Offline = false);
+
+/// <summary>Request for <see cref="ServerCommandTypes.UpdateExtension"/> (maps 1:1 to <c>ExtensionPackageUpdateRequest</c>).</summary>
+public sealed record UpdateExtensionCommand(
+    string Type,
+    string? Id = null,
+    string? ServerSessionId = null,
+    string? Source = null,
+    bool Extensions = false,
+    string? ExtensionSource = null,
+    bool Force = false,
+    bool Offline = false);
+
+/// <summary>Request for <see cref="ServerCommandTypes.RemoveExtension"/>: removes an installed package and hot-reloads extensions.</summary>
+public sealed record RemoveExtensionCommand(
+    string Type,
+    string? Id = null,
+    string? ServerSessionId = null,
+    string? Reference = null,
+    bool Local = false);
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.ManageSkill"/>. <see cref="Op"/> is one of
+/// <c>create</c>|<c>update</c>|<c>delete</c>|<c>list</c>|<c>promote</c>; the fields used per op:
+/// create = Name/Description/Content/DisableModelInvocation, update = Name + optional fields,
+/// delete = Name, promote = SourceReference.
+/// </summary>
+public sealed record ManageSkillCommand(
+    string Type,
+    string? Id = null,
+    string? ServerSessionId = null,
+    string Op = "list",
+    string? Name = null,
+    string? Description = null,
+    string? Content = null,
+    bool? DisableModelInvocation = null,
+    string? SourceReference = null);
+
+/// <summary>Serializable skill projection for <see cref="ServerCommandTypes.GetSkills"/> (the registry stores richer definitions with a runner delegate).</summary>
+public sealed record ServerSkillInfo(
+    string Name,
+    string Description,
+    string? Source,
+    int SourcePriority,
+    bool Hide,
+    bool AlwaysApply,
+    bool DisableModelInvocation,
+    IReadOnlyList<string>? Globs = null);
+
 /// <summary>Server-side equivalent of the CLI's slash-command execution options (which lives in PiSharp.Cli and cannot be referenced from the server).</summary>
 public sealed record SlashCommandExecutionOptions(string? Cwd = null);
 
@@ -180,4 +277,150 @@ public sealed record PiServerCommandDelegates(
     Func<ProcessInputRequest, CancellationToken, Task<ProcessInputResult>>? ProcessInputAsync = null,
     Func<CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync = null,
     Func<Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null,
+    Func<CancellationToken, Task<McpStatusResult>>? GetMcpStatusAsync = null,
     Func<CancellationToken, Task>? OnShutdown = null);
+
+// --- P05: daemon theme authority surface (plan C8) ---
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.ListThemes"/>: names of all theme documents the daemon
+/// registry currently knows (documents ride <c>get_theme</c> and <c>theme_changed</c>). The server
+/// session id is optional — the theme registry is daemon-global, not session-scoped.
+/// </summary>
+public sealed record ListThemesCommand(string Type, string? Id = null, string? ServerSessionId = null);
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.SetTheme"/>: activates the named theme in the daemon
+/// registry and broadcasts <c>theme_changed</c> on every live session stream. The server session id
+/// is optional — the active theme is daemon-global.
+/// </summary>
+public sealed record SetThemeCommand(string Type, string? Id = null, string? ServerSessionId = null, string? Name = null);
+
+/// <summary>Name-only projection for <see cref="ServerCommandTypes.ListThemes"/>: <c>{ name }</c>.</summary>
+public sealed record ServerThemeSummary(string Name);
+
+// --- P14: plan-mode daemon surface (plan C5) ---
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.SetPlanMode"/>: drives the plugin-owned plan-mode
+/// machine. <see cref="Phase"/> is one of <c>planning</c> (enter), <c>executing</c> (approve),
+/// <c>aborted</c> (abort), or <c>inactive</c> (end); the response carries the new
+/// <see cref="ServerPlanModeState"/>. Each transition emits <c>plan_mode_changed</c> on the
+/// session event stream via the C3 custom-event lane.
+/// </summary>
+public sealed record SetPlanModeCommand(string Type, string? Id, string ServerSessionId, string Phase);
+
+/// <summary>
+/// Wire snapshot of the plan-mode machine (mirror of the plugin's <c>PlanModeState</c>) returned by
+/// <see cref="ServerCommandTypes.SetPlanMode"/> and <see cref="ServerCommandTypes.GetPlanMode"/>.
+/// </summary>
+public sealed record ServerPlanModeState(
+    string Phase,
+    IReadOnlyList<string> RestrictedToolNames,
+    string? PlanningModel,
+    string? PlanFile);
+
+// --- P25: daemon observability surface (plan C6) ---
+
+/// <summary>Per-model aggregation row inside <see cref="MetricsSnapshot"/>.</summary>
+public sealed record PerModelMetrics(
+    string Model,
+    long Turns,
+    long TokensIn,
+    long TokensOut,
+    long TokensCache,
+    double AvgLatencyMs);
+
+/// <summary>Per-tool aggregation row inside <see cref="MetricsSnapshot"/>.</summary>
+public sealed record PerToolMetrics(
+    string Tool,
+    long Calls,
+    long Failures,
+    long Retries,
+    double AvgDurationMs);
+
+/// <summary>
+/// Daemon-global telemetry aggregate returned by <see cref="ServerCommandTypes.GetMetrics"/>.
+/// When telemetry is disabled (<see cref="Enabled"/> false) every counter is zero and the
+/// breakdown lists are empty; <c>pisharp stats --json</c> renders this document verbatim.
+/// </summary>
+public sealed record MetricsSnapshot(
+    bool Enabled,
+    DateTimeOffset GeneratedAt,
+    long SessionCount,
+    long TurnCount,
+    long TokenCountIn,
+    long TokenCountOut,
+    long TokenCountCache,
+    long ToolCallCount,
+    long ToolFailureCount,
+    long ToolRetryCount,
+    long CompactionCount,
+    double TurnLatencyAvgMs,
+    double TurnLatencyP95Ms,
+    IReadOnlyList<PerModelMetrics> ByModel,
+    IReadOnlyList<PerToolMetrics> ByTool,
+    IReadOnlyList<string> RecentJournalLines)
+{
+    /// <summary>The canonical <c>get_metrics</c> payload when telemetry is disabled (plan §4.5).</summary>
+    public static MetricsSnapshot Disabled(DateTimeOffset generatedAt)
+        => new(false, generatedAt, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [], [], []);
+}
+
+/// <summary>
+/// Per-session counters returned by <see cref="ServerCommandTypes.GetSessionStats"/>, computed
+/// from the live session's message context and retained event log (no telemetry dependency).
+/// </summary>
+public sealed record SessionStats(
+    string ServerSessionId,
+    string RuntimeSessionId,
+    string? Model,
+    int Messages,
+    int Turns,
+    long TokensIn,
+    long TokensOut,
+    int ToolCalls,
+    int ToolFailures,
+    int Retries,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? LastActivityAt);
+
+// --- P23: continuity daemon wire surface request records (plan C5 §4.9) ---
+// Response/result records (ContinuityGoalResult, ContinuityJobResult, etc.) live in
+// PiSharp.Continuity.Contracts so the plugin, server, and client share one serialization shape.
+
+/// <summary>Request for <see cref="ServerCommandTypes.SetGoal"/>: { Objective, MaxTokens? }.</summary>
+public sealed record SetGoalCommand(string Type, string? Id, string ServerSessionId, string Objective, long? MaxTokens = null);
+
+/// <summary>Request for <see cref="ServerCommandTypes.GetGoal"/>: {}.</summary>
+public sealed record GetGoalCommand(string Type, string? Id, string ServerSessionId);
+
+/// <summary>Request for <see cref="ServerCommandTypes.ScheduleJob"/>: { Name, Cron, Prompt, Enabled? }.</summary>
+public sealed record ScheduleJobCommand(
+    string Type,
+    string? Id,
+    string ServerSessionId,
+    string Name,
+    string Cron,
+    string Prompt,
+    bool? Enabled = null);
+
+/// <summary>Request for <see cref="ServerCommandTypes.ListJobs"/>: {}.</summary>
+public sealed record ListJobsCommand(string Type, string? Id, string ServerSessionId);
+
+/// <summary>Request for <see cref="ServerCommandTypes.CancelJob"/>: { JobId }.</summary>
+public sealed record CancelJobCommand(string Type, string? Id, string ServerSessionId, string JobId);
+
+/// <summary>Request for <see cref="ServerCommandTypes.Autonomous"/>: { Message?, MaxTurns?, MaxTokens?, TimeoutMinutes?, Gates? }.</summary>
+public sealed record AutonomousCommandRequest(
+    string Type,
+    string? Id,
+    string ServerSessionId,
+    string? Message = null,
+    int? MaxTurns = null,
+    long? MaxTokens = null,
+    int? TimeoutMinutes = null,
+    IReadOnlyList<QualityGate>? Gates = null);
+
+/// <summary>Request for <see cref="ServerCommandTypes.GetContinuityState"/>: {}.</summary>
+public sealed record GetContinuityStateCommand(string Type, string? Id, string ServerSessionId);

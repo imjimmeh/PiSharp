@@ -168,14 +168,26 @@ public sealed partial class ServerSessionRegistry : IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(runtimeSessionId)) _liveRuntimeSessionIds.TryRemove(runtimeSessionId, out _);
     }
 
-    private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeAsync(CreateServerSessionRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Default runtime factory mapping a <see cref="CreateServerSessionRequest"/> to
+    /// <see cref="PiSharp.Runtime.SessionRuntime"/> (no telemetry).
+    /// </summary>
+    public static Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeAsync(CreateServerSessionRequest request, CancellationToken cancellationToken = default)
+        => CreateRuntimeAsync(request, telemetry: null, cancellationToken);
+
+    /// <summary>
+    /// Runtime factory with an optional daemon-side telemetry service (P25 daemon observability);
+    /// the service is wired into the runtime and its harness instrumentor is bound.
+    /// </summary>
+    public static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeAsync(CreateServerSessionRequest request, PiSharp.Runtime.Telemetry.TelemetryService? telemetry, CancellationToken cancellationToken)
         => await PiRuntimeBootstrap.CreateRuntimeAsync(new PiRuntimeOptions(
             new SystemExecutionEnv(request.Cwd),
             SessionsRoot: request.SessionsRoot,
             Model: new RuntimeModelOptions(request.Provider, request.Model, request.Thinking, request.ScopedModels),
             Tools: new RuntimeToolOptions(request.Tools, request.NoTools, request.NoBuiltinTools),
             Resources: new RuntimeResourceOptions(request.Extensions, DisableExtensions: request.NoExtensions, DisableSkills: request.NoSkills, DisablePromptTemplates: request.NoPromptTemplates, DisableThemes: request.NoThemes, DisableContextFiles: request.NoContextFiles),
-            Session: new RuntimeSessionStartupOptions(SessionIdOrPath: request.SessionIdOrPath, ContinueLatestForCwd: request.ContinueLatestForCwd, NewSessionId: request.SessionId)),
+            Session: new RuntimeSessionStartupOptions(SessionIdOrPath: request.SessionIdOrPath, ContinueLatestForCwd: request.ContinueLatestForCwd, NewSessionId: request.SessionId),
+            Telemetry: telemetry),
             cancellationToken: cancellationToken);
 
     private static void ValidateCreateRequest(CreateServerSessionRequest request)

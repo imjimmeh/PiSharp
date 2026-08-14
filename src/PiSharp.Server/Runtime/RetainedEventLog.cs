@@ -7,8 +7,10 @@ public sealed record ReplayResult(long FromSequence, long HeadSequence, bool Gap
 
 /// <summary>
 /// Lock-guarded ring buffer of the most recent <c>capacity</c> session envelopes, replayable by the
-/// per-session monotonic <see cref="ServerEventEnvelope.Sequence"/>. A replay reports a gap when the
-/// requested <c>sinceSequence</c> predates the oldest retained envelope.
+/// per-session monotonic <see cref="ServerEventEnvelope.Sequence"/>. A replay reports a gap only when
+/// the requested <c>sinceSequence</c> falls inside the evicted range — between the first sequence ever
+/// appended and the oldest retained envelope. Requests at or before the very first sequence (e.g. a
+/// fresh client attaching at 0) replay everything retained.
 /// </summary>
 public sealed class RetainedEventLog(int capacity)
 {
@@ -17,13 +19,14 @@ public sealed class RetainedEventLog(int capacity)
     private int _start;   // index of the oldest retained envelope
     private int _count;
     private long _head;
-
+    private long _firstSequence = -1;
     public long HeadSequence { get { lock (_gate) return _head; } }
 
     public void Append(ServerEventEnvelope envelope)
     {
         lock (_gate)
         {
+            if (_count == 0) _firstSequence = envelope.Sequence;
             if (_count < capacity) { _buffer[(_start + _count) % capacity] = envelope; _count++; }
             else { _buffer[_start] = envelope; _start = (_start + 1) % capacity; }
             _head = envelope.Sequence;
@@ -35,8 +38,7 @@ public sealed class RetainedEventLog(int capacity)
         lock (_gate)
         {
             var oldest = _head - _count + 1;
-            var gap = sinceSequence < oldest;
-            if (gap) sinceSequence = oldest;
+            var gap = _count > 0 && sinceSequence >= _firstSequence && sinceSequence < oldest;
             var events = new List<ServerEventEnvelope>();
             for (var i = 0; i < _count; i++)
             {

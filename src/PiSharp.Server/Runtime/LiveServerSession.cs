@@ -2,8 +2,8 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Harness;
+using PiSharp.Extensions;
 using PiSharp.Server.Contracts;
-
 namespace PiSharp.Server.Runtime;
 
 public sealed class LiveServerSession : IAsyncDisposable
@@ -13,6 +13,7 @@ public sealed class LiveServerSession : IAsyncDisposable
     private readonly int _eventCapacity;
     private readonly Func<LiveServerSession, string, string, CancellationToken, Task>? _runtimeSessionChanged;
     private IDisposable? _subscription;
+    private IDisposable? _advisorSubscription;
     private CancellationTokenSource _operationAbort = new();
     private string _runtimeSessionId;
     private int _scheduledOperations;
@@ -30,6 +31,7 @@ public sealed class LiveServerSession : IAsyncDisposable
         _eventCapacity = eventCapacity;
         EventLog = new RetainedEventLog(eventCapacity);
         BindCurrentHarness();
+        BindAdvisorEventForwarding();
         Runtime.SetRebindSession(OnRuntimeReboundAsync);
     }
 
@@ -166,6 +168,33 @@ public sealed class LiveServerSession : IAsyncDisposable
         }
     }
 
+
+    /// <summary>
+    /// Subscribes to the runtime's shared extension registry so that an extension-emitted
+    /// <c>advisor_note</c> (produced by the advisor plugin via <c>api.Events.EmitAsync</c>) is
+    /// mapped onto the daemon per-session event lane through
+    /// <see cref="AgentSessionEvent.FromAdvisor"/>. Uses <c>EmitEvent</c> so the flat event is
+    /// retained in the log and broadcast to every attached client, exactly like the harness path.
+    /// </summary>
+    private void BindAdvisorEventForwarding()
+    {
+        _advisorSubscription?.Dispose();
+        var extensionManager = Runtime.ExtensionManager;
+        if (extensionManager is null) return;
+        _advisorSubscription = extensionManager.Registry.RegisterHandler(
+            "daemon:advisor",
+            ExtensionEventNames.AdvisorNote,
+            OnAdvisorEventAsync);
+    }
+
+    private Task OnAdvisorEventAsync(ExtensionEvent evt, CancellationToken cancellationToken)
+    {
+        if (evt.Payload is ExtensionAdvisorEvent advisorEvent)
+        {
+            EmitEvent(AgentSessionEvent.FromAdvisor(advisorEvent));
+        }
+        return Task.CompletedTask;
+    }
     private void BindCurrentHarness()
     {
         _subscription?.Dispose();
@@ -198,6 +227,7 @@ public sealed class LiveServerSession : IAsyncDisposable
         _disposed = true;
         _lifetime.Cancel();
         _subscription?.Dispose();
+        _advisorSubscription?.Dispose();
         RequestAbort();
         await Gate.WaitAsync();
         try { await Runtime.DisposeAsync(); }
