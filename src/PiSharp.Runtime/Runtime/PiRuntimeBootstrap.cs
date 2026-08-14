@@ -141,7 +141,7 @@ public static class PiRuntimeBootstrap
                 }
 
                 var tsExtensionPaths = resources.ExtensionPaths.Where(path => !path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)).ToArray();
-                if (tsExtensionPaths is { Length: > 0 })
+                if (!resourcesOptions.DisableTypeScriptExtensions && tsExtensionPaths is { Length: > 0 })
                 {
                     tsHost = new TsExtensionHost(new TsBridgeOptions(
                         ExtensionPaths: [],

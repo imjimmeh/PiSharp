@@ -65,6 +65,50 @@ public sealed class PiRuntimeBootstrapTests
     }
 
     [Fact]
+    public async Task DisableTypeScriptExtensionsKeepsNativeHostAndDropsScriptPaths()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-runtime-bootstrap-" + Guid.NewGuid().ToString("N"));
+        var home = Path.Combine(root, "home");
+        var repoRoot = Path.Combine(root, "repo");
+        Directory.CreateDirectory(Path.Combine(home, ".pi", "PiSharp"));
+        Directory.CreateDirectory(Path.Combine(repoRoot, ".pi", "extensions"));
+        await File.WriteAllTextAsync(Path.Combine(repoRoot, ".pi", "extensions", "plugin.ts"), "export default {};");
+        var resources = new RuntimeResourceOptions(DisableTypeScriptExtensions: true, DisableSkills: true, DisablePromptTemplates: true, DisableThemes: true, DisableContextFiles: true);
+
+        await using var runtime = await PiRuntimeBootstrap.CreateRuntimeAsync(new PiRuntimeOptions(
+            new SystemExecutionEnv(repoRoot),
+            HomeDirectory: home,
+            Model: new RuntimeModelOptions("amazon-bedrock", "anthropic.claude-haiku-4-5-20251001-v1:0"),
+            Resources: resources));
+
+        Assert.NotNull(runtime.PluginHost);
+        Assert.Null(runtime.TsHost);
+        Assert.DoesNotContain(runtime.Resources!.ExtensionPaths, path => path.EndsWith(".ts", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task DisableTypeScriptExtensionsSkipsBridgeEvenForExplicitNonDllPaths()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-runtime-bootstrap-" + Guid.NewGuid().ToString("N"));
+        var home = Path.Combine(root, "home");
+        var repoRoot = Path.Combine(root, "repo");
+        Directory.CreateDirectory(Path.Combine(home, ".pi", "PiSharp"));
+        Directory.CreateDirectory(repoRoot);
+        var scriptPath = Path.Combine(repoRoot, "plugin.mjs");
+        await File.WriteAllTextAsync(scriptPath, "export default {};");
+        var resources = new RuntimeResourceOptions(ExtensionPaths: [scriptPath], DisableTypeScriptExtensions: true, DisableSkills: true, DisablePromptTemplates: true, DisableThemes: true, DisableContextFiles: true);
+
+        await using var runtime = await PiRuntimeBootstrap.CreateRuntimeAsync(new PiRuntimeOptions(
+            new SystemExecutionEnv(repoRoot),
+            HomeDirectory: home,
+            Model: new RuntimeModelOptions("amazon-bedrock", "anthropic.claude-haiku-4-5-20251001-v1:0"),
+            Resources: resources));
+
+        Assert.NotNull(runtime.PluginHost);
+        Assert.Null(runtime.TsHost);
+    }
+
+    [Fact]
     public async Task CreateRuntimeRestoresResumedSessionThinkingLevelOverPersistedDefault()
     {
         var root = Path.Combine(Path.GetTempPath(), "pisharp-runtime-bootstrap-" + Guid.NewGuid().ToString("N"));
