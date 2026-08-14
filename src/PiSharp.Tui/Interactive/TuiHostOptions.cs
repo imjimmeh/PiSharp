@@ -24,6 +24,10 @@ public sealed record TuiSessionSnapshot(
     string? SessionName,
     IReadOnlyList<SessionTreeEntry> BranchEntries);
 
+public sealed record TuiHostStartupResult(
+    TuiThemeDocument? Theme,
+    IReadOnlyList<string> StartupMessages);
+
 public sealed record TuiInputHookResult(bool Handled, string Text, IReadOnlyList<ImageContent>? Images);
 
 internal sealed record TuiHostRunContext(
@@ -64,9 +68,12 @@ public sealed record TuiHostOptions(
     TuiTimingOptions? TimingOptions = null,
     ILoggerFactory? LoggerFactory = null)
 {
+    public Func<CancellationToken, Task<TuiHostStartupResult>>? StartupAsync { get; init; }
     public Func<CancellationToken, Task>? OnHarnessReplaced { get; set; }
 
     internal IConsoleDriver? ConsoleDriver { get; init; }
+
+    internal ITuiApplicationContext? ApplicationContext { get; init; }
 
     internal TuiProfilingCounters? ProfilingCounters { get; init; }
 

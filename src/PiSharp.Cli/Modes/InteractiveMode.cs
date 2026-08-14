@@ -254,72 +254,93 @@ public static class InteractiveMode
     /// </summary>
     internal static async Task<int> RunRemoteAsync(DaemonLease lease, CliArgs runtimeArgs, IConsoleIO console, CancellationToken cancellationToken)
     {
-        await using var transport = new ClientWebSocketTransport();
+        await using var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
         await using var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection);
 
-        await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}"), lease.ApiKey, cancellationToken);
-
         var cwd = Directory.GetCurrentDirectory();
         var attachId = runtimeArgs.Attach;
-        ServerSessionCreated? created = null;
-        string? attachedServerSessionId = null;
-        if (!string.IsNullOrWhiteSpace(attachId))
+        string? runtimeSessionId = null;
+        var remoteReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        async Task<TuiHostStartupResult> StartRemoteAsync(CancellationToken token)
         {
-            var listResponse = await connection.SendAsync(
-                new ServerCommandEnvelope(ServerCommandTypes.ListSessions),
-                new ListSessionsCommand(Type: ServerCommandTypes.ListSessions, Cwd: cwd),
-                cancellationToken);
-            if (!listResponse.Success)
+            try
             {
-                throw new InvalidOperationException($"list_sessions failed: {listResponse.Error?.Code}: {listResponse.Error?.Message}");
-            }
+                await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}"), lease.ApiKey, token);
 
-            var listed = FromPayload<ServerSessionListResult>(listResponse.Data)
-                ?? throw new InvalidOperationException("list_sessions returned no session list.");
-
-            var live = listed.Sessions.FirstOrDefault(session => string.Equals(session.Id, attachId, StringComparison.Ordinal) && session.IsLive);
-            if (live is not null)
-            {
-                var sinceSequence = ReadCursorSequence(attachId, cwd) + 1;
-                var attachResponse = await connection.SendAsync(
-                    new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: live.ServerSessionId),
-                    new { sinceSequence },
-                    cancellationToken);
-                if (!attachResponse.Success)
+                var startupNotices = new List<string>();
+                ServerSessionCreated? created = null;
+                string? attachedServerSessionId = null;
+                if (!string.IsNullOrWhiteSpace(attachId))
                 {
-                    throw new InvalidOperationException($"attach failed: {attachResponse.Error?.Code}: {attachResponse.Error?.Message}");
+                    var listResponse = await connection.SendAsync(
+                        new ServerCommandEnvelope(ServerCommandTypes.ListSessions),
+                        new ListSessionsCommand(Type: ServerCommandTypes.ListSessions, Cwd: cwd),
+                        token);
+                    if (!listResponse.Success)
+                    {
+                        throw new InvalidOperationException($"list_sessions failed: {listResponse.Error?.Code}: {listResponse.Error?.Message}");
+                    }
+
+                    var listed = FromPayload<ServerSessionListResult>(listResponse.Data)
+                        ?? throw new InvalidOperationException("list_sessions returned no session list.");
+
+                    var live = listed.Sessions.FirstOrDefault(session => string.Equals(session.Id, attachId, StringComparison.Ordinal) && session.IsLive);
+                    if (live is not null)
+                    {
+                        var sinceSequence = ReadCursorSequence(attachId, cwd) + 1;
+                        var attachResponse = await connection.SendAsync(
+                            new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: live.ServerSessionId),
+                            new { sinceSequence },
+                            token);
+                        if (!attachResponse.Success)
+                        {
+                            throw new InvalidOperationException($"attach failed: {attachResponse.Error?.Code}: {attachResponse.Error?.Message}");
+                        }
+
+                        attachedServerSessionId = live.ServerSessionId;
+                        startupNotices.Add($"Attached to live session {attachId}.");
+                    }
+                    else
+                    {
+                        startupNotices.Add($"Session {attachId} is not live; started a new session.");
+                    }
                 }
 
-                attachedServerSessionId = live.ServerSessionId;
-                await console.Out.WriteLineAsync($"attached to live session {attachId}".AsMemory(), cancellationToken);
+                if (attachedServerSessionId is null)
+                {
+                    created = await CreateRemoteSessionAsync(connection, runtimeArgs, token);
+                }
+
+                backend.ServerSessionId = (attachedServerSessionId ?? created!.ServerSessionId)!;
+                runtimeSessionId = attachedServerSessionId is null ? created!.State.RuntimeSessionId : attachId!;
+
+                var startupMessages = await backend.GetStartupMessagesAsync(token);
+                var theme = await backend.GetThemeAsync(token);
+                remoteReady.TrySetResult();
+                return new TuiHostStartupResult(theme, [.. startupNotices, .. startupMessages]);
             }
-            else
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                await console.Error.WriteLineAsync($"session {attachId} is not live; starting a new session".AsMemory(), cancellationToken);
+                remoteReady.TrySetCanceled(token);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                remoteReady.TrySetException(exception);
+                throw;
             }
         }
-
-        if (attachedServerSessionId is null)
-        {
-            created = await CreateRemoteSessionAsync(connection, runtimeArgs, cancellationToken);
-        }
-
-        var sessionId = (attachedServerSessionId ?? created!.ServerSessionId)!;
-        var runtimeSessionId = attachedServerSessionId is null ? created!.State.RuntimeSessionId : attachId!;
-        backend.ServerSessionId = sessionId;
-
-        var startupMessages = await backend.GetStartupMessagesAsync(cancellationToken);
-        var theme = await backend.GetThemeAsync(cancellationToken);
 
         var options = new TuiHostOptions(
             backend,
-            sessionId,
+            SessionId: "connecting",
             SessionFile: null,
             backend.GetSessionNameAsync,
             DispatchCommandAsync: backend.DispatchCommandAsync,
             CompleteCommand: text => backend.CompleteCommandAsync(text, CancellationToken.None).GetAwaiter().GetResult(),
-            WorkingDirectory: Directory.GetCurrentDirectory(),
+            WorkingDirectory: cwd,
             FooterSnapshot: null,
             ConfigureUiBridge: bridge =>
             {
@@ -331,24 +352,35 @@ public static class InteractiveMode
                     return new ServerUiResponse(result.RequestId, result.Value, result.Cancelled);
                 };
             },
-            StartupMessages: startupMessages,
-            PostStartupChecksAsync: (inject, ct) => backend.PostStartupChecksAsync(inject, ct),
-            Theme: theme,
-            GetExtensionShortcuts: () => backend.GetExtensionShortcutsAsync(CancellationToken.None).GetAwaiter().GetResult(),
+            StartupMessages: null,
+            PostStartupChecksAsync: async (inject, ct) =>
+            {
+                await remoteReady.Task.WaitAsync(ct);
+                await backend.PostStartupChecksAsync(inject, ct);
+            },
+            Theme: null,
+            GetExtensionShortcuts: () => backend.ServerSessionId is null
+                ? []
+                : backend.GetExtensionShortcutsAsync(CancellationToken.None).GetAwaiter().GetResult(),
             GetExtensionRegistry: () => null,
             ResolveTool: _ => null,
             CycleThinkingLevelAsync: backend.CycleThinkingLevelAsync,
-            ProcessFileReferencesAsync: async (text, cwd, token) =>
+            ProcessFileReferencesAsync: async (text, workingDirectory, token) =>
             {
-                var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, cwd, token);
+                var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, workingDirectory, token);
                 return (processed.Text, processed.Images);
             },
             ProcessInputAsync: backend.ProcessInputAsync,
             GetSessionSnapshotAsync: backend.GetSessionSnapshotAsync,
             ForkFromEntryAsync: backend.ForkFromEntryAsync,
-            GetExtensionLoadStatus: () => backend.GetExtensionLoadStatusAsync(CancellationToken.None).GetAwaiter().GetResult(),
+            GetExtensionLoadStatus: () => backend.ServerSessionId is null
+                ? new TuiExtensionLoadStatus(0, 0, 0, 0, 0)
+                : backend.GetExtensionLoadStatusAsync(CancellationToken.None).GetAwaiter().GetResult(),
             ExtensionLoadCommandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" },
-            LoggerFactory: null);
+            LoggerFactory: null)
+        {
+            StartupAsync = StartRemoteAsync
+        };
 
         var host = new TuiHost(options);
         try
@@ -359,7 +391,10 @@ public static class InteractiveMode
         {
             var lastAppliedSequence = connection.LastAppliedSequence;
             await backend.DisposeAsync();
-            WriteCursorSequence(runtimeSessionId, cwd, lastAppliedSequence);
+            if (!string.IsNullOrWhiteSpace(runtimeSessionId))
+            {
+                WriteCursorSequence(runtimeSessionId, cwd, lastAppliedSequence);
+            }
         }
     }
 

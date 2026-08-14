@@ -57,20 +57,43 @@ public sealed class TuiHost(TuiHostOptions options)
         }
         TuiTheme.Apply(options.Theme);
         TuiShortcutRegistrar.LoggerFactory = options.LoggerFactory;
-        var appContext = new TerminalGuiApplicationContext();
+        var appContext = options.ApplicationContext ?? new TerminalGuiApplicationContext();
+
+        // Owns the deferred startup hydration: cancelling it during teardown stops any
+        // in-flight metadata/daemon work from mutating the UI once the loop is shutting down.
+        using var hostLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         var runtime = options.Runtime;
-        var state = TuiRenderState.Empty(
-            options.SessionId, options.SessionFile,
-            runtime.Model, runtime.ThinkingLevel,
-            await options.GetSessionNameAsync(cancellationToken));
-        if (options.GetSessionSnapshotAsync is not null)
+        var startupAsync = options.StartupAsync;
+
+        // Local callers (no startup hook) keep the host's original synchronous hydration:
+        // session metadata and startup messages are resolved before the shell is built, so
+        // the first frame already reflects them and no late mutation can race the app loop.
+        // Remote callers (StartupAsync) defer this work until after the first render so the
+        // shell paints before any daemon round-trip can block it.
+        TuiRenderState state;
+        if (startupAsync is not null)
         {
-            var snapshot = await options.GetSessionSnapshotAsync(cancellationToken);
-            state = state.HydrateSession(snapshot.SessionId, snapshot.SessionFile, snapshot.SessionName, snapshot.BranchEntries);
+            state = TuiRenderState.Empty(
+                options.SessionId, options.SessionFile,
+                runtime.Model, runtime.ThinkingLevel,
+                sessionName: null);
         }
-        foreach (var message in options.StartupMessages ?? [])
-            state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+        else
+        {
+            var sessionName = await options.GetSessionNameAsync(cancellationToken);
+            state = TuiRenderState.Empty(
+                options.SessionId, options.SessionFile,
+                runtime.Model, runtime.ThinkingLevel,
+                sessionName);
+            if (options.GetSessionSnapshotAsync is not null)
+            {
+                var snapshot = await options.GetSessionSnapshotAsync(cancellationToken);
+                state = state.HydrateSession(snapshot.SessionId, snapshot.SessionFile, snapshot.SessionName, snapshot.BranchEntries);
+            }
+            foreach (var message in options.StartupMessages ?? [])
+                state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+        }
 
         var shell = new TuiShellView(options.LoggerFactory);
         shell.ProfilingCounters = options.ProfilingCounters;
@@ -272,6 +295,40 @@ public sealed class TuiHost(TuiHostOptions options)
         harnessLifecycle.BindInitialHarnessSubscription();
         renderCoordinator.Initialize();
         shell.Prompt.FocusAtEnd();
+
+        if (startupAsync is not null)
+        {
+            // The remote startup handshake and session metadata hydrate only after the
+            // initial frame is queued, so the shell renders before any daemon work can
+            // block it. All state, theme, and prompt mutations are marshaled through the
+            // app loop. The app loop owns the launch: the posted callback paints the
+            // connecting state and starts hydration off-loop so the shell keeps
+            // rendering, the host-lifetime token (cancelled during teardown) bounds any
+            // further UI mutation, and the fault continuation observes anything the
+            // hydration itself does not report. One delivered post is sufficient to
+            // render the connecting view and launch hydration.
+            appContext.Post(() =>
+            {
+                state = state.AppendSystem("Connecting to daemon…", pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+                shell.Prompt.Enabled = false;
+                try
+                {
+                    var hydration = Task.Run(() => HydrateStartupAsync(hostLifetime.Token), hostLifetime.Token);
+                    _ = hydration.ContinueWith(
+                        static (task, state) => ((ILogger<TuiHost>)state!).LogError(
+                            task.Exception!.GetBaseException(), "TUI startup hydration failed unexpectedly"),
+                        _logger,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                }
+                catch (OperationCanceledException) when (hostLifetime.IsCancellationRequested)
+                {
+                    _logger.LogDebug("TUI startup hydration was cancelled before it could start");
+                }
+            });
+        }
+
         renderCoordinator.RequestRender(cancellationToken);
 
         if (options.PostStartupChecksAsync is not null)
@@ -283,6 +340,66 @@ public sealed class TuiHost(TuiHostOptions options)
                     renderCoordinator.RequestRender();
                 }, cancellationToken);
             _ = Task.Run(() => options.PostStartupChecksAsync(InjectMessage, cancellationToken), cancellationToken);
+        }
+
+        async Task HydrateStartupAsync(CancellationToken token)
+        {
+            try
+            {
+                // Only deferred-startup callers reach this function; the guard also keeps
+                // the nullable flow analysis sound.
+                if (startupAsync is null)
+                    return;
+                var startupResult = await startupAsync(token).ConfigureAwait(false);
+                if (startupResult.Theme is not null)
+                    await appContext.InvokeAsync(() => TuiTheme.Apply(startupResult.Theme), token).ConfigureAwait(false);
+
+                var sessionName = await options.GetSessionNameAsync(token).ConfigureAwait(false);
+                TuiSessionSnapshot? snapshot = null;
+                if (options.GetSessionSnapshotAsync is not null)
+                    snapshot = await options.GetSessionSnapshotAsync(token).ConfigureAwait(false);
+
+                await appContext.InvokeAsync(() =>
+                {
+                    if (snapshot is not null)
+                    {
+                        ApplySessionSnapshot(snapshot);
+                    }
+                    else
+                    {
+                        state = state with { SessionName = sessionName };
+                    }
+                    foreach (var message in options.StartupMessages ?? [])
+                        state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+                    foreach (var message in startupResult.StartupMessages ?? [])
+                        state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+                    shell.Prompt.Enabled = true;
+                    renderCoordinator.RequestRender();
+                }, token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                _logger.LogDebug("TUI startup hydration cancelled; host is shutting down");
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "TUI startup hydration failed");
+                var errorMessage = $"Failed to connect to the daemon: {exception.Message}. Verify the daemon is running and restart the interactive session.";
+                try
+                {
+                    // The persistent error is surfaced even during teardown; a shutdown
+                    // marshal failure is caught below and logged instead of crashing.
+                    await appContext.InvokeAsync(() =>
+                    {
+                        state = state.AppendSystem(errorMessage, isError: true, expiresAfter: null);
+                        renderCoordinator.RequestRender();
+                    }, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception marshalException) when (marshalException is OperationCanceledException or InvalidOperationException or ObjectDisposedException)
+                {
+                    _logger.LogDebug(marshalException, "TUI startup error could not be surfaced; host is shutting down");
+                }
+            }
         }
 
         try
@@ -307,6 +424,9 @@ public sealed class TuiHost(TuiHostOptions options)
         }
         finally
         {
+            // Stop any in-flight startup hydration from mutating the UI while the loop is
+            // shutting down; a queued-but-unrun mutation observes the cancelled token.
+            hostLifetime.Cancel();
             try
             {
                 renderCoordinator.Dispose();
