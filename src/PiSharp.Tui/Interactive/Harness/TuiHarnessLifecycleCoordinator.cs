@@ -10,8 +10,7 @@ internal sealed class TuiHarnessLifecycleCoordinator(
     TuiHostOptions options,
     ITuiApplicationContext appContext,
     TuiRenderCoordinator renderCoordinator,
-    Func<TuiRenderState> getState,
-    Action<TuiRenderState> setState,
+    RenderStateStore store,
     Func<CancellationToken, Task<TuiSessionSnapshot?>> loadSessionSnapshotAsync,
     Action<TuiSessionSnapshot, bool> applySessionSnapshot,
     ILoggerFactory? loggerFactory)
@@ -44,8 +43,7 @@ internal sealed class TuiHarnessLifecycleCoordinator(
     private TuiHarnessSubscription CreateHarnessSubscription()
         => new(
             () => session.CurrentRuntime,
-            getState,
-            setState,
+            store,
             token => renderCoordinator.RequestRender(token),
             appContext.Post,
             options.ResolveTool,

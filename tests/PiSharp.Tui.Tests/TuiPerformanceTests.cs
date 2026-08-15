@@ -106,16 +106,11 @@ public sealed class TuiPerformanceTests
         var harness = TuiIntegrationTestHost.CreateHarness();
         var runtime = TuiIntegrationTestHost.CreateRuntimeFacade(harness);
         var state = Empty();
-        var setStateCalls = 0;
+        var store = new RenderStateStore(state);
         var scheduledRenders = 0;
         using var subscription = new TuiHarnessSubscription(
             () => runtime,
-            () => state,
-            next =>
-            {
-                state = next;
-                setStateCalls++;
-            },
+            store,
             _ => scheduledRenders++,
             action => action(),
             resolveTool: null,
@@ -126,10 +121,9 @@ public sealed class TuiPerformanceTests
         subscription.Bind();
 
         await harness.SetThinkingLevelAsync(ThinkingLevel.High);
-        await WaitForConditionAsync(() => setStateCalls > 0, TimeSpan.FromSeconds(1));
+        await WaitForConditionAsync(() => store.Snapshot().ThinkingLevel == ThinkingLevel.High, TimeSpan.FromSeconds(1));
 
-        Assert.Equal(ThinkingLevel.High, state.ThinkingLevel);
-        Assert.Equal(1, setStateCalls);
+        Assert.Equal(ThinkingLevel.High, store.Snapshot().ThinkingLevel);
         Assert.Equal(1, scheduledRenders);
     }
 

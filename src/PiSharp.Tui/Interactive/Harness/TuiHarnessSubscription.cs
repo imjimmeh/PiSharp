@@ -11,8 +11,7 @@ namespace PiSharp.Tui.Interactive.Harness;
 
 internal sealed class TuiHarnessSubscription(
     Func<ITuiRuntimeFacade> getCurrentRuntime,
-    Func<TuiRenderState> getState,
-    Action<TuiRenderState> setState,
+    RenderStateStore store,
     Action<CancellationToken> scheduleRender,
     Action<Action> dispatch,
     Func<string, IAgentTool?>? resolveTool,
@@ -79,7 +78,7 @@ internal sealed class TuiHarnessSubscription(
         var events = new AgentHarnessEvent[batch.Count];
         for (var index = 0; index < batch.Count; index++) events[index] = batch[index].Event;
 
-        var previousState = getState();
+        var previousState = store.Snapshot();
         var state = previousState.ReduceBatch(events);
         var thinkingEvents = events.Select(DescribeThinkingEvent).Where(description => description is not null).Cast<string>().ToArray();
         if (thinkingEvents.Length > 0)
@@ -100,9 +99,8 @@ internal sealed class TuiHarnessSubscription(
             }
         }
 
-        setState(state);
+        store.Replace(state);
         scheduleRender(default);
-
         foreach (var queued in batch)
         {
             var token = queued.CancellationToken.IsCancellationRequested ? CancellationToken.None : queued.CancellationToken;
@@ -150,20 +148,18 @@ internal sealed class TuiHarnessSubscription(
                 var renderedCall = await callRenderer.RenderCallAsync(new ToolRenderRequest(tool.ToolCallId, tool.ToolName, tool.Arguments.Clone(), null, true, false, false, 120), token);
                 if (renderedCall is { Lines.Count: > 0 })
                 {
-                    var state = getState().SetToolRenderedLines(tool.ToolCallId, callLines: renderedCall.Lines);
-                    setState(state);
+                    store.Update(s => s.SetToolRenderedLines(tool.ToolCallId, callLines: renderedCall.Lines));
                     return true;
                 }
                 return false;
             case AgentHarnessEvent.Core { Event: AgentEvent.ToolExecutionEnd tool }:
                 if (resolveTool?.Invoke(tool.ToolName) is not IAgentToolRenderer { HasRenderResult: true } resultRenderer) return false;
-                var existing = getState().Transcript.LastOrDefault(item => string.Equals(item.ToolCallId, tool.ToolCallId, StringComparison.Ordinal));
+                var existing = store.Snapshot().Transcript.LastOrDefault(item => string.Equals(item.ToolCallId, tool.ToolCallId, StringComparison.Ordinal));
                 var result = tool.Result as AgentToolResult<object?>;
                 var renderedResult = await resultRenderer.RenderResultAsync(new ToolRenderRequest(tool.ToolCallId, tool.ToolName, existing?.ToolArguments?.Clone(), result, false, tool.IsError, existing?.IsExpanded ?? false, 120), token);
                 if (renderedResult is { Lines.Count: > 0 })
                 {
-                    var state = getState().SetToolRenderedLines(tool.ToolCallId, resultLines: renderedResult.Lines);
-                    setState(state);
+                    store.Update(s => s.SetToolRenderedLines(tool.ToolCallId, resultLines: renderedResult.Lines));
                     return true;
                 }
                 return false;

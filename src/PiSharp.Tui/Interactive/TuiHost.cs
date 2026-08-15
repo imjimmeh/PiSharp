@@ -115,6 +115,8 @@ public sealed class TuiHost(TuiHostOptions options)
         foreach (var diagnostic in initialKeybindingsDiagnostics)
             state = state.AppendSystem(diagnostic, isError: true);
 
+        var stateStore = new RenderStateStore(state);
+
         var shell = new TuiShellView(options.LoggerFactory);
         shell.ProfilingCounters = options.ProfilingCounters;
         var chatPipeline = new ChatRowRenderPipeline(options.GetExtensionRegistry?.Invoke(), loggerFactory: options.LoggerFactory);
@@ -129,7 +131,7 @@ public sealed class TuiHost(TuiHostOptions options)
             => options.GetSessionSnapshotAsync is null ? null : await options.GetSessionSnapshotAsync(token);
 
         void ApplySessionSnapshot(TuiSessionSnapshot snapshot, bool preserve = false)
-            => state = TuiSessionSwitch.ApplySnapshot(state, snapshot, preserve);
+            => stateStore.Replace(TuiSessionSwitch.ApplySnapshot(stateStore.Snapshot(), snapshot, preserve));
 
         var headerExpanded = false;
         var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: options.LoggerFactory);
@@ -142,8 +144,12 @@ public sealed class TuiHost(TuiHostOptions options)
                 shortcutActionsRef.DispatchShortcutCommand(command);
         }
         var renderCoordinator = new TuiRenderCoordinator(
-            shell, () => state, s => state = s, appContext,
-            () => options.FooterSnapshot?.Invoke(state) ?? footerSnapshotProvider.CreateSnapshot(state, options.WorkingDirectory ?? Environment.CurrentDirectory),
+            shell, () => stateStore.Snapshot(), s => stateStore.Replace(s), appContext,
+            () =>
+            {
+                var current = stateStore.Snapshot();
+                return options.FooterSnapshot?.Invoke(current) ?? footerSnapshotProvider.CreateSnapshot(current, options.WorkingDirectory ?? Environment.CurrentDirectory);
+            },
             options.ProfilingCounters,
             renderFrameInterval: timingOptions.RenderFrameInterval,
             getHeaderExpanded: () => headerExpanded,
@@ -157,17 +163,17 @@ public sealed class TuiHost(TuiHostOptions options)
         renderCoordinator.SelectionSessionGetter = () => inlineSelection.CurrentSession;
 
         var bridge = new ExtensionUiBridgeHost(shell.Window,
-            updateState: u => { state = u(state); renderCoordinator.RequestRender(); },
+            updateState: u => { stateStore.Update(u); renderCoordinator.RequestRender(); },
             getEditorText: () => shell.Prompt.PromptText,
             setEditorText: t => shell.Prompt.SetPromptText(t),
-            getState: () => state,
+            getState: () => stateStore.Snapshot(),
             loggerFactory: options.LoggerFactory)
         {
             DispatchUi = appContext.Post,
             RestoreFocus = () => shell.Prompt.FocusAtEnd(),
             ShowNotification = message =>
             {
-                state = state.AppendSystem(message, expiresAfter: TransientSystemMessageLifetime);
+                stateStore.Update(s => s.AppendSystem(message, expiresAfter: TransientSystemMessageLifetime));
                 renderCoordinator.RequestRender();
             }
         };
@@ -200,8 +206,8 @@ public sealed class TuiHost(TuiHostOptions options)
         }
 
         var commandController = new TuiCommandController(new TuiCommandControllerOptions(
-            () => state,
-            next => { state = next; renderCoordinator.RequestRender(); },
+            () => stateStore.Snapshot(),
+            next => { stateStore.Replace(next); renderCoordinator.RequestRender(); },
             () => runtime.Abort(),
             () => appContext.Post(() => appContext.RequestStop(shell.Window)),
             () => TuiHotkeyText.RenderFromBindings(keybindingsStore.CommandDescriptors, shortcutController.BuildExtensionShortcutBindings()),
@@ -209,7 +215,7 @@ public sealed class TuiHost(TuiHostOptions options)
                 (string text, CancellationToken ct) => PromptDialog.InputAsync(text, ct, dispatcher: appContext),
                 (msg, isErr, _) =>
                 {
-                    state = state.AppendSystem(msg, isErr, expiresAfter: isErr ? null : TransientSystemMessageLifetime);
+                    stateStore.Update(s => s.AppendSystem(msg, isErr, expiresAfter: isErr ? null : TransientSystemMessageLifetime));
                     renderCoordinator.RequestRender();
                     return Task.CompletedTask;
                 },
@@ -231,10 +237,10 @@ public sealed class TuiHost(TuiHostOptions options)
             => await ConfirmDialog.ConfirmAsync(title, message, ct, dispatcher: appContext) ? "allow" : "deny";
 
         var sessionContext = new TuiSessionContext { CurrentRuntime = runtime, HeaderExpanded = headerExpanded };
-        var stateGateway = new TuiStateGateway(() => state, s => state = s, renderCoordinator, appContext, cancellationToken);
+        var stateGateway = new TuiStateGateway(() => stateStore.Snapshot(), s => stateStore.Replace(s), renderCoordinator, appContext, cancellationToken);
         var harnessLifecycle = new TuiHarnessLifecycleCoordinator(
             sessionContext, options, appContext, renderCoordinator,
-            () => state, s => state = s, LoadSessionSnapshotAsync, ApplySessionSnapshot, options.LoggerFactory);
+            stateStore, LoadSessionSnapshotAsync, ApplySessionSnapshot, options.LoggerFactory);
         var shortcutActions = new TuiShortcutActionHandler(
             shell, inlineSelection, appContext, stateGateway, sessionContext, options, cancellationToken, options.LoggerFactory);
         var transcriptController = new TuiTranscriptInteractionController(
@@ -353,7 +359,7 @@ public sealed class TuiHost(TuiHostOptions options)
             // render the connecting view and launch hydration.
             appContext.Post(() =>
             {
-                state = state.AppendSystem("Connecting to daemon…", pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+                stateStore.Update(s => s.AppendSystem("Connecting to daemon…", pinToTop: true, expiresAfter: TransientSystemMessageLifetime));
                 shell.Prompt.Enabled = false;
                 try
                 {
@@ -380,7 +386,7 @@ public sealed class TuiHost(TuiHostOptions options)
             Task InjectMessage(string message) =>
                 appContext.InvokeAsync(() =>
                 {
-                    state = state.AppendSystem(message, pinToTop: false, expiresAfter: PostStartupMessageLifetime);
+                    stateStore.Update(s => s.AppendSystem(message, pinToTop: false, expiresAfter: PostStartupMessageLifetime));
                     renderCoordinator.RequestRender();
                 }, cancellationToken);
             _ = Task.Run(() => options.PostStartupChecksAsync(InjectMessage, cancellationToken), cancellationToken);
@@ -417,15 +423,15 @@ public sealed class TuiHost(TuiHostOptions options)
                     }
                     else
                     {
-                        state = state with { SessionName = sessionName };
+                        stateStore.Update(s => s with { SessionName = sessionName });
                     }
                     _logger.LogDebug(
                         "TUI startup state applied; placeholder session={PlaceholderSession}",
-                        string.Equals(state.SessionId, "connecting", StringComparison.Ordinal));
+                        string.Equals(stateStore.Snapshot().SessionId, "connecting", StringComparison.Ordinal));
                     foreach (var message in options.StartupMessages ?? [])
-                        state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+                        stateStore.Update(s => s.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime));
                     foreach (var message in startupResult.StartupMessages ?? [])
-                        state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
+                        stateStore.Update(s => s.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime));
                     shell.Prompt.Enabled = true;
                     renderCoordinator.RequestRender();
                     _logger.LogDebug("TUI startup hydration completed");
@@ -445,7 +451,7 @@ public sealed class TuiHost(TuiHostOptions options)
                     // marshal failure is caught below and logged instead of crashing.
                     await appContext.InvokeAsync(() =>
                     {
-                        state = state.AppendSystem(errorMessage, isError: true, expiresAfter: null);
+                        stateStore.Update(s => s.AppendSystem(errorMessage, isError: true, expiresAfter: null));
                         renderCoordinator.RequestRender();
                     }, CancellationToken.None).ConfigureAwait(false);
                 }
@@ -467,7 +473,7 @@ public sealed class TuiHost(TuiHostOptions options)
                     shell.Prompt,
                     shell.Footer,
                     Application.Driver,
-                    () => state,
+                    () => stateStore.Snapshot(),
                     () => renderCoordinator.RequestRender(),
                     InvokeMenuCommand);
 

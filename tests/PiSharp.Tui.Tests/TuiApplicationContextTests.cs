@@ -1048,12 +1048,12 @@ public sealed class TuiDisposalTests
         var state = TuiRenderState.Empty("sid", "file",
             new PiSharp.Agent.Core.Models.ModelDescriptor("test", "m", "test"),
             ThinkingLevel.Off, null);
+        var store = new RenderStateStore(state);
         using var provider = new RecordingLoggerProvider();
         using var loggerFactory = LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Debug).AddProvider(provider));
         using var subscription = new TuiHarnessSubscription(
             () => runtime,
-            () => state,
-            next => state = next,
+            store,
             _ => { },
             action => action(),
             resolveTool: null,
