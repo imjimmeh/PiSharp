@@ -274,10 +274,10 @@ public sealed record PiServerHostContext(LiveServerSession Session, IServerUiBri
 /// makes the command respond <c>not_available</c>.
 public sealed record PiServerCommandDelegates(
     Func<PiServerHostContext, string, SlashCommandExecutionOptions?, CancellationToken, Task<ServerCommandResult>>? RunCommandAsync = null,
-    Func<string, CancellationToken, Task<IReadOnlyList<string>>>? CompleteCommandAsync = null,
+    Func<LiveServerSession, string, CancellationToken, Task<IReadOnlyList<string>>>? CompleteCommandAsync = null,
     Func<ProcessInputRequest, CancellationToken, Task<ProcessInputResult>>? ProcessInputAsync = null,
-    Func<CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync = null,
-    Func<Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null,
+    Func<LiveServerSession, CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync = null,
+    Func<LiveServerSession, Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null,
     Func<CancellationToken, Task<McpStatusResult>>? GetMcpStatusAsync = null,
     Func<CancellationToken, Task>? OnShutdown = null);
 

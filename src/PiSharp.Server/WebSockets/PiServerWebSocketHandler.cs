@@ -420,9 +420,9 @@ public sealed class PiServerWebSocketHandler(
     private async Task<ServerResponse> CompleteCommandAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
         var command = JsonSerializer.Deserialize<CompleteCommandRequest>(json, ServerJsonSerializer.Options)!;
-        RequireSession(command.ServerSessionId);
+        var live = RequireSession(command.ServerSessionId);
         if (delegates?.CompleteCommandAsync is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Command '{command.Type}' is not available on this daemon.");
-        var completions = await delegates.CompleteCommandAsync(command.Text, cancellationToken);
+        var completions = await delegates.CompleteCommandAsync(live, command.Text, cancellationToken);
         return ServerResponse.Ok(command.Id, command.Type, completions);
     }
 
@@ -658,9 +658,9 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> GetStartupMessagesAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        RequireSession(RequiredSessionId(envelope));
+        var live = RequireSession(RequiredSessionId(envelope));
         if (delegates?.GetStartupMessagesAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
-        var messages = await delegates.GetStartupMessagesAsync(cancellationToken);
+        var messages = await delegates.GetStartupMessagesAsync(live, cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type, messages);
     }
 
@@ -668,7 +668,7 @@ public sealed class PiServerWebSocketHandler(
     {
         var live = RequireSession(RequiredSessionId(envelope));
         if (delegates?.PostStartupChecksAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
-        await delegates.PostStartupChecksAsync(message => live.EmitEvent(AgentSessionEvent.FromServer("system_message", new { text = message })), cancellationToken);
+        await delegates.PostStartupChecksAsync(live, message => live.EmitEvent(AgentSessionEvent.FromServer("system_message", new { text = message })), cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type);
     }
 
