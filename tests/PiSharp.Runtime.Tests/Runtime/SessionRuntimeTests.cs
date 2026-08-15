@@ -222,6 +222,38 @@ public sealed class SessionRuntimeTests
     }
 
     [Fact]
+    public async Task BindHarnessEventForwarding_IsIdempotent_WhenRepeated()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-session-runtime-bind-idempotent-" + Guid.NewGuid().ToString("N"));
+        var repo = new JsonlSessionRepo(new SystemExecutionEnv(root), "sessions");
+        var createOptions = new JsonlSessionCreateOptions(root);
+        var initial = await repo.CreateAsync(createOptions);
+        var registry = new ExtensionRegistry();
+        var tsHost = new TsExtensionHost(new TsBridgeOptions(WorkingDirectory: root), registry);
+        await using var runtime = new SessionRuntime(repo, createOptions, Harness, initial, extensionManager: new ExtensionManager(registry), tsHost: tsHost);
+
+        var bridgedEvents = new[]
+        {
+            ExtensionEventNames.BeforePromptRender,
+            ExtensionEventNames.BeforeAgentStart,
+            ExtensionEventNames.Input,
+            ExtensionEventNames.SessionBeforeSwitch,
+            ExtensionEventNames.SessionBeforeFork,
+            ExtensionEventNames.SessionShutdown,
+            ExtensionEventNames.SettingsChanged
+        };
+
+        // First bind registers exactly one ts-bridge handler per bridged event.
+        runtime.BindHarnessEventForwarding();
+        Assert.All(bridgedEvents, eventName => Assert.Single(registry.HandlersFor(eventName)));
+
+        // Re-binding must first unbind: no throw, no double-dispose, and no leaked
+        // duplicate handler registration (each event stays at exactly one handler).
+        runtime.BindHarnessEventForwarding();
+        Assert.All(bridgedEvents, eventName => Assert.Single(registry.HandlersFor(eventName)));
+    }
+
+    [Fact]
     public async Task BindExtensionRuntimeReplaysExistingRegistrySkillsToHarness()
     {
         var root = Path.Combine(Path.GetTempPath(), "pisharp-session-runtime-" + Guid.NewGuid().ToString("N"));

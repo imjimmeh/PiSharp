@@ -63,6 +63,24 @@ The main runtime object is `SessionRuntime`. It owns the session repo, current s
 
 See [Runtime, settings, resources, CLI, and sessions](pisharp-runtime.md) for details.
 
+### `SessionRuntime` de-god roadmap (follow-up, not yet done)
+
+`SessionRuntime` is a large composition root with many cross-cutting responsibilities
+(session state, harness binding, extension wiring, event forwarding, theme, diagnostics).
+An adversarial review flagged this as the top refactor risk; it is intentionally
+deferred. When it is tackled, the extraction plan is:
+
+1. Pull session/event-forwarding into a dedicated `HarnessEventBridge` service — the
+   subscriber/`RealTimeBridge` lifecycle currently lives directly on `SessionRuntime`.
+2. Replace the `ExtensionRuntimeBinding` Func-bag with a typed interface and keep
+   `ValidateBound()` (already added as part of the adversarial-review fix) that fails
+   startup when a required capability was not wired, removing silent no-op defaults.
+3. Shrink `CreateRuntimeAsync()` (`PiRuntimeBootstrap`) via a small composition root per
+   subsystem (settings, session, extensions, model selection) instead of one long method.
+
+Subscription lifecycle is safe today: `UnbindHarnessEventForwarding` is idempotent and
+`Bind` always unbinds first (covered by `SessionRuntimeTests`).
+
 ## Daemon architecture and remote TUI
 
 Since the daemon-client work, `pisharp` in interactive mode is split into a per-user **daemon**
