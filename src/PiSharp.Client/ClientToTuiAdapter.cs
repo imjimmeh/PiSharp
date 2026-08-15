@@ -59,6 +59,7 @@ public static class ClientToTuiAdapter
             "thinking_level_select" => MapThinkingLevelSelect(envelope.Event.Data),
             "compaction_start" => MapCompactionStart(envelope.Event.Data),
             "compaction_end" => MapCompactionEnd(envelope.Event.Data),
+            "system_message" => MapSystemMessage(envelope.Event.Data),
             _ => null,
         };
 
@@ -186,6 +187,11 @@ public static class ClientToTuiAdapter
                 payload.ErrorMessage))
             : null;
 
+    private static AgentHarnessEvent? MapSystemMessage(object? data)
+        => FromPayload<SystemMessageWire>(data) is { Text: { } text } wire && !string.IsNullOrWhiteSpace(text)
+            ? new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.SystemMessage(text, wire.IsError ?? false))
+            : null;
+
 
     // --- assistant event reconstruction ---
 
@@ -251,4 +257,5 @@ public static class ClientToTuiAdapter
     private sealed record ThinkingLevelPayload(string? Level, string? PreviousLevel);
     private sealed record CompactionStartPayload(string? Reason);
     private sealed record CompactionEndPayload(string? Reason, object? Result, bool? Aborted, bool? WillRetry, string? ErrorMessage);
+    private sealed record SystemMessageWire(string? Text, bool? IsError);
 }

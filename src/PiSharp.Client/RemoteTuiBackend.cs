@@ -404,7 +404,13 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.PostStartupChecks, ServerSessionId: RequireSessionId()),
             token);
-        ThrowOnFailure(response, "post_startup_checks");
+        if (!response.Success)
+        {
+            // Older or delegate-less daemons answer not_available; startup-check lines then arrive
+            // as system_message events on the normal stream (or never) — not a client failure.
+            _logger?.LogDebug("post_startup_checks not available: {Code}: {Message}", response.Error?.Code, response.Error?.Message);
+            return;
+        }
     }
 
     public async Task CycleThinkingLevelAsync(CancellationToken token = default)

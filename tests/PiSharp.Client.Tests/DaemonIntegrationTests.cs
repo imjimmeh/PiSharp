@@ -190,6 +190,91 @@ public sealed class DaemonIntegrationTests
         Assert.Equal(sessionName, snapshot.SessionName);
     }
 
+    [Fact]
+    public async Task PostStartupChecks_EmitsSystemMessage_DeliveredToHarnessListener()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+            PostStartupChecksAsync = (session, emit, ct) =>
+            {
+                emit("Self-update check complete");
+                return Task.CompletedTask;
+            },
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: sessionId),
+            new { sinceSequence = 0L },
+            CancellationToken.None);
+
+        await using var backend = new RemoteTuiBackend(conn)
+        {
+            ServerSessionId = sessionId,
+        };
+
+        var received = new TaskCompletionSource<AgentHarnessOwnEvent.SystemMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var subscription = backend.Subscribe((evt, ct) =>
+        {
+            if (evt is AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SystemMessage system })
+                received.TrySetResult(system);
+            return Task.CompletedTask;
+        });
+
+        // Drive post_startup_checks: the server delegate emits one system_message event through
+        // the real transport; the harness listener receives the mapped Own(SystemMessage) event.
+        await backend.PostStartupChecksAsync(_ => Task.CompletedTask);
+
+        var system = await received.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.Equal("Self-update check complete", system.Text);
+        Assert.False(system.IsError);
+    }
+
+    [Fact]
+    public async Task PostStartupChecks_WithoutDelegate_ReturnsNotAvailable_DoesNotThrow()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        await using var backend = new RemoteTuiBackend(conn)
+        {
+            ServerSessionId = sessionId,
+        };
+
+        // A delegate-less daemon answers not_available; the client must tolerate it instead of throwing.
+        await backend.PostStartupChecksAsync(_ => Task.CompletedTask);
+    }
+
     // --- helpers ---
 
     private static object CreatePayload(string root) => new

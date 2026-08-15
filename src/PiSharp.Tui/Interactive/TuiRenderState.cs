@@ -251,6 +251,7 @@ public sealed record TuiRenderState(
             AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CompactionEnd } => this with { IsBusy = false, Status = "Idle" },
             AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ThinkingLevelSelect select } => this with { ThinkingLevel = select.Level },
             AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ThinkingLevelChanged changed } => this with { ThinkingLevel = changed.Level },
+            AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SystemMessage system } => AppendSystem(system.Text, system.IsError),
             _ => this
         };
         return evt is AgentHarnessEvent.Core { Event: AgentEvent.AgentEnd }
@@ -315,6 +316,9 @@ public sealed record TuiRenderState(
                     break;
                 case AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ThinkingLevelChanged changed }:
                     state = state with { ThinkingLevel = changed.Level };
+                    break;
+                case AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SystemMessage system }:
+                    Append(new TuiTranscriptItem("system", system.Text, IsError: system.IsError));
                     break;
             }
         }

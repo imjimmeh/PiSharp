@@ -81,6 +81,7 @@ public sealed class AgentSessionEvent
             AgentHarnessOwnEvent.SessionTree e => new AgentSessionEvent("session_tree", new { newLeafId = e.NewLeafId, oldLeafId = e.OldLeafId, summaryEntry = e.SummaryEntry, fromHook = e.FromHook }),
             AgentHarnessOwnEvent.ResourcesUpdate e => new AgentSessionEvent("resources_update", new { resources = e.Resources, previousResources = e.PreviousResources }),
             AgentHarnessOwnEvent.AdvisorNote e => FromAdvisor(e.Event),
+            AgentHarnessOwnEvent.SystemMessage e => new AgentSessionEvent("system_message", new { text = e.Text, isError = e.IsError }),
             AgentHarnessOwnEvent.CustomEvent e => new AgentSessionEvent(e.Name, e.Payload),
             _ => throw new NotSupportedException($"Unknown own event: {ownEvent.GetType().Name}")
         };
@@ -330,6 +331,13 @@ public abstract record AgentHarnessOwnEvent
     /// </summary>
     public sealed record AdvisorNote(
         ExtensionAdvisorEvent Event) : AgentHarnessOwnEvent;
+
+    /// <summary>
+    /// Server-originated informational line (startup checks, self-update output, package/skill
+    /// change notices) rendered as a TUI system row. Produced client-side from the flat
+    /// <c>system_message</c> event; never raised by the runtime itself.
+    /// </summary>
+    public sealed record SystemMessage(string Text, bool IsError = false) : AgentHarnessOwnEvent;
 
     /// <summary>
     /// Extension-originated session event pushed to harness subscribers and the

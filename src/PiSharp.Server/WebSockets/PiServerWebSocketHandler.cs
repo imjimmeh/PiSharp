@@ -668,7 +668,7 @@ public sealed class PiServerWebSocketHandler(
     {
         var live = RequireSession(RequiredSessionId(envelope));
         if (delegates?.PostStartupChecksAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
-        await delegates.PostStartupChecksAsync(live, message => live.EmitEvent(AgentSessionEvent.FromServer("system_message", new { text = message })), cancellationToken);
+        await delegates.PostStartupChecksAsync(live, message => live.EmitEvent(AgentSessionEvent.FromServer(ExtensionEventNames.SystemMessage, new { text = message })), cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type);
     }
 

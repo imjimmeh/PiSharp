@@ -193,6 +193,17 @@ public sealed class TuiRenderStateTests
     }
 
     [Fact]
+    public void Reduce_SystemMessage_AppendsSystemRow()
+    {
+        var state = Empty().Reduce(new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.SystemMessage("Outdated packages found", IsError: true)));
+
+        var item = Assert.Single(state.Transcript);
+        Assert.Equal("system", item.Role);
+        Assert.Equal("Outdated packages found", item.Text);
+        Assert.True(item.IsError);
+    }
+
+    [Fact]
     public void HydrateSessionAttachesEntryIdsToMessagesAndToolRows()
     {
         using var args = JsonDocument.Parse("{\"path\":\"file.txt\"}");
