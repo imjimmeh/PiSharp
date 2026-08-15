@@ -112,7 +112,7 @@ public sealed record SwitchSessionCommand(string Type, string? Id, string Server
 public sealed record ForkSessionCommand(string Type, string? Id, string ServerSessionId, string? EntryId = null, string? NewSessionId = null);
 public sealed record SetSessionNameCommand(string Type, string? Id, string ServerSessionId, string Name);
 public sealed record AttachCommand(string Type, string? Id, string ServerSessionId, long SinceSequence = 0);
-public sealed record ShutdownRequest(string? ConfirmationToken = null);
+public sealed record ShutdownRequest(string? ConfirmationToken = null, bool Confirm = false);
 public sealed record ShutdownResult(bool Stopped);
 public sealed record AttachResult(string ServerSessionId, long FromSequence, long HeadSequence, bool Gap, int ReplayedCount);
 

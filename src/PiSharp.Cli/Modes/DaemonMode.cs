@@ -128,7 +128,7 @@ public static class DaemonMode
         {
             await using var transport = new ClientWebSocketTransport();
             await transport.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}"), lease.ApiKey, cancellationToken);
-            var response = await transport.SendCommandAsync(new ServerCommandEnvelope(ServerCommandTypes.Shutdown, Id: Guid.NewGuid().ToString("N")), cancellationToken);
+            var response = await transport.SendCommandAsync(new ServerCommandEnvelope(ServerCommandTypes.Shutdown, Id: Guid.NewGuid().ToString("N")), new ShutdownRequest(Confirm: true), cancellationToken);
             stopped = response.Success;
         }
         catch (Exception ex) when (ex is WebSocketException or IOException or InvalidOperationException or OperationCanceledException)

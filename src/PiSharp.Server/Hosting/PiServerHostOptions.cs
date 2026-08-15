@@ -19,6 +19,19 @@ public sealed record PiServerHostOptions
     /// </summary>
     public bool TelemetryEnabled { get; init; } = false;
 
+    /// <summary>
+    /// Maximum accepted size, in bytes, of a single inbound WebSocket message frame cycle.
+    /// Messages larger than this are rejected with a <c>MessageTooBig</c> close frame and never
+    /// dispatched. Default 8 MiB.
+    /// </summary>
+    public int MaxMessageBytes { get; init; } = 8 * 1024 * 1024;
+
+    /// <summary>
+    /// Maximum number of commands dispatched concurrently per WebSocket connection. Commands
+    /// beyond this limit queue until an in-flight dispatch completes. Default 4.
+    /// </summary>
+    public int MaxConcurrentCommands { get; init; } = 4;
+
     /// <summary>Additional sinks fed alongside the metrics aggregator (e.g. the metrics.jsonl file sink).</summary>
     public IReadOnlyList<ITelemetrySink>? TelemetrySinks { get; init; }
 

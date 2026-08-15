@@ -160,10 +160,12 @@ public sealed class HostIntegrationTests
         await using var client = new RawClient();
         await client.ConnectAsync(HostUri(host), ApiKey, CancellationToken.None);
 
-        // Shutdown is session-independent: the CLI daemon-stop sends a bare envelope
-        // (ShutdownRequest.ConfirmationToken is optional), so no payload is required.
-        var response = await client.SendCommandAsync(
-            new ServerCommandEnvelope(ServerCommandTypes.Shutdown, Id: "shutdown"));
+        // Shutdown is session-independent and requires explicit confirmation (Confirm: true),
+        // mirroring the CLI daemon-stop payload.
+        var response = await client.SendCommandAsync(new
+        {
+            id = "shutdown", type = ServerCommandTypes.Shutdown, confirm = true,
+        });
 
         AssertSuccess(response);
         Assert.Equal(ServerCommandTypes.Shutdown, response.RootElement.GetProperty("command").GetString());

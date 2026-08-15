@@ -32,6 +32,7 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
         builder.Services.AddSingleton(new ApiKeyValidator(new ApiKeyOptions { ApiKey = options.ApiKey }));
         var metricsAggregator = Metrics;
         builder.Services.AddSingleton(metricsAggregator);
+        builder.Services.AddSingleton(options);
         builder.Services.AddSingleton(new ServerSessionRegistry(CreateRuntimeFactory(options, Metrics), options.IdleTimeout));
         builder.Services.AddSingleton(new PiServerCommandDelegates(
             options.RunCommandAsync,

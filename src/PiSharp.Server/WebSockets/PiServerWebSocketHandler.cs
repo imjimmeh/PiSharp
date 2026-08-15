@@ -2,6 +2,9 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
+using PiSharp.Server.Hosting;
+
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
@@ -25,8 +28,11 @@ public sealed class PiServerWebSocketHandler(
     IServerUiBridge? uiBridge = null,
     PiServerCommandDelegates? delegates = null,
     ThemeRegistry? themeRegistry = null,
-    TelemetryMetricsAggregator? metrics = null)
+    TelemetryMetricsAggregator? metrics = null,
+    PiServerHostOptions? options = null)
 {
+    private readonly int _maxMessageBytes = options?.MaxMessageBytes ?? 8 * 1024 * 1024;
+    private readonly int _maxConcurrentCommands = options?.MaxConcurrentCommands ?? 4;
     private IServerUiBridge Bridge => uiBridge ?? NoOpServerUiBridge.Instance;
     private ThemeRegistry Themes => themeRegistry ?? new ThemeRegistry();
 
@@ -63,6 +69,8 @@ public sealed class PiServerWebSocketHandler(
         using var sendGate = new SemaphoreSlim(1, 1);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var eventPumps = new ConcurrentDictionary<string, Task>(StringComparer.Ordinal);
+        var pumpGuard = new object();
+        var dispatchChannel = Channel.CreateUnbounded<string>();
 
         async Task SendAsync(object payload, CancellationToken token)
         {
@@ -75,17 +83,55 @@ public sealed class PiServerWebSocketHandler(
         Task EnsureEventPumpAsync(LiveServerSession live, long sinceSequence = 0)
         {
             if (eventPumps.ContainsKey(live.Id)) return Task.CompletedTask;
-            eventPumps[live.Id] = Task.Run(async () =>
+            lock (pumpGuard)
             {
+                // Double-checked so concurrent attaches to the same session start exactly one pump.
+                if (eventPumps.ContainsKey(live.Id)) return Task.CompletedTask;
+                Task pump = null!;
+                pump = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await foreach (var evt in live.ReadEventsAsync(sinceSequence, linked.Token)) await SendAsync(evt, linked.Token);
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (Exception ex) { logger.LogWarning(ex, "Event pump failed for {ServerSessionId}", live.Id); }
+                    finally
+                    {
+                        // Remove only the exact instance this pump registered, so a finished pump
+                        // can be restarted by a later attach instead of blocking with a stale entry.
+                        ((ICollection<KeyValuePair<string, Task>>)eventPumps).Remove(new KeyValuePair<string, Task>(live.Id, pump));
+                    }
+                }, CancellationToken.None);
+                eventPumps[live.Id] = pump;
+                return Task.CompletedTask;
+            }
+        }
+
+        // Bounded dispatch: at most MaxConcurrentCommands commands run in parallel per connection;
+        // the rest queue on the channel until an in-flight dispatch completes.
+        var dispatchTask = Parallel.ForEachAsync(
+            dispatchChannel.Reader.ReadAllAsync(linked.Token),
+            new ParallelOptions { MaxDegreeOfParallelism = _maxConcurrentCommands, CancellationToken = linked.Token },
+            async (message, _) =>
+            {
+                var responseSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 try
                 {
-                    await foreach (var evt in live.ReadEventsAsync(sinceSequence, linked.Token)) await SendAsync(evt, linked.Token);
+                    var response = await DispatchTextCommandAsync(message, EnsureEventPumpAsync, SendAsync, responseSent.Task, linked.Token);
+                    try
+                    {
+                        await SendAsync(response, linked.Token);
+                        logger.LogDebug("Command response sent for {CommandType}", response.Command);
+                    }
+                    finally
+                    {
+                        responseSent.TrySetResult();
+                    }
                 }
                 catch (OperationCanceledException) { }
-                catch (Exception ex) { logger.LogWarning(ex, "Event pump failed for {ServerSessionId}", live.Id); }
-            }, CancellationToken.None);
-            return Task.CompletedTask;
-        }
+                catch (Exception ex) { logger.LogWarning(ex, "Command dispatch failed"); }
+            });
 
         try
         {
@@ -93,30 +139,16 @@ public sealed class PiServerWebSocketHandler(
             {
                 var message = await ReceiveTextAsync(socket, cancellationToken);
                 if (message is null) break;
-                _ = Task.Run(async () =>
-                {
-                    var responseSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                    try
-                    {
-                        var response = await DispatchTextCommandAsync(message, EnsureEventPumpAsync, SendAsync, responseSent.Task, linked.Token);
-                        try
-                        {
-                            await SendAsync(response, linked.Token);
-                            logger.LogDebug("Command response sent for {CommandType}", response.Command);
-                        }
-                        finally
-                        {
-                            responseSent.TrySetResult();
-                        }
-                    }
-                    catch (OperationCanceledException) { }
-                    catch (Exception ex) { logger.LogWarning(ex, "Command dispatch failed"); }
-                }, CancellationToken.None);
+                await dispatchChannel.Writer.WriteAsync(message);
             }
         }
         finally
         {
             linked.Cancel();
+            dispatchChannel.Writer.TryComplete();
+            try { await dispatchTask; }
+            catch (OperationCanceledException) { }
+            catch { }
             try { await Task.WhenAll(eventPumps.Values); } catch { }
             if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
                 await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "closed", CancellationToken.None);
@@ -208,7 +240,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> CreateSessionAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)
     {
-        var request = JsonSerializer.Deserialize<CreateServerSessionRequest>(json, ServerJsonSerializer.Options)!;
+        var request = RequirePayload<CreateServerSessionRequest>(json);
         var startTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
         logger.LogDebug("Creating server session");
         var created = await registry.CreateAsync(request, cancellationToken);
@@ -245,7 +277,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> AttachAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<AttachCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<AttachCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         var replay = live.EventLog.ReplayFrom(command.SinceSequence);
         if (ensureEventPump is not null) await ensureEventPump(live, command.SinceSequence);
@@ -257,7 +289,7 @@ public sealed class PiServerWebSocketHandler(
 
     private Task<ServerResponse> PromptAsync(string json, ServerCommandEnvelope envelope, Func<object, CancellationToken, Task>? sendAsync, Task responseSent, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<PromptCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<PromptCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         _ = Task.Run(async () =>
         {
@@ -282,7 +314,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> TextQueueAsync(string json, ServerCommandEnvelope envelope, string commandType, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<TextMessageCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<TextMessageCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         await live.RunExclusiveAsync(async (runtime, token) =>
         {
@@ -317,13 +349,13 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> ListSessionsAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<ListSessionsCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<ListSessionsCommand>(json);
         return ServerResponse.Ok(command.Id ?? envelope.Id, command.Type, await registry.ListSessionsAsync(command, cancellationToken));
     }
 
     private async Task<ServerResponse> SetModelAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<SetModelCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<SetModelCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         var selection = RuntimeModelSelector.Resolve(new RuntimeModelSelectionRequest(command.Provider, command.ModelId, live.Runtime.Harness.ThinkingLevel));
         await live.RunExclusiveAsync((runtime, token) => runtime.SetModelAsync(selection, "server", token), cancellationToken);
@@ -332,7 +364,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> SetThinkingLevelAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<SetThinkingLevelCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<SetThinkingLevelCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         await live.RunExclusiveAsync((runtime, token) => runtime.SetThinkingLevelAsync(command.Level, token), cancellationToken);
         return ServerResponse.Ok(command.Id, command.Type);
@@ -340,7 +372,7 @@ public sealed class PiServerWebSocketHandler(
 
     private Task<ServerResponse> CompactAsync(string json, ServerCommandEnvelope envelope, Func<object, CancellationToken, Task>? sendAsync, Task responseSent, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<CompactCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<CompactCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         _ = Task.Run(async () =>
         {
@@ -373,7 +405,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> SwitchSessionAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<SwitchSessionCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<SwitchSessionCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         var result = await live.RunExclusiveAsync(async (runtime, token) =>
         {
@@ -388,7 +420,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> ForkAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<ForkSessionCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<ForkSessionCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         var result = await registry.RunWithReservedRuntimeSessionIdAsync(live, command.NewSessionId, async () =>
         {
@@ -400,7 +432,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> SetSessionNameAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<SetSessionNameCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<SetSessionNameCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         await live.RunExclusiveAsync((runtime, token) => runtime.Harness.SetSessionNameAsync(command.Name, token), cancellationToken);
         return ServerResponse.Ok(command.Id, command.Type, await live.SnapshotAsync(cancellationToken));
@@ -408,7 +440,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> RunCommandAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<RunCommandRequest>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<RunCommandRequest>(json);
         var live = RequireSession(command.ServerSessionId);
         if (delegates?.RunCommandAsync is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Command '{command.Type}' is not available on this daemon.");
         var result = await live.RunExclusiveAsync((runtime, token) => delegates.RunCommandAsync(new PiServerHostContext(live, Bridge), command.Text, command.Options, token), cancellationToken);
@@ -417,7 +449,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> CompleteCommandAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<CompleteCommandRequest>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<CompleteCommandRequest>(json);
         RequireSession(command.ServerSessionId);
         if (delegates?.CompleteCommandAsync is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Command '{command.Type}' is not available on this daemon.");
         var completions = await delegates.CompleteCommandAsync(command.Text, cancellationToken);
@@ -426,7 +458,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> ProcessInputAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<ProcessInputRequest>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<ProcessInputRequest>(json);
         var live = RequireSession(RequiredSessionId(envelope));
         if (delegates?.ProcessInputAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
         var result = await live.RunExclusiveAsync((runtime, token) => delegates.ProcessInputAsync(command, token), cancellationToken);
@@ -435,7 +467,7 @@ public sealed class PiServerWebSocketHandler(
 
     private Task<ServerResponse> UiResponseAsync(string json, ServerCommandEnvelope envelope)
     {
-        var command = JsonSerializer.Deserialize<UiResponseCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<UiResponseCommand>(json);
         RequireSession(command.ServerSessionId);
         Bridge.ResolveUiAsync(command.RequestId, command.Value, command.Cancelled);
         return Task.FromResult(ServerResponse.Ok(command.Id, command.Type));
@@ -459,7 +491,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> SetThemeAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<SetThemeCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<SetThemeCommand>(json);
         if (!string.IsNullOrWhiteSpace(command.ServerSessionId)) RequireSession(command.ServerSessionId);
         if (!Themes.TrySetActive(command.Name))
             return ServerResponse.Fail(command.Id ?? envelope.Id, command.Type, "theme_not_found", $"Unknown theme '{command.Name}'.");
@@ -471,7 +503,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> SetPlanModeAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<SetPlanModeCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<SetPlanModeCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetPlanModeControl(live) is not { } control)
             return ServerResponse.Fail(command.Id, command.Type, "plan_mode_unavailable", "The plan-mode extension is not loaded in this session.");
@@ -501,7 +533,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> SetGoalAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<SetGoalCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<SetGoalCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetContinuityService(live) is not { } service)
             return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
@@ -511,7 +543,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> GetGoalAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<GetGoalCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<GetGoalCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetContinuityService(live) is not { } service)
             return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
@@ -521,7 +553,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> ScheduleJobAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<ScheduleJobCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<ScheduleJobCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetContinuityService(live) is not { } service)
             return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
@@ -531,7 +563,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> ListJobsAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<ListJobsCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<ListJobsCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetContinuityService(live) is not { } service)
             return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
@@ -541,7 +573,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> CancelJobAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<CancelJobCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<CancelJobCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetContinuityService(live) is not { } service)
             return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
@@ -551,7 +583,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> AutonomousAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<AutonomousCommandRequest>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<AutonomousCommandRequest>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetContinuityService(live) is not { } service)
             return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
@@ -562,7 +594,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> GetContinuityStateAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<GetContinuityStateCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<GetContinuityStateCommand>(json);
         var live = RequireSession(command.ServerSessionId);
         if (TryGetContinuityService(live) is not { } service)
             return ServerResponse.Fail(command.Id, command.Type, "continuity_unavailable", "The continuity extension is not loaded in this session.");
@@ -618,7 +650,7 @@ public sealed class PiServerWebSocketHandler(
 
     private Task<ServerResponse> ResolveToolAsync(string json, ServerCommandEnvelope envelope)
     {
-        var command = JsonSerializer.Deserialize<ResolveToolRequest>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<ResolveToolRequest>(json);
         var live = RequireSession(command.ServerSessionId);
         var manager = live.Runtime.ExtensionManager;
         if (manager is null) return Task.FromResult(ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session."));
@@ -681,7 +713,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> InstallExtensionAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<InstallExtensionCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<InstallExtensionCommand>(json);
         var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
         var binding = live.Runtime.ExtensionBinding;
         var result = await live.RunExclusiveAsync((runtime, token) => binding.InstallExtensionAsync(command.Reference ?? string.Empty, command.Local, command.Force, command.Offline, token), cancellationToken);
@@ -691,7 +723,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> UpdateExtensionAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<UpdateExtensionCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<UpdateExtensionCommand>(json);
         var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
         var binding = live.Runtime.ExtensionBinding;
         var request = new ExtensionPackageUpdateRequest(command.Source, command.Extensions, command.ExtensionSource, command.Force, command.Offline);
@@ -702,7 +734,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> RemoveExtensionAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<RemoveExtensionCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<RemoveExtensionCommand>(json);
         var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
         var binding = live.Runtime.ExtensionBinding;
         var removed = await live.RunExclusiveAsync((runtime, token) => binding.RemoveExtensionAsync(command.Reference ?? string.Empty, command.Local, token), cancellationToken);
@@ -719,7 +751,7 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> ManageSkillAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        var command = JsonSerializer.Deserialize<ManageSkillCommand>(json, ServerJsonSerializer.Options)!;
+        var command = RequirePayload<ManageSkillCommand>(json);
         var live = RequireSession(command.ServerSessionId ?? RequiredSessionId(envelope));
         var binding = live.Runtime.ExtensionBinding;
         switch (command.Op)
@@ -821,10 +853,12 @@ public sealed class PiServerWebSocketHandler(
 
     private Task<ServerResponse> ShutdownAsync(string json, ServerCommandEnvelope envelope, Task responseSent)
     {
-        _ = JsonSerializer.Deserialize<ShutdownRequest>(json, ServerJsonSerializer.Options); // validate request shape; confirmation token is optional
+        var request = RequirePayload<ShutdownRequest>(json);
         var onShutdown = delegates?.OnShutdown;
         if (onShutdown is null)
             return Task.FromResult(ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "Shutdown is not available on this server."));
+        if (!request.Confirm)
+            return Task.FromResult(ServerResponse.Fail(envelope.Id, envelope.Type, "confirmation_required", "Shutdown requires an explicit confirm flag to stop the daemon."));
 
         // Respond first, then stop the host once the response has been flushed to the client.
         _ = Task.Run(async () =>
@@ -849,7 +883,15 @@ public sealed class PiServerWebSocketHandler(
     private static string RequiredSessionId(ServerCommandEnvelope envelope)
         => string.IsNullOrWhiteSpace(envelope.ServerSessionId) ? throw new InvalidOperationException("serverSessionId is required.") : envelope.ServerSessionId;
 
-    private static async Task<string?> ReceiveTextAsync(WebSocket socket, CancellationToken cancellationToken)
+    /// <summary>
+    /// Deserializes a command payload, converting a null result (missing/invalid JSON body)
+    /// into a <see cref="JsonException"/> that surfaces as an <c>invalid_json</c> failure.
+    /// </summary>
+    private static T RequirePayload<T>(string json) where T : class
+        => JsonSerializer.Deserialize<T>(json, ServerJsonSerializer.Options)
+           ?? throw new JsonException($"Command payload for '{typeof(T).Name}' must not be null.");
+
+    private async Task<string?> ReceiveTextAsync(WebSocket socket, CancellationToken cancellationToken)
     {
         var buffer = new byte[8192];
         using var stream = new MemoryStream();
@@ -858,6 +900,11 @@ public sealed class PiServerWebSocketHandler(
             var result = await socket.ReceiveAsync(buffer, cancellationToken);
             if (result.MessageType == WebSocketMessageType.Close) return null;
             stream.Write(buffer, 0, result.Count);
+            if (stream.Length > _maxMessageBytes)
+            {
+                await socket.CloseAsync(WebSocketCloseStatus.MessageTooBig, $"Message exceeds the {_maxMessageBytes} byte limit.", CancellationToken.None);
+                return null;
+            }
             if (result.EndOfMessage) return Encoding.UTF8.GetString(stream.ToArray());
         }
     }
