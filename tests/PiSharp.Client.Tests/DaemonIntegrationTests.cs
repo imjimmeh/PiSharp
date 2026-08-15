@@ -7,6 +7,8 @@ using PiSharp.Server.Contracts;
 using PiSharp.Server.Hosting;
 using PiSharp.Server.Serialization;
 using PiSharp.Server.UiBridge;
+using PiSharp.Tui.Interactive;
+using Terminal.Gui;
 using Xunit;
 
 namespace PiSharp.Client.Tests;
@@ -314,11 +316,21 @@ public sealed class DaemonIntegrationTests
         Assert.True(binding.HasUi);
         await WaitUntilAsync(() => live.AttachedClients > 0, TimeSpan.FromSeconds(8));
 
-        var uiRequestTcs = new TaskCompletionSource<ServerUiIntent>(TaskCreationOptions.RunContinuationsAsynchronously);
-        conn.EventReceived += envelope =>
+        // A real TUI chain answers the approval: RemoteTuiBackend reroutes the daemon's ui_request
+        // into ExtensionUiBridgeHost, whose ApprovalAction renders the verdict ("allow" here, the
+        // result a user choosing allow on the dialog would produce) — NOT raw conn.EventReceived.
+        var bridge = new ExtensionUiBridgeHost(new Window())
         {
-            if (envelope.Event.Type == "ui_request")
-                uiRequestTcs.TrySetResult(ClientToTuiAdapter.FromPayload<ServerUiIntent>(envelope.Event.Data)!);
+            DispatchUi = action => action(),
+            ApprovalAction = (_, _, _) => Task.FromResult<string?>("allow"),
+        };
+        await using var backend = new RemoteTuiBackend(conn) { ServerSessionId = sessionId };
+        backend.UiRequestHandler = async (intent, ct) =>
+        {
+            var result = await bridge.HandleAsync(
+                new ExtensionUiIntent(intent.RequestId, intent.Kind, intent.Title, intent.Message, intent.Options, intent.Component, intent.ExtensionId),
+                ct);
+            return new ServerUiResponse(result.RequestId, result.Value, result.Cancelled);
         };
 
         // Back the real ApprovalClient with the session's real extension API (binding-backed),
@@ -331,24 +343,83 @@ public sealed class DaemonIntegrationTests
             CancellationToken.None);
         var approvals = new ApprovalClient(captured.Api!);
 
-        var approvalTask = approvals.RequestApprovalAsync(
+        // Driven end-to-end through the production dispatch: permission_request surfaces as a
+        // ui_request, the client bridge host renders it and answers "allow", and ApprovalClient
+        // resolves to Allow (today: NoExtensionUi hard-denies and ApprovalClient returns Deny).
+        var verdict = await approvals.RequestApprovalAsync(
             "bash",
             JsonSerializer.SerializeToElement(new { command = "echo hi" }),
             "run a command",
-            "s1");
+            "s1").WaitAsync(TimeSpan.FromSeconds(8));
 
-        var intent = await uiRequestTcs.Task.WaitAsync(TimeSpan.FromSeconds(8));
-        Assert.Equal(ApprovalClient.PermissionRequestKind, intent.Kind);
+        Assert.Equal(ApprovalVerdict.Allow, verdict);
+    }
 
-        // The attached client answers "allow"; the approval must resolve to Allow (today:
-        // NoExtensionUi hard-denies and ApprovalClient returns Deny).
+    [Fact]
+    public async Task RunCommand_ConfirmAnsweredWithBooleanValue_ResolvesOverRealWire()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+            // A daemon-side confirm bridges to the attached client. A TUI confirm answers with a
+            // JSON bool (ExtensionUiBridgeHost.Confirm -> ServerUiResponse.Value holding a bool);
+            // the server must tolerate the bool on the wire and surface it as the string "true"
+            // (P1-3) instead of a swallowed JsonException that leaves the request hanging.
+            RunCommandAsync = async (context, text, options, ct) =>
+            {
+                var intent = new ServerUiIntent("confirm-1", "confirm", "Sure?", "Proceed?", null, null);
+                var uiResponse = await context.UiBridge.RequestUiAsync(intent, ct);
+                return new ServerCommandResult(true, uiResponse.Cancelled ? "cancelled" : uiResponse.Value?.ToString());
+            },
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
         await conn.SendAsync(
-            new ServerCommandEnvelope(ServerCommandTypes.UiResponse, ServerSessionId: sessionId),
-            new { requestId = intent.RequestId, value = "allow", cancelled = false },
+            new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: sessionId),
+            new { sinceSequence = 0L },
             CancellationToken.None);
 
-        var verdict = await approvalTask.WaitAsync(TimeSpan.FromSeconds(8));
-        Assert.Equal(ApprovalVerdict.Allow, verdict);
+        var uiRequestTcs = new TaskCompletionSource<ServerUiIntent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        conn.EventReceived += envelope =>
+        {
+            if (envelope.Event.Type == "ui_request")
+                uiRequestTcs.TrySetResult(ClientToTuiAdapter.FromPayload<ServerUiIntent>(envelope.Event.Data)!);
+        };
+
+        // run_command awaits the confirm, so it stays in flight until the client answers.
+        var runTask = conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.RunCommand, ServerSessionId: sessionId),
+            new { text = "/confirm", options = (object?)null },
+            CancellationToken.None);
+
+        var intent = await uiRequestTcs.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.Equal("confirm", intent.Kind);
+
+        // The client answers with the JSON bool that a real confirm dialog produces (value: true).
+        await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.UiResponse, ServerSessionId: sessionId),
+            new { requestId = intent.RequestId, value = true, cancelled = false },
+            CancellationToken.None);
+
+        var runResp = await runTask;
+        Assert.True(runResp.Success, runResp.Error?.Message);
+        var result = ClientToTuiAdapter.FromPayload<ServerCommandResult>(runResp.Data);
+        Assert.NotNull(result);
+        Assert.True(result!.Handled);
+        Assert.Equal("true", result.Message);
     }
 
     // --- helpers ---

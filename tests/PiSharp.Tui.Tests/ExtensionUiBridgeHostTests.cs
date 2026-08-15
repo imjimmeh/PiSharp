@@ -421,6 +421,41 @@ public sealed class ExtensionUiBridgeHostTests
     }
 
     [Fact]
+    public async Task PermissionRequest_WithApprovalAction_ReturnsStringVerdictNotBool()
+    {
+        string? capturedMessage = null;
+        var host = new ExtensionUiBridgeHost(new Window())
+        {
+            DispatchUi = action => action(),
+            ApprovalAction = (_, message, _) =>
+            {
+                capturedMessage = message;
+                return Task.FromResult<string?>("allow");
+            }
+        };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent(
+            "req-approval", "permission_request", "Permission Request",
+            null, null, JsonSerializer.SerializeToElement(new { tool = "bash", reason = "run a command" })));
+
+        Assert.False(result.Cancelled);
+        Assert.IsType<string>(result.Value);
+        Assert.Equal("allow", result.Value);
+        Assert.Contains("run a command", capturedMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PermissionRequest_DefaultAction_AutoCancels()
+    {
+        var host = new ExtensionUiBridgeHost(new Window()) { DispatchUi = action => action() };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-approval", "permission_request", "Permission Request", null, null, null));
+
+        Assert.True(result.Cancelled);
+        Assert.Null(result.Value);
+    }
+
+    [Fact]
     public async Task SelectIntentWithoutActionKeepsCannedFirstOptionBehavior()
     {
         var host = new ExtensionUiBridgeHost(new Window()) { DispatchUi = action => action() };

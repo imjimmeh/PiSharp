@@ -219,6 +219,8 @@ public sealed class TuiHost(TuiHostOptions options)
             => PromptDialog.InputAsync(prompt, initialValue, ct, dispatcher: appContext);
         bridge.ConfirmAction = (string title, string? message, CancellationToken ct)
             => ConfirmDialog.ConfirmAsync(title, message, ct, dispatcher: appContext);
+        bridge.ApprovalAction = async (string title, string? message, CancellationToken ct)
+            => await ConfirmDialog.ConfirmAsync(title, message, ct, dispatcher: appContext) ? "allow" : "deny";
 
         var sessionContext = new TuiSessionContext { CurrentRuntime = runtime, HeaderExpanded = headerExpanded };
         var stateGateway = new TuiStateGateway(() => state, s => state = s, renderCoordinator, appContext, cancellationToken);

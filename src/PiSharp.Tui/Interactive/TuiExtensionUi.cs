@@ -23,6 +23,13 @@ public sealed class TuiExtensionUi(ExtensionUiBridgeHost bridge, Func<string, IR
                 return new ExtensionUiResult(true, await OpenEditorAsync(message ?? string.Empty, GetString(request.Payload, "initialValue"), cancellationToken));
             case "confirm":
                 return new ExtensionUiResult(true, await ConfirmAsync(message ?? string.Empty, cancellationToken));
+            case "permission_request":
+                var approval = await bridge.HandleAsync(new ExtensionUiIntent(
+                    Guid.NewGuid().ToString("N"), "permission_request", "Permission Request", message,
+                    null, request.Payload, request.ExtensionId), cancellationToken);
+                return approval.Cancelled
+                    ? new ExtensionUiResult(false, Error: "Permission request cancelled (no UI handler).")
+                    : new ExtensionUiResult(true, approval.Value?.ToString());
             case "markdown":
                 await NotifyAsync(GetString(request.Payload, "markdown") ?? message ?? string.Empty, cancellationToken: cancellationToken);
                 return new ExtensionUiResult(true);

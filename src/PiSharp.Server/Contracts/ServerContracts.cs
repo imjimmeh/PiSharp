@@ -166,7 +166,7 @@ public sealed record CompleteCommandRequest(string Type, string? Id, string Serv
 public sealed record ProcessInputRequest(string Text, IReadOnlyList<ImageContent>? Images = null, string Source = "interactive");
 public sealed record ProcessInputResult(bool Handled, string Text, IReadOnlyList<ImageContent>? Images = null);
 public sealed record ResolveToolRequest(string Type, string? Id, string ServerSessionId, string Name);
-public sealed record UiResponseCommand(string Type, string? Id, string ServerSessionId, string RequestId, string? Value = null, bool Cancelled = false);
+public sealed record UiResponseCommand(string Type, string? Id, string ServerSessionId, string RequestId, object? Value = null, bool Cancelled = false);
 
 /// <summary>Request for the <see cref="ServerCommandTypes.McpStatus"/> command (read-only, session-independent).</summary>
 public sealed record McpStatusCommand(string Type, string? Id = null);

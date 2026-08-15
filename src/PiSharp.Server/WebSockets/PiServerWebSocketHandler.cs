@@ -456,9 +456,33 @@ public sealed class PiServerWebSocketHandler(
     {
         var command = JsonSerializer.Deserialize<UiResponseCommand>(json, ServerJsonSerializer.Options)!;
         RequireSession(command.ServerSessionId);
-        Bridge.ResolveUiAsync(command.RequestId, command.Value, command.Cancelled);
+        Bridge.ResolveUiAsync(command.RequestId, UiResponseValueToText(command.Value), command.Cancelled);
         return Task.FromResult(ServerResponse.Ok(command.Id, command.Type));
     }
+
+    /// <summary>
+    /// Coerces a <c>ui_response</c> value of any JSON shape into the <c>string?</c> the bridge
+    /// carries: JSON strings pass through, JSON bools become <c>"true"</c>/<c>"false"</c> (the
+    /// confirm/notify/status/widget answers the TUI produces), and structured values fall back to
+    /// their JSON text. Previously a JSON bool failed deserialization into <c>string?</c> and the
+    /// pending request never resolved (P1-3).
+    /// </summary>
+    private static string? UiResponseValueToText(object? value)
+        => value switch
+        {
+            null => null,
+            string text => text,
+            bool flag => flag ? "true" : "false",
+            JsonElement element => element.ValueKind switch
+            {
+                JsonValueKind.Null => null,
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => element.ToString()
+            },
+            _ => value.ToString()
+        };
 
     private Task<ServerResponse> GetThemeAsync(ServerCommandEnvelope envelope)
     {

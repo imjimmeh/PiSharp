@@ -22,7 +22,7 @@ public sealed class ServerUiBridge : IServerUiBridge
     internal static readonly TimeSpan InteractiveKindTimeout = TimeSpan.FromMinutes(5);
     private static readonly HashSet<string> InteractiveKinds = new(StringComparer.Ordinal)
     {
-        "select", "input", "editor", "confirm", "custom", "custom_update"
+        "select", "input", "editor", "confirm", "custom", "custom_update", "permission_request"
     };
 
     /// <summary>Per-kind default response timeout: interactive kinds get <see cref="InteractiveKindTimeout"/>,

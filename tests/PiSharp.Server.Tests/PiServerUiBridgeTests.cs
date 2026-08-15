@@ -126,7 +126,7 @@ public sealed class PiServerUiBridgeTests
     [Fact]
     public void TimeoutFor_InteractiveKinds_AreGenerous()
     {
-        foreach (var kind in new[] { "select", "input", "editor", "confirm", "custom", "custom_update" })
+        foreach (var kind in new[] { "select", "input", "editor", "confirm", "custom", "custom_update", "permission_request" })
             Assert.True(ServerUiBridge.TimeoutFor(kind) > TimeSpan.FromMinutes(1), $"{kind} should get a generous default timeout");
 
         Assert.Equal(ServerUiBridge.TimeoutFor("notify"), ServerUiBridge.TimeoutFor("status"));
