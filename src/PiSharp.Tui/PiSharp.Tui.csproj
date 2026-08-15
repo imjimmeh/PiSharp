@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Logging\PiSharp.Logging.csproj" />
     <ProjectReference Include="..\PiSharp.Abstractions\PiSharp.Abstractions.csproj" />
     <ProjectReference Include="..\PiSharp.Agent.Core\PiSharp.Agent.Core.csproj" />
     <ProjectReference Include="..\PiSharp.Agent\PiSharp.Agent.csproj" />

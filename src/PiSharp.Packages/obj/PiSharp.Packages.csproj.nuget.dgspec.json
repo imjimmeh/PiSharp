@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Packages\\PiSharp.Packages.csproj": {}
+    "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Packages\\PiSharp.Packages.csproj": {}
   },
   "projects": {
-    "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj": {
+    "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj": {
       "version": "0.0.0-dev",
       "restore": {
-        "projectUniqueName": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj",
+        "projectUniqueName": "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj",
         "projectName": "PiSharp.Compatibility",
-        "projectPath": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj",
+        "projectPath": "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj",
         "packagesPath": "C:\\Users\\jimme\\.nuget\\packages\\",
-        "outputPath": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\obj\\",
+        "outputPath": "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Compatibility\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -354,14 +354,14 @@
         }
       }
     },
-    "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Packages\\PiSharp.Packages.csproj": {
+    "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Packages\\PiSharp.Packages.csproj": {
       "version": "0.0.0-dev",
       "restore": {
-        "projectUniqueName": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Packages\\PiSharp.Packages.csproj",
+        "projectUniqueName": "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Packages\\PiSharp.Packages.csproj",
         "projectName": "PiSharp.Packages",
-        "projectPath": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Packages\\PiSharp.Packages.csproj",
+        "projectPath": "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Packages\\PiSharp.Packages.csproj",
         "packagesPath": "C:\\Users\\jimme\\.nuget\\packages\\",
-        "outputPath": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Packages\\obj\\",
+        "outputPath": "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Packages\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -383,8 +383,8 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj": {
-                "projectPath": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj"
+              "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj": {
+                "projectPath": "G:\\code\\AI\\pi\\PiSharp\\.worktrees\\client-logging\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj"
               }
             }
           }

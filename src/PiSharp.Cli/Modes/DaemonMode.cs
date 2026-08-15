@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using Microsoft.Extensions.Logging;
 using PiSharp.Cli.IO;
-using PiSharp.Cli.Logging;
+using PiSharp.Logging;
 using PiSharp.Cli.Parsing;
 using PiSharp.Client;
 using PiSharp.Compatibility.Settings;

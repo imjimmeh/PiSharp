@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
-namespace PiSharp.Cli.Logging;
+namespace PiSharp.Logging;
 
 /// <summary>
 /// Renders one structured <c>ILogger</c> entry as a JSON-lines object:
@@ -13,7 +13,7 @@ namespace PiSharp.Cli.Logging;
 /// are not directly JSON-serializable fall back to their <c>ToString()</c> representation so a
 /// single hostile value can never break the line.
 /// </summary>
-internal static class JsonLogFormatter
+public static class JsonLogFormatter
 {
     public const string FormatEnvironmentVariable = "PISHARP_LOG_FORMAT";
     public const string FormatValueJson = "json";

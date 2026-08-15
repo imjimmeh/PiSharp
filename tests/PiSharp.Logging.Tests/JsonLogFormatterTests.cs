@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using PiSharp.Cli.Logging;
+using PiSharp.Logging;
 using Xunit;
 
-namespace PiSharp.Cli.Tests.Logging;
+namespace PiSharp.Logging.Tests;
 
 /// <summary>
 /// P25 C5: the JSON-lines file formatter — structured state keys serialized verbatim, template

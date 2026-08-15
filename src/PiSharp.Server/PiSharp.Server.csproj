@@ -13,6 +13,7 @@
     <InternalsVisibleTo Include="PiSharp.Server.Tests" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Logging\PiSharp.Logging.csproj" />
     <ProjectReference Include="..\PiSharp.Runtime\PiSharp.Runtime.csproj" />
     <ProjectReference Include="..\PiSharp.Continuity.Contracts\PiSharp.Continuity.Contracts.csproj" />
   </ItemGroup>

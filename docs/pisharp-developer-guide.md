@@ -231,6 +231,20 @@ PiSharp preserves Pi-compatible locations and concepts where practical:
 
 PiSharp adds native .NET extension support, PiSharp-specific settings layers, descriptor caching for TypeScript extensions, and ASP.NET Core hosting. See [PiSharp vs TypeScript Pi](pisharp-vs-pi.md).
 
+## Logging
+
+The TUI, CLI, and daemon all share the same file-logging mechanism, wired through
+`Microsoft.Extensions.Logging`.
+
+- **Destination:** line-append to `~/.pi/PiSharp/logs/pi.log` by default. When no
+  explicit `logging.file` is set, interactive sessions retarget to
+  `~/.pi/PiSharp/logs/<encodedCwd>/<session>.log`. The daemon always logs to `pi.log`.
+- **Settings keys** (`settings.json`): `logging.file`, `logging.level`,
+  `logging.maxFiles`, `logging.json`.
+- **Environment overrides:** `PISHARP_LOG_FILE`, `PISHARP_LOG_LEVEL`,
+  `PISHARP_LOG_MAX_FILES`, `PISHARP_LOG_FORMAT` (`=json` selects JSON-lines output).
+- **Defaults:** level `Debug`, retention of 7 files, plain-text format.
+
 ## Development notes
 
 - Documentation-only changes do not require running the full build.

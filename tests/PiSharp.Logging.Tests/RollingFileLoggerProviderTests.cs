@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using PiSharp.Cli.Logging;
+using PiSharp.Logging;
 using Xunit;
 
-namespace PiSharp.Cli.Tests.Logging;
+namespace PiSharp.Logging.Tests;
 
 public sealed class RollingFileLoggerProviderTests
 {

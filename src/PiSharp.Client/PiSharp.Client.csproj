@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PiSharp.Logging\PiSharp.Logging.csproj" />
     <ProjectReference Include="..\PiSharp.Server\PiSharp.Server.csproj" />
     <ProjectReference Include="..\PiSharp.Tui\PiSharp.Tui.csproj" />
   </ItemGroup>

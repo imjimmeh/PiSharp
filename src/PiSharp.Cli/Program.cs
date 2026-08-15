@@ -4,7 +4,7 @@ using PiSharp.Cli.Bootstrap;
 using PiSharp.Cli.Commands;
 using PiSharp.Cli.Files;
 using PiSharp.Cli.IO;
-using PiSharp.Cli.Logging;
+using PiSharp.Logging;
 using PiSharp.Cli.Modes;
 using PiSharp.Packages;
 using PiSharp.Cli.Runtime;

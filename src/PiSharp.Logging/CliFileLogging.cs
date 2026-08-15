@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using PiSharp.Compatibility.Settings;
 
-namespace PiSharp.Cli.Logging;
+namespace PiSharp.Logging;
 
-internal static class CliFileLogging
+public static class CliFileLogging
 {
     public const string PathEnvironmentVariable = "PISHARP_LOG_FILE";
     public const string LevelEnvironmentVariable = "PISHARP_LOG_LEVEL";
@@ -19,10 +19,10 @@ internal static class CliFileLogging
         return registration;
     }
 
-    internal static RollingFileLoggerOptions? ResolveOptions(string cwd, string? homeDirectory = null, string? profile = null, CliFileLoggingOverrides? overrides = null)
+    public static RollingFileLoggerOptions? ResolveOptions(string cwd, string? homeDirectory = null, string? profile = null, CliFileLoggingOverrides? overrides = null)
         => ResolveConfiguration(cwd, homeDirectory, overrides, profile)?.Options;
 
-    internal static CliFileLoggingRegistration? CreateConfiguredFileLogging(string cwd, string? homeDirectory = null, CliFileLoggingOverrides? overrides = null, string? profile = null)
+    public static CliFileLoggingRegistration? CreateConfiguredFileLogging(string cwd, string? homeDirectory = null, CliFileLoggingOverrides? overrides = null, string? profile = null)
     {
         var configuration = ResolveConfiguration(cwd, homeDirectory, overrides, profile);
         if (configuration is null) return null;
@@ -52,41 +52,41 @@ internal static class CliFileLogging
         return new ResolvedFileLogging(new RollingFileLoggerOptions(resolvedPath, resolvedLevel, resolvedMaxFiles, mode, jsonFormat), paths.HomeDirectory, retargetsToSession, paths.GlobalPiSharpDirectory);
     }
 
-    internal static string GetDefaultLogFilePath(string? homeDirectory = null)
+    public static string GetDefaultLogFilePath(string? homeDirectory = null)
     {
         var home = homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return Path.Combine(home, ".pi", "PiSharp", "logs", "pi.log");
     }
 
-    internal static string GetSessionLogFilePath(string globalPiSharpDirectory, string sessionPath)
+    public static string GetSessionLogFilePath(string globalPiSharpDirectory, string sessionPath)
     {
         var encodedCwd = Path.GetFileName(Path.GetDirectoryName(sessionPath)) ?? string.Empty;
         var sessionStem = Path.GetFileNameWithoutExtension(sessionPath);
         return Path.Combine(globalPiSharpDirectory, "logs", encodedCwd, sessionStem + ".log");
     }
 
-    internal static string ResolveLogFilePath(string? settingsFile, string? envFile, string defaultPath)
+    public static string ResolveLogFilePath(string? settingsFile, string? envFile, string defaultPath)
     {
         if (envFile is not null) return envFile;
         if (settingsFile is not null) return settingsFile;
         return defaultPath;
     }
 
-    internal static LogLevel ResolveLogLevel(string? settingsLevel, string? envLevel)
+    public static LogLevel ResolveLogLevel(string? settingsLevel, string? envLevel)
     {
         var resolved = ParseLogLevel(settingsLevel) ?? LogLevel.Debug;
         resolved = ParseLogLevel(envLevel) ?? resolved;
         return resolved;
     }
 
-    internal static int ResolveMaxFiles(string? settingsMaxFiles, string? envMaxFiles)
+    public static int ResolveMaxFiles(string? settingsMaxFiles, string? envMaxFiles)
     {
         var resolved = ParsePositiveInt(settingsMaxFiles) ?? 7;
         resolved = ParsePositiveInt(envMaxFiles) ?? resolved;
         return resolved;
     }
 
-    internal static bool ResolveJsonFormat(bool settingsJson, string? envFormat)
+    public static bool ResolveJsonFormat(bool settingsJson, string? envFormat)
     {
         if (envFormat is not null) return string.Equals(envFormat, "json", StringComparison.OrdinalIgnoreCase);
         return settingsJson;
@@ -99,7 +99,7 @@ internal static class CliFileLogging
         => int.TryParse(value, out var parsed) && parsed > 0 ? parsed : null;
 }
 
-internal sealed class CliFileLoggingRegistration(RollingFileLoggerProvider provider, string homeDirectory, bool retargetsToSession, string globalPiSharpDirectory)
+public sealed class CliFileLoggingRegistration(RollingFileLoggerProvider provider, string homeDirectory, bool retargetsToSession, string globalPiSharpDirectory)
 {
     public RollingFileLoggerProvider Provider { get; } = provider;
     public string CurrentFilePath => Provider.FilePath;
@@ -113,9 +113,9 @@ internal sealed class CliFileLoggingRegistration(RollingFileLoggerProvider provi
     }
 }
 
-internal sealed record ResolvedFileLogging(RollingFileLoggerOptions Options, string HomeDirectory, bool RetargetsToSession, string GlobalPiSharpDirectory);
+public sealed record ResolvedFileLogging(RollingFileLoggerOptions Options, string HomeDirectory, bool RetargetsToSession, string GlobalPiSharpDirectory);
 
-internal sealed record CliFileLoggingOverrides(string? File, string? Level, string? MaxFiles, string? Format = null)
+public sealed record CliFileLoggingOverrides(string? File, string? Level, string? MaxFiles, string? Format = null)
 {
     public static CliFileLoggingOverrides FromEnvironment()
         => new(

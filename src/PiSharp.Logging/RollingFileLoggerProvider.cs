@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 
-namespace PiSharp.Cli.Logging;
+namespace PiSharp.Logging;
 
-internal class RollingFileLoggerProvider : ILoggerProvider
+public class RollingFileLoggerProvider : ILoggerProvider
 {
     private RollingFileLoggerOptions _options;
     private readonly object _gate = new();
@@ -21,17 +21,17 @@ internal class RollingFileLoggerProvider : ILoggerProvider
     public ILogger CreateLogger(string categoryName)
         => _loggers.GetOrAdd(categoryName, category => new RollingFileLogger(category, this));
 
-    internal string FilePath
+    public string FilePath
     {
         get { lock (_gate) return _options.FilePath; }
     }
 
-    internal RollingFileMode Mode
+    public RollingFileMode Mode
     {
         get { lock (_gate) return _options.Mode; }
     }
 
-    internal void UpdateFilePath(string filePath)
+    public void UpdateFilePath(string filePath)
     {
         lock (_gate)
         {
@@ -53,10 +53,10 @@ internal class RollingFileLoggerProvider : ILoggerProvider
         }
     }
 
-    internal bool IsEnabled(LogLevel logLevel)
+    public bool IsEnabled(LogLevel logLevel)
         => !_disposed && logLevel != LogLevel.None && logLevel >= _options.MinimumLevel;
 
-    internal virtual void Write<TState>(string category, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    public virtual void Write<TState>(string category, LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         if (!IsEnabled(logLevel)) return;
 
@@ -140,9 +140,9 @@ internal class RollingFileLoggerProvider : ILoggerProvider
             => provider.Write(category, logLevel, eventId, state, exception, formatter);
     }
 }
-internal sealed record RollingFileLoggerOptions(string FilePath, LogLevel MinimumLevel, int MaxRetainedFiles, RollingFileMode Mode = RollingFileMode.Dated, bool Json = false);
+public sealed record RollingFileLoggerOptions(string FilePath, LogLevel MinimumLevel, int MaxRetainedFiles, RollingFileMode Mode = RollingFileMode.Dated, bool Json = false);
 
-internal enum RollingFileMode
+public enum RollingFileMode
 {
     Dated,
     ExactFile
