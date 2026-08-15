@@ -1,8 +1,11 @@
+using System.Text.Json;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
+using PiSharp.Agent.Core;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Continuity.Contracts;
+using PiSharp.Extensions;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.UiBridge;
 
@@ -37,8 +40,11 @@ public static class ServerCommandTypes
     public const string GetForkMessages = "get_fork_messages";
     public const string GetExtensionLoadStatus = "get_extension_load_status";
     public const string GetExtensionShortcuts = "get_extension_shortcuts";
+    public const string InvokeExtensionShortcut = "invoke_extension_shortcut";
     public const string GetExtensionRegistry = "get_extension_registry";
     public const string ResolveTool = "resolve_tool";
+    public const string RenderToolCall = "render_tool_call";
+    public const string RenderToolResult = "render_tool_result";
     public const string CycleThinkingLevel = "cycle_thinking_level";
     public const string GetAvailableModels = "get_available_models";
     public const string GetCommands = "get_commands";
@@ -166,7 +172,26 @@ public sealed record CompleteCommandRequest(string Type, string? Id, string Serv
 public sealed record ProcessInputRequest(string Text, IReadOnlyList<ImageContent>? Images = null, string Source = "interactive");
 public sealed record ProcessInputResult(bool Handled, string Text, IReadOnlyList<ImageContent>? Images = null);
 public sealed record ResolveToolRequest(string Type, string? Id, string ServerSessionId, string Name);
-public sealed record UiResponseCommand(string Type, string? Id, string ServerSessionId, string RequestId, string? Value = null, bool Cancelled = false);
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.RenderToolCall"/> / <see cref="ServerCommandTypes.RenderToolResult"/>:
+/// the client asks the daemon to render a tool call/result line for a registered extension tool that
+/// implements <see cref="PiSharp.Agent.Core.Tools.IAgentToolRenderer"/>. The daemon answers
+/// <c>{ lines: [...] }</c>; non-renderable or unknown tools answer <c>not_available</c> so the
+/// client TUI falls back to its plain text rows.
+/// </summary>
+public sealed record RenderToolRequest(
+    string Type,
+    string? Id,
+    string ServerSessionId,
+    string Name,
+    string ToolCallId,
+    JsonElement Arguments,
+    bool IsCall,
+    bool IsError,
+    bool IsExpanded,
+    int Width);
+public sealed record UiResponseCommand(string Type, string? Id, string ServerSessionId, string RequestId, object? Value = null, bool Cancelled = false);
 
 /// <summary>Request for the <see cref="ServerCommandTypes.McpStatus"/> command (read-only, session-independent).</summary>
 public sealed record McpStatusCommand(string Type, string? Id = null);
@@ -214,6 +239,43 @@ public sealed record RemoveExtensionCommand(
     string? ServerSessionId = null,
     string? Reference = null,
     bool Local = false);
+// --- P24: extension registry wire surface (scout gap 8) ---
+
+/// <summary>
+/// Serializable projection of <see cref="PiSharp.Extensions.ExtensionRegistry"/> answered by
+/// <see cref="ServerCommandTypes.GetExtensionRegistry"/>. The live registry holds delegate-bearing
+/// registrations that serialize to empty objects; this DTO carries only wireable metadata. The
+/// renderer/decorator rows are metadata-only — their invocation handlers are not wireable — so
+/// clients reconstruct tools/shortcuts but never renderer/decorator handlers.
+/// </summary>
+public sealed record ExtensionRegistryWire(
+    IReadOnlyList<ExtensionToolWire> Tools,
+    IReadOnlyList<ExtensionShortcutWire> Shortcuts,
+    IReadOnlyList<ExtensionRendererWire> Renderers,
+    IReadOnlyList<ExtensionDecoratorWire> Decorators);
+
+/// <summary>Serializable tool projection for <see cref="ExtensionRegistryWire"/>.</summary>
+public sealed record ExtensionToolWire(
+    string Name, string Label, string Description,
+    JsonElement ParametersSchema, bool HasRenderCall, bool HasRenderResult,
+    string? RendererName, string? RenderShell,
+    ToolExecutionMode? ExecutionMode, string? PromptSnippet, IReadOnlyList<string>? PromptGuidelines);
+
+/// <summary>Serializable shortcut projection for <see cref="ExtensionRegistryWire"/>.</summary>
+public sealed record ExtensionShortcutWire(string Id, string? SourceId, string Keys, string Description);
+
+/// <summary>Serializable message-renderer projection for <see cref="ExtensionRegistryWire"/> (metadata only).</summary>
+public sealed record ExtensionRendererWire(string RowType, string? CustomType, ExtensionOverridePolicy Override);
+
+/// <summary>Serializable message-decorator projection for <see cref="ExtensionRegistryWire"/> (metadata only).</summary>
+public sealed record ExtensionDecoratorWire(string RowType, string? CustomType, ExtensionOverridePolicy Override);
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.InvokeExtensionShortcut"/>: invokes the registered
+/// extension shortcut matching <see cref="Keys"/> on the live session with <see cref="Args"/>.
+/// </summary>
+public sealed record InvokeExtensionShortcutRequest(string Type, string? Id, string ServerSessionId, string Keys, string Args);
+
 
 /// <summary>
 /// Request for <see cref="ServerCommandTypes.ManageSkill"/>. <see cref="Op"/> is one of
@@ -274,11 +336,12 @@ public sealed record PiServerHostContext(LiveServerSession Session, IServerUiBri
 /// makes the command respond <c>not_available</c>.
 public sealed record PiServerCommandDelegates(
     Func<PiServerHostContext, string, SlashCommandExecutionOptions?, CancellationToken, Task<ServerCommandResult>>? RunCommandAsync = null,
-    Func<string, CancellationToken, Task<IReadOnlyList<string>>>? CompleteCommandAsync = null,
+    Func<LiveServerSession, string, CancellationToken, Task<IReadOnlyList<string>>>? CompleteCommandAsync = null,
     Func<ProcessInputRequest, CancellationToken, Task<ProcessInputResult>>? ProcessInputAsync = null,
-    Func<CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync = null,
-    Func<Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null,
+    Func<LiveServerSession, CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync = null,
+    Func<LiveServerSession, Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null,
     Func<CancellationToken, Task<McpStatusResult>>? GetMcpStatusAsync = null,
+    Func<LiveServerSession, CancellationToken, Task<IReadOnlyList<string>>>? GetCommandsAsync = null,
     Func<CancellationToken, Task>? OnShutdown = null);
 
 // --- P05: daemon theme authority surface (plan C8) ---

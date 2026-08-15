@@ -10,6 +10,7 @@ using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Ai;
 using PiSharp.Agent.Core.Events;
+using PiSharp.Agent.Core.Tools;
 using PiSharp.Runtime;
 using PiSharp.Server.Authentication;
 using PiSharp.Continuity.Contracts;
@@ -17,6 +18,7 @@ using PiSharp.Server.Contracts;
 using PiSharp.Extensions;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.Serialization;
+using PiSharp.Server.Extensions;
 using PiSharp.Server.UiBridge;
 
 namespace PiSharp.Server.WebSockets;
@@ -40,6 +42,8 @@ public sealed class PiServerWebSocketHandler(
     {
         public static NoOpServerUiBridge Instance { get; } = new();
         public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
+        public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, LiveServerSession target, TimeSpan? responseTimeout, CancellationToken ct = default)
             => Task.FromResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
         public void ResolveUiAsync(string requestId, string? value, bool cancelled) { }
     }
@@ -193,11 +197,14 @@ public sealed class PiServerWebSocketHandler(
                 ServerCommandTypes.GetForkMessages => await GetForkMessagesAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetExtensionLoadStatus => await GetExtensionLoadStatusAsync(envelope),
                 ServerCommandTypes.GetExtensionShortcuts => await GetExtensionShortcutsAsync(envelope),
+                ServerCommandTypes.InvokeExtensionShortcut => await InvokeExtensionShortcutAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.GetExtensionRegistry => await GetExtensionRegistryAsync(envelope),
                 ServerCommandTypes.ResolveTool => await ResolveToolAsync(json, envelope),
+                ServerCommandTypes.RenderToolCall => await RenderToolCallAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.RenderToolResult => await RenderToolResultAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.CycleThinkingLevel => await CycleThinkingLevelAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetAvailableModels => GetAvailableModels(envelope),
-                ServerCommandTypes.GetCommands => GetCommandsNotAvailable(envelope),
+                ServerCommandTypes.GetCommands => await GetCommandsAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetLastAssistantText => await GetLastAssistantTextAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetStartupMessages => await GetStartupMessagesAsync(envelope, cancellationToken),
                 ServerCommandTypes.PostStartupChecks => await PostStartupChecksAsync(envelope, cancellationToken),
@@ -248,6 +255,9 @@ public sealed class PiServerWebSocketHandler(
         logger.LogDebug("Created server session in {ElapsedMilliseconds:0.0} ms", elapsedMilliseconds);
         if (registry.TryGet(created.ServerSessionId, out var live))
         {
+            // Bind the daemon-side extension UI forwarder so extension UI requests (permission
+            // approvals, confirmations, custom UI) round-trip to this client's session lane.
+            EnsureExtensionUiBound(live);
             // Feed the daemon theme registry from this session's theme resources so list_themes/
             // get_theme can answer before any explicit set_theme. Discovery is not a precondition
             // for the client session response.
@@ -279,9 +289,23 @@ public sealed class PiServerWebSocketHandler(
     {
         var command = RequirePayload<AttachCommand>(json);
         var live = RequireSession(command.ServerSessionId);
+        EnsureExtensionUiBound(live);
         var replay = live.EventLog.ReplayFrom(command.SinceSequence);
         if (ensureEventPump is not null) await ensureEventPump(live, command.SinceSequence);
         return ServerResponse.Ok(envelope.Id, envelope.Type, new AttachResult(live.Id, replay.FromSequence, replay.HeadSequence, replay.Gap, replay.Events.Count));
+    }
+
+    /// <summary>
+    /// Binds the daemon-side extension UI forwarder to the session's extension binding so
+    /// extension UI requests (permission approvals, confirmations, custom UI) round-trip to the
+    /// attached interactive client over the <c>ui_request</c>/<c>ui_response</c> lane. Sessions
+    /// with no attached client keep the immediate hard deny (see <see cref="DaemonExtensionUi"/>).
+    /// </summary>
+    private void EnsureExtensionUiBound(LiveServerSession live)
+    {
+        var binding = live.Runtime.ExtensionBinding;
+        if (binding.Ui is DaemonExtensionUi) return;
+        binding.SetUi(new DaemonExtensionUi(live, Bridge), true);
     }
 
     private async Task<ServerResponse> DisposeSessionAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
@@ -450,9 +474,9 @@ public sealed class PiServerWebSocketHandler(
     private async Task<ServerResponse> CompleteCommandAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
         var command = RequirePayload<CompleteCommandRequest>(json);
-        RequireSession(command.ServerSessionId);
+        var live = RequireSession(command.ServerSessionId);
         if (delegates?.CompleteCommandAsync is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Command '{command.Type}' is not available on this daemon.");
-        var completions = await delegates.CompleteCommandAsync(command.Text, cancellationToken);
+        var completions = await delegates.CompleteCommandAsync(live, command.Text, cancellationToken);
         return ServerResponse.Ok(command.Id, command.Type, completions);
     }
 
@@ -469,9 +493,33 @@ public sealed class PiServerWebSocketHandler(
     {
         var command = RequirePayload<UiResponseCommand>(json);
         RequireSession(command.ServerSessionId);
-        Bridge.ResolveUiAsync(command.RequestId, command.Value, command.Cancelled);
+        Bridge.ResolveUiAsync(command.RequestId, UiResponseValueToText(command.Value), command.Cancelled);
         return Task.FromResult(ServerResponse.Ok(command.Id, command.Type));
     }
+
+    /// <summary>
+    /// Coerces a <c>ui_response</c> value of any JSON shape into the <c>string?</c> the bridge
+    /// carries: JSON strings pass through, JSON bools become <c>"true"</c>/<c>"false"</c> (the
+    /// confirm/notify/status/widget answers the TUI produces), and structured values fall back to
+    /// their JSON text. Previously a JSON bool failed deserialization into <c>string?</c> and the
+    /// pending request never resolved (P1-3).
+    /// </summary>
+    private static string? UiResponseValueToText(object? value)
+        => value switch
+        {
+            null => null,
+            string text => text,
+            bool flag => flag ? "true" : "false",
+            JsonElement element => element.ValueKind switch
+            {
+                JsonValueKind.Null => null,
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => element.ToString()
+            },
+            _ => value.ToString()
+        };
 
     private Task<ServerResponse> GetThemeAsync(ServerCommandEnvelope envelope)
     {
@@ -634,9 +682,31 @@ public sealed class PiServerWebSocketHandler(
     {
         var live = RequireSession(RequiredSessionId(envelope));
         var manager = live.Runtime.ExtensionManager;
-        return Task.FromResult(manager is null
-            ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session.")
-            : ServerResponse.Ok(envelope.Id, envelope.Type, manager.Registry.Shortcuts));
+        if (manager is null) return Task.FromResult(ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session."));
+        var shortcuts = manager.Registry.Shortcuts
+            .Select(registration => new ExtensionShortcutWire(
+                registration.Id,
+                registration.SourceId,
+                registration.Value.Keys,
+                registration.Value.Description))
+            .ToArray();
+        return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type, shortcuts));
+    }
+
+    private async Task<ServerResponse> InvokeExtensionShortcutAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<InvokeExtensionShortcutRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var manager = live.Runtime.ExtensionManager;
+        if (manager is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session.");
+        var registration = manager.Registry.Shortcuts.FirstOrDefault(s => string.Equals(s.Value.Keys, command.Keys, StringComparison.Ordinal));
+        if (registration is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Extension shortcut '{command.Keys}' is not registered.");
+        var binding = live.Runtime.ExtensionBinding;
+        await registration.Value.InvokeAsync(new ExtensionCommandContext(
+            registration.Value.Keys, command.Args, binding.Ui,
+            UnavailableExtensionSessionApi.Instance, UnavailableExtensionModelApi.Instance, UnavailableExtensionToolApi.Instance,
+            binding.FlagValues, cancellationToken), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type);
     }
 
     private Task<ServerResponse> GetExtensionRegistryAsync(ServerCommandEnvelope envelope)
@@ -645,7 +715,67 @@ public sealed class PiServerWebSocketHandler(
         var manager = live.Runtime.ExtensionManager;
         return Task.FromResult(manager is null
             ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session.")
-            : ServerResponse.Ok(envelope.Id, envelope.Type, manager.Registry));
+            : ServerResponse.Ok(envelope.Id, envelope.Type, ComposeExtensionRegistryWire(manager.Registry)));
+    }
+
+    /// <summary>
+    /// Projects the live extension registry onto the wire. Tool rows carry serializable metadata;
+    /// <c>RendererName</c>/<c>RenderShell</c> are not exposed by the registry's
+    /// <see cref="IAgentToolRenderer"/> surface, so they ride as null until a producer type
+    /// publishes them. Renderer/decorator handler delegates are not wireable — only the
+    /// row-type/custom-type/override metadata is transferred.
+    /// </summary>
+    private static ExtensionRegistryWire ComposeExtensionRegistryWire(ExtensionRegistry registry)
+    {
+        var tools = registry.Tools
+            .Select(registration => ComposeToolWire(registration.Value))
+            .ToArray();
+
+        var shortcuts = registry.Shortcuts
+            .Select(registration => new ExtensionShortcutWire(
+                registration.Id,
+                registration.SourceId,
+                registration.Value.Keys,
+                registration.Value.Description))
+            .ToArray();
+
+        var renderers = registry.Renderers
+            .Select(registration => new ExtensionRendererWire(
+                registration.Value.RowType.ToString(),
+                registration.Value.CustomType,
+                registration.Value.Override))
+            .ToArray();
+
+        var decorators = registry.Decorators
+            .Select(registration => new ExtensionDecoratorWire(
+                registration.Value.RowType.ToString(),
+                registration.Value.CustomType,
+                registration.Override))
+            .ToArray();
+
+        return new ExtensionRegistryWire(tools, shortcuts, renderers, decorators);
+    }
+
+    /// <summary>
+    /// Projects a registered tool onto the wire. The capability flags come from the tool's
+    /// <see cref="IAgentToolRenderer"/> surface; <c>RendererName</c>/<c>RenderShell</c> are not
+    /// exposed by that surface, so they ride as null until a producer type publishes them.
+    /// </summary>
+    private static ExtensionToolWire ComposeToolWire(IAgentTool tool)
+    {
+        var renderer = tool as IAgentToolRenderer;
+        return new ExtensionToolWire(
+            tool.Name,
+            tool.Label,
+            tool.Description,
+            tool.ParametersSchema,
+            renderer?.HasRenderCall ?? false,
+            renderer?.HasRenderResult ?? false,
+            RendererName: null,
+            RenderShell: null,
+            tool.ExecutionMode,
+            tool.PromptSnippet,
+            tool.PromptGuidelines.Count == 0 ? null : tool.PromptGuidelines.ToArray());
     }
 
     private Task<ServerResponse> ResolveToolAsync(string json, ServerCommandEnvelope envelope)
@@ -657,7 +787,37 @@ public sealed class PiServerWebSocketHandler(
         var tool = manager.Registry.Tools.FirstOrDefault(t => string.Equals(t.Value.Name, command.Name, StringComparison.Ordinal))?.Value;
         return Task.FromResult(tool is null
             ? ServerResponse.Fail(command.Id, command.Type, "not_available", $"Tool '{command.Name}' is not registered.")
-            : ServerResponse.Ok(command.Id, command.Type, tool));
+            : ServerResponse.Ok(command.Id, command.Type, ComposeToolWire(tool)));
+    }
+
+    private async Task<ServerResponse> RenderToolCallAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<RenderToolRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var manager = live.Runtime.ExtensionManager;
+        if (manager is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session.");
+        var tool = manager.Registry.Tools.FirstOrDefault(t => string.Equals(t.Value.Name, command.Name, StringComparison.Ordinal))?.Value;
+        if (tool is not IAgentToolRenderer { HasRenderCall: true } renderer)
+            return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Tool '{command.Name}' does not support call rendering.");
+        var rendered = await renderer.RenderCallAsync(
+            new ToolRenderRequest(command.ToolCallId, command.Name, command.Arguments, Result: null, IsPartial: true, IsError: false, command.IsExpanded, command.Width),
+            cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, new { lines = rendered?.Lines ?? [] });
+    }
+
+    private async Task<ServerResponse> RenderToolResultAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<RenderToolRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var manager = live.Runtime.ExtensionManager;
+        if (manager is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session.");
+        var tool = manager.Registry.Tools.FirstOrDefault(t => string.Equals(t.Value.Name, command.Name, StringComparison.Ordinal))?.Value;
+        if (tool is not IAgentToolRenderer { HasRenderResult: true } renderer)
+            return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Tool '{command.Name}' does not support result rendering.");
+        var rendered = await renderer.RenderResultAsync(
+            new ToolRenderRequest(command.ToolCallId, command.Name, command.Arguments, Result: null, IsPartial: false, IsError: command.IsError, command.IsExpanded, command.Width),
+            cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, new { lines = rendered?.Lines ?? [] });
     }
 
     private async Task<ServerResponse> CycleThinkingLevelAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
@@ -675,8 +835,13 @@ public sealed class PiServerWebSocketHandler(
     private static ServerResponse GetAvailableModels(ServerCommandEnvelope envelope)
         => ServerResponse.Ok(envelope.Id, envelope.Type, PublicApi.Models.Select(m => m.Descriptor).ToArray());
 
-    private static ServerResponse GetCommandsNotAvailable(ServerCommandEnvelope envelope)
-        => ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "Command discovery is not available on this daemon.");
+    private async Task<ServerResponse> GetCommandsAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        if (delegates?.GetCommandsAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
+        var commands = await delegates.GetCommandsAsync(live, cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, commands);
+    }
 
     private async Task<ServerResponse> GetLastAssistantTextAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
@@ -688,9 +853,9 @@ public sealed class PiServerWebSocketHandler(
 
     private async Task<ServerResponse> GetStartupMessagesAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
-        RequireSession(RequiredSessionId(envelope));
+        var live = RequireSession(RequiredSessionId(envelope));
         if (delegates?.GetStartupMessagesAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
-        var messages = await delegates.GetStartupMessagesAsync(cancellationToken);
+        var messages = await delegates.GetStartupMessagesAsync(live, cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type, messages);
     }
 
@@ -698,7 +863,7 @@ public sealed class PiServerWebSocketHandler(
     {
         var live = RequireSession(RequiredSessionId(envelope));
         if (delegates?.PostStartupChecksAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
-        await delegates.PostStartupChecksAsync(message => live.EmitEvent(AgentSessionEvent.FromServer("system_message", new { text = message })), cancellationToken);
+        await delegates.PostStartupChecksAsync(live, message => live.EmitEvent(AgentSessionEvent.FromServer(ExtensionEventNames.SystemMessage, new { text = message })), cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type);
     }
 

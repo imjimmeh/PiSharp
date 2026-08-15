@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PiSharp.Extensions;
 using PiSharp.Server.Contracts;
+using PiSharp.Server.Runtime;
 
 namespace PiSharp.Server.Hosting;
 
@@ -36,9 +37,10 @@ public sealed record PiServerHostOptions
     public IReadOnlyList<ITelemetrySink>? TelemetrySinks { get; init; }
 
     public Func<PiServerHostContext, string, SlashCommandExecutionOptions?, CancellationToken, Task<ServerCommandResult>>? RunCommandAsync { get; init; }
-    public Func<string, CancellationToken, Task<IReadOnlyList<string>>>? CompleteCommandAsync { get; init; }
+    public Func<LiveServerSession, string, CancellationToken, Task<IReadOnlyList<string>>>? CompleteCommandAsync { get; init; }
     public Func<ProcessInputRequest, CancellationToken, Task<ProcessInputResult>>? ProcessInputAsync { get; init; }
-    public Func<CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync { get; init; }
-    public Func<Action<string>, CancellationToken, Task>? PostStartupChecksAsync { get; init; }
+    public Func<LiveServerSession, CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync { get; init; }
+    public Func<LiveServerSession, Action<string>, CancellationToken, Task>? PostStartupChecksAsync { get; init; }
     public Func<CancellationToken, Task<McpStatusResult>>? GetMcpStatusAsync { get; init; }
+    public Func<LiveServerSession, CancellationToken, Task<IReadOnlyList<string>>>? GetCommandsAsync { get; init; }
 }

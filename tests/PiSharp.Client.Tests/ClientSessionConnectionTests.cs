@@ -61,12 +61,14 @@ public sealed class ClientSessionConnectionTests
 public sealed class FakeTransport : IClientTransport
 {
     public Channel<ServerEventEnvelope> Events { get; } = Channel.CreateUnbounded<ServerEventEnvelope>();
+    public Channel<ServerResponse> Late { get; } = Channel.CreateUnbounded<ServerResponse>();
     public ServerCommandEnvelope? LastCommand { get; private set; }
     public object? LastPayload { get; private set; }
     public Uri? LastUri { get; private set; }
     public string? LastApiKey { get; private set; }
 
     ChannelReader<ServerEventEnvelope> IClientTransport.Events => Events.Reader;
+    ChannelReader<ServerResponse> IClientTransport.LateResponses => Late.Reader;
 
     public Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct)
     {
@@ -75,10 +77,10 @@ public sealed class FakeTransport : IClientTransport
         return Task.CompletedTask;
     }
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
-        => SendCommandAsync(envelope, payload: null, ct);
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
+        => SendCommandAsync(envelope, payload: null, ct, timeoutOverride);
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
     {
         LastCommand = envelope;
         LastPayload = payload;

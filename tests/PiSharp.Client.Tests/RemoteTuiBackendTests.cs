@@ -4,8 +4,11 @@ using System.Threading.Channels;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
+using PiSharp.Agent.Core;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
+using PiSharp.Agent.Core.Tools;
+using PiSharp.Extensions;
 using PiSharp.Agent.Harness;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
@@ -186,6 +189,288 @@ public sealed class RemoteTuiBackendTests
         Assert.Equal(true, (bool?)PayloadValue(payload, "cancelled"));
     }
 
+    [Fact]
+    public async Task LateRunCommandWithShouldExit_RaisesLateCommandShouldExit()
+    {
+        var transport = new BackendFakeTransport();
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.LateCommandShouldExit += () => fired.TrySetResult();
+
+        transport.Late.Writer.TryWrite(ServerResponse.Ok(
+            "late-1", ServerCommandTypes.RunCommand, new ServerCommandResult(Handled: true, ShouldExit: true)));
+
+        await fired.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task LateResponseWithoutShouldExit_DoesNotRaiseEvent()
+    {
+        var transport = new BackendFakeTransport();
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.LateCommandShouldExit += () => fired.TrySetResult();
+
+        // A run_command that did not exit, and a ShouldExit response for a different command
+        // type, must both stay silent on the event.
+        transport.Late.Writer.TryWrite(ServerResponse.Ok(
+            "late-1", ServerCommandTypes.RunCommand, new ServerCommandResult(Handled: true, ShouldExit: false)));
+        transport.Late.Writer.TryWrite(ServerResponse.Ok(
+            "late-2", ServerCommandTypes.CreateSession, new ServerCommandResult(Handled: true, ShouldExit: true)));
+
+        await Task.Delay(300);
+        Assert.False(fired.Task.IsCompleted);
+    }
+    [Fact]
+    public async Task GetExtensionRegistry_ReconstructsRegistryFromWire()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionRegistryWire(
+            Tools: [new ExtensionToolWire(
+                "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+                HasRenderCall: false, HasRenderResult: false,
+                RendererName: "my-renderer", RenderShell: "bash",
+                ExecutionMode: null, PromptSnippet: "Use fmt", PromptGuidelines: ["guideline"])],
+            Shortcuts: [new ExtensionShortcutWire("shortcut:ctrl+r:ext:test", "ext:test", "ctrl+r", "Runs something")],
+            Renderers: [],
+            Decorators: []);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.GetExtensionRegistry
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var registry = await backend.GetExtensionRegistryAsync(CancellationToken.None);
+
+        Assert.NotNull(registry);
+        var tool = Assert.Single(registry.Tools);
+        Assert.Equal("fmt", tool.Value.Name);
+        Assert.Equal("Pretty-prints code", tool.Value.Description);
+        Assert.Equal("Use fmt", tool.Value.PromptSnippet);
+        var shortcut = Assert.Single(registry.Shortcuts);
+        Assert.Equal("ctrl+r", shortcut.Value.Keys);
+    }
+    [Fact]
+    public async Task GetExtensionShortcuts_BuildsHandlersThatInvokeOverTheWire()
+    {
+        var wire = new[]
+        {
+            new ExtensionShortcutWire("shortcut:ctrl+r:ext:test", "ext:test", "ctrl+r", "Runs something"),
+        };
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.GetExtensionShortcuts
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var shortcuts = await backend.GetExtensionShortcutsAsync(CancellationToken.None);
+
+        var shortcut = Assert.Single(shortcuts);
+        Assert.Equal("ext:test", shortcut.SourceId);
+        Assert.Equal("ctrl+r", shortcut.Value.Keys);
+        await shortcut.Value.Handler("go", CancellationToken.None);
+
+        var sent = Assert.Single(transport.Commands.Where(command => command.Envelope.Type == ServerCommandTypes.InvokeExtensionShortcut));
+        Assert.Equal(ServerCommandTypes.InvokeExtensionShortcut, sent.Envelope.Type);
+        Assert.Equal(SessionId, sent.Envelope.ServerSessionId);
+        Assert.Equal("ctrl+r", PayloadValue(sent.Payload, "keys"));
+        Assert.Equal("go", PayloadValue(sent.Payload, "args"));
+    }
+
+    [Fact]
+    public async Task ExtensionShortcutHandler_ThrowsOnFailedInvokeResponse()
+    {
+        var wire = new[]
+        {
+            new ExtensionShortcutWire("shortcut:ctrl+r:ext:test", "ext:test", "ctrl+r", "Runs something"),
+        };
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.GetExtensionShortcuts
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Fail("st", type, "not_available", "Extension shortcut 'ctrl+r' is not registered."),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var shortcuts = await backend.GetExtensionShortcutsAsync(CancellationToken.None);
+
+        var shortcut = Assert.Single(shortcuts);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => shortcut.Value.Handler("go", CancellationToken.None));
+        Assert.Contains("not_available", exception.Message);
+        Assert.Contains("ctrl+r", exception.Message);
+    }
+
+
+    [Fact]
+    public async Task ResolveTool_ReturnsRemoteRegisteredTool_WithWireCapabilities()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: ToolExecutionMode.Parallel, PromptSnippet: "Use fmt", PromptGuidelines: ["guideline"]);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.ResolveTool
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+
+        Assert.NotNull(tool);
+        Assert.Equal("fmt", tool.Name);
+        Assert.Equal("Format", tool.Label);
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        Assert.True(renderer.HasRenderCall);
+        Assert.False(renderer.HasRenderResult);
+        var (envelope, payload) = Assert.Single(transport.Commands);
+        Assert.Equal(ServerCommandTypes.ResolveTool, envelope.Type);
+        Assert.Equal(SessionId, envelope.ServerSessionId);
+        Assert.Equal("fmt", (string?)PayloadValue(payload, "name"));
+    }
+
+    [Fact]
+    public async Task ResolveTool_NonRenderableWire_YieldsRendererWithNoCapabilities()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: false, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.ResolveTool
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        Assert.False(renderer.HasRenderCall);
+        Assert.False(renderer.HasRenderResult);
+    }
+
+    [Fact]
+    public async Task ResolveTool_RenderCallAsync_SendsRenderToolCall_AndMapsLines()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type switch
+            {
+                ServerCommandTypes.ResolveTool => ServerResponse.Ok("st", type, wire),
+                ServerCommandTypes.RenderToolCall => ServerResponse.Ok("st", type, new { lines = new[] { "call line" } }),
+                _ => ServerResponse.Ok("st", type),
+            },
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        var rendered = await renderer.RenderCallAsync(
+            new ToolRenderRequest("tc-1", "fmt", schema.RootElement.Clone(), null, IsPartial: true, IsError: false, Expanded: false, Width: 120),
+            CancellationToken.None);
+
+        Assert.NotNull(rendered);
+        Assert.Equal(["call line"], rendered.Lines);
+        var renderCommand = Assert.Single(transport.Commands, command => command.Envelope.Type == ServerCommandTypes.RenderToolCall);
+        Assert.Equal("tc-1", (string?)PayloadValue(renderCommand.Payload, "ToolCallId"));
+        Assert.Equal("fmt", (string?)PayloadValue(renderCommand.Payload, "Name"));
+        Assert.Equal(true, (bool?)PayloadValue(renderCommand.Payload, "IsCall"));
+        Assert.Equal(120, (int?)PayloadValue(renderCommand.Payload, "Width"));
+    }
+
+    [Fact]
+    public async Task ResolveTool_RenderResultAsync_SendsRenderToolResult_AndMapsLines()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: true,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type switch
+            {
+                ServerCommandTypes.ResolveTool => ServerResponse.Ok("st", type, wire),
+                ServerCommandTypes.RenderToolResult => ServerResponse.Ok("st", type, new { lines = new[] { "result line" } }),
+                _ => ServerResponse.Ok("st", type),
+            },
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        var rendered = await renderer.RenderResultAsync(
+            new ToolRenderRequest("tc-1", "fmt", Arguments: null, null, IsPartial: false, IsError: true, Expanded: true, Width: 120),
+            CancellationToken.None);
+
+        Assert.NotNull(rendered);
+        Assert.Equal(["result line"], rendered.Lines);
+        var renderCommand = Assert.Single(transport.Commands, command => command.Envelope.Type == ServerCommandTypes.RenderToolResult);
+        Assert.Equal("tc-1", (string?)PayloadValue(renderCommand.Payload, "ToolCallId"));
+        Assert.Equal(true, (bool?)PayloadValue(renderCommand.Payload, "IsError"));
+        Assert.Equal(false, (bool?)PayloadValue(renderCommand.Payload, "IsCall"));
+    }
+
+    [Fact]
+    public async Task ResolveTool_RenderCallAsync_ServerFailure_ReturnsNull()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type switch
+            {
+                ServerCommandTypes.ResolveTool => ServerResponse.Ok("st", type, wire),
+                ServerCommandTypes.RenderToolCall => ServerResponse.Fail("st", type, "not_available", "Tool 'fmt' is not registered."),
+                _ => ServerResponse.Ok("st", type),
+            },
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        var rendered = await renderer.RenderCallAsync(
+            new ToolRenderRequest("tc-1", "fmt", schema.RootElement.Clone(), null, IsPartial: true, IsError: false, Expanded: false, Width: 120),
+            CancellationToken.None);
+
+        Assert.Null(rendered);
+    }
+
     // --- helpers ---
 
     private static ServerEventEnvelope MessageEnvelope(long sequence, string text)
@@ -214,17 +499,19 @@ public sealed class RemoteTuiBackendTests
     private sealed class BackendFakeTransport : IClientTransport
     {
         public Channel<ServerEventEnvelope> Events { get; } = Channel.CreateUnbounded<ServerEventEnvelope>();
+        public Channel<ServerResponse> Late { get; } = Channel.CreateUnbounded<ServerResponse>();
         public List<(ServerCommandEnvelope Envelope, object? Payload)> Commands { get; } = [];
         public Func<string, ServerResponse>? Responder { get; set; }
 
         ChannelReader<ServerEventEnvelope> IClientTransport.Events => Events.Reader;
+        ChannelReader<ServerResponse> IClientTransport.LateResponses => Late.Reader;
 
         public Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct) => Task.CompletedTask;
 
-        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
-            => SendCommandAsync(envelope, payload: null, ct);
+        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
+            => SendCommandAsync(envelope, payload: null, ct, timeoutOverride);
 
-        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
+        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
         {
             Commands.Add((envelope, payload));
             return Task.FromResult(Responder?.Invoke(envelope.Type) ?? ServerResponse.Ok(envelope.Id, envelope.Type));

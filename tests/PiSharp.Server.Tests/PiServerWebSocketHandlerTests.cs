@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core;
+using PiSharp.Agent.Core.Tools;
+using PiSharp.Extensions;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Core.Streaming;
 using PiSharp.Agent.Harness;
@@ -327,7 +329,7 @@ public sealed class PiServerWebSocketHandlerTests
         var active = 0;
         var peak = 0;
         var completed = 0;
-        var delegates = new PiServerCommandDelegates(CompleteCommandAsync: async (_, _) =>
+        var delegates = new PiServerCommandDelegates(CompleteCommandAsync: async (_, _, _) =>
         {
             var now = Interlocked.Increment(ref active);
             try
@@ -475,6 +477,252 @@ public sealed class PiServerWebSocketHandlerTests
         }
     }
 
+    public async Task GetExtensionRegistry_SerializesWireMappingOfRegisteredExtensions()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.GetExtensionRegistry, serverSessionId = created.ServerSessionId
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(response.Success);
+        var wire = Assert.IsType<ExtensionRegistryWire>(response.Data);
+        var tool = Assert.Single(wire.Tools);
+        Assert.Equal("fmt", tool.Name);
+        Assert.Equal("Format", tool.Label);
+        Assert.Equal("Pretty-prints code", tool.Description);
+        Assert.Equal(ToolExecutionMode.Parallel, tool.ExecutionMode);
+        Assert.Equal("Use fmt", tool.PromptSnippet);
+        Assert.Contains("guideline", tool.PromptGuidelines!);
+        Assert.Equal(ExtensionChatRowType.Custom.ToString(), Assert.Single(wire.Renderers).RowType);
+        Assert.Equal("my-type", Assert.Single(wire.Renderers).CustomType);
+        Assert.Equal(ExtensionOverridePolicy.OverrideBuiltIn, Assert.Single(wire.Renderers).Override);
+        Assert.Equal(ExtensionChatRowType.System.ToString(), Assert.Single(wire.Decorators).RowType);
+        Assert.Equal("ctrl+r", Assert.Single(wire.Shortcuts).Keys);
+    }
+    [Fact]
+    public async Task GetExtensionShortcuts_ReturnsFlatExtensionShortcutWire()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "g", type = ServerCommandTypes.GetExtensionShortcuts, serverSessionId = created.ServerSessionId
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.True(response.Success);
+        var wire = Assert.IsType<ExtensionShortcutWire[]>(response.Data);
+        var shortcut = Assert.Single(wire);
+        Assert.Equal("ext:test", shortcut.SourceId);
+        Assert.Equal("ctrl+r", shortcut.Keys);
+        Assert.Equal("Runs something", shortcut.Description);
+    }
+
+    [Fact]
+    public async Task InvokeExtensionShortcut_InvokesRegisteredHandlerAndReturnsOk()
+    {
+        string? receivedArgs = null;
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd,
+            new ExtensionShortcutRegistration("ctrl+r", "Runs something", (args, _) =>
+            {
+                receivedArgs = args;
+                return Task.CompletedTask;
+            })));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "s", type = ServerCommandTypes.InvokeExtensionShortcut, serverSessionId = created.ServerSessionId, keys = "ctrl+r", args = "hello"
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.True(response.Success);
+        Assert.Equal("hello", receivedArgs);
+    }
+
+    [Fact]
+    public async Task InvokeExtensionShortcut_UnknownKeys_ReturnsNotAvailable()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "s", type = ServerCommandTypes.InvokeExtensionShortcut, serverSessionId = created.ServerSessionId, keys = "ctrl+x", args = ""
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+        Assert.Equal("not_available", response.Error?.Code);
+    }
+
+    [Fact]
+    public async Task ResolveTool_AnswersExtensionToolWire()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.ResolveTool, serverSessionId = created.ServerSessionId, name = "fmt"
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.True(response.Success);
+        var wire = Assert.IsType<ExtensionToolWire>(response.Data);
+        Assert.Equal("fmt", wire.Name);
+        Assert.Equal("Format", wire.Label);
+        Assert.Equal("Pretty-prints code", wire.Description);
+        Assert.Equal(ToolExecutionMode.Parallel, wire.ExecutionMode);
+        Assert.Equal("Use fmt", wire.PromptSnippet);
+        Assert.False(wire.HasRenderCall);
+        Assert.False(wire.HasRenderResult);
+    }
+
+    [Fact]
+    public async Task ResolveTool_UnknownTool_ReturnsNotAvailable()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.ResolveTool, serverSessionId = created.ServerSessionId, name = "nope"
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+        Assert.Equal("not_available", response.Error?.Code);
+    }
+
+    [Fact]
+    public async Task RenderToolCall_ForRenderableTool_ReturnsRenderedLines()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithRenderableToolAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.RenderToolCall, serverSessionId = created.ServerSessionId,
+            name = "fmt-render", toolCallId = "tc-1", arguments = new { file = "a.cs" },
+            isCall = true, isError = false, isExpanded = false, width = 120
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.True(response.Success);
+        var payload = JsonSerializer.Deserialize<RenderLinesPayload>(
+            JsonSerializer.Serialize(response.Data, ServerJsonSerializer.Options), ServerJsonSerializer.Options);
+        Assert.Equal(["formatted call"], payload?.Lines);
+    }
+
+    [Fact]
+    public async Task RenderToolResult_ForRenderableTool_ReturnsRenderedLines()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithRenderableToolAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.RenderToolResult, serverSessionId = created.ServerSessionId,
+            name = "fmt-render", toolCallId = "tc-1", arguments = new { file = "a.cs" },
+            isCall = false, isError = true, isExpanded = true, width = 120
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.True(response.Success);
+        var payload = JsonSerializer.Deserialize<RenderLinesPayload>(
+            JsonSerializer.Serialize(response.Data, ServerJsonSerializer.Options), ServerJsonSerializer.Options);
+        Assert.Equal(["formatted result"], payload?.Lines);
+    }
+
+    [Fact]
+    public async Task RenderToolCall_UnknownTool_ReturnsNotAvailable()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.RenderToolCall, serverSessionId = created.ServerSessionId,
+            name = "nope", toolCallId = "tc-1", arguments = new { },
+            isCall = true, isError = false, isExpanded = false, width = 120
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+        Assert.Equal("not_available", response.Error?.Code);
+    }
+
+    private sealed record RenderLinesPayload(IReadOnlyList<string>? Lines);
+
+    /// <summary>Stub tool that renders its own call/result lines (mirrors TS-bridge renderable tools).</summary>
+    private sealed class RenderableStubTool : IAgentTool, IAgentToolRenderer
+    {
+        private static readonly JsonDocument Schema = JsonDocument.Parse("{\"type\":\"object\"}");
+
+        public string Name => "fmt-render";
+        public string Label => "Format";
+        public string Description => "Pretty-prints code";
+        public JsonElement ParametersSchema => Schema.RootElement.Clone();
+        public ToolExecutionMode? ExecutionMode => ToolExecutionMode.Parallel;
+        public bool HasRenderCall => true;
+        public bool HasRenderResult => true;
+
+        public JsonElement PrepareArguments(JsonElement args) => args;
+
+        public Task<AgentToolResult<object?>> ExecuteAsync(
+            string toolCallId,
+            JsonElement parameters,
+            CancellationToken cancellationToken = default,
+            AgentToolUpdateCallback<object?>? onUpdate = null)
+            => Task.FromResult(new AgentToolResult<object?>([], null));
+
+        public Task<ToolRenderResult?> RenderCallAsync(ToolRenderRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult<ToolRenderResult?>(new ToolRenderResult(["formatted call"]));
+
+        public Task<ToolRenderResult?> RenderResultAsync(ToolRenderRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult<ToolRenderResult?>(new ToolRenderResult(["formatted result"]));
+    }
+
     private static PiServerWebSocketHandler CreateHandler(ServerSessionRegistry registry, IServerUiBridge? uiBridge = null, PiServerCommandDelegates? delegates = null, PiServerHostOptions? options = null)
         => new(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance, uiBridge, delegates, options: options);
 
@@ -484,6 +732,48 @@ public sealed class PiServerWebSocketHandlerTests
         var createOptions = new JsonlSessionCreateOptions(root);
         var initial = await repo.CreateAsync(createOptions);
         return new PiSharp.Runtime.SessionRuntime(repo, createOptions, session => new AgentHarness<JsonlSessionMetadata>(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), FakeStream, FakeCompletion, [])), initial);
+    }
+    private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeWithExtensionsAsync(string root, ExtensionShortcutRegistration? shortcut = null)
+    {
+        var repo = new JsonlSessionRepo(new SystemExecutionEnv(root), "sessions");
+        var createOptions = new JsonlSessionCreateOptions(root);
+        var initial = await repo.CreateAsync(createOptions);
+        var extensions = new ExtensionRegistry();
+        extensions.RegisterTool(
+            "ext:test",
+            new ExtensionToolRegistration(
+                "fmt", "Format", "Pretty-prints code",
+                JsonDocument.Parse("{\"type\":\"object\"}").RootElement.Clone(),
+                (_, _, _, _) => Task.FromResult(new AgentToolResult<object?>([], null)),
+                ExecutionMode: ToolExecutionMode.Parallel,
+                PromptSnippet: "Use fmt",
+                PromptGuidelines: ["guideline"]).ToAgentTool());
+        extensions.RegisterShortcut("ext:test", shortcut ?? new ExtensionShortcutRegistration("ctrl+r", "Runs something", (_, _) => Task.CompletedTask));
+        extensions.RegisterMessageRenderer("ext:test", new ExtensionMessageRendererRegistration(
+            "custom-ren", RowType: ExtensionChatRowType.Custom, CustomType: "my-type", Override: ExtensionOverridePolicy.OverrideBuiltIn));
+        extensions.RegisterMessageDecorator("ext:test", new ExtensionMessageDecoratorRegistration(
+            "custom-dec", RowType: ExtensionChatRowType.System, CustomType: "dec-type"));
+        return new PiSharp.Runtime.SessionRuntime(
+            repo,
+            createOptions,
+            session => new AgentHarness<JsonlSessionMetadata>(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), FakeStream, FakeCompletion, [])),
+            initial,
+            new ExtensionManager(extensions));
+    }
+
+    private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeWithRenderableToolAsync(string root)
+    {
+        var repo = new JsonlSessionRepo(new SystemExecutionEnv(root), "sessions");
+        var createOptions = new JsonlSessionCreateOptions(root);
+        var initial = await repo.CreateAsync(createOptions);
+        var extensions = new ExtensionRegistry();
+        extensions.RegisterTool("ext:test", new RenderableStubTool());
+        return new PiSharp.Runtime.SessionRuntime(
+            repo,
+            createOptions,
+            session => new AgentHarness<JsonlSessionMetadata>(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), FakeStream, FakeCompletion, [])),
+            initial,
+            new ExtensionManager(extensions));
     }
 
     private static AgentCompletionAsync FakeCompletion => (_, _, _, _) => Task.FromResult(AgentMessages.Assistant("ok"));

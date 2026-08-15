@@ -1,9 +1,12 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
+using PiSharp.Agent.Core;
 using PiSharp.Agent.Core.Events;
+using PiSharp.Agent.Core.Tools;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Harness;
 using PiSharp.Agent.Resources.Theme;
@@ -42,6 +45,13 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     /// <summary>Raised after a completed gap-recovery resync.</summary>
     public event Action? Resynced;
 
+    /// <summary>
+    /// Raised when a <c>run_command</c> response carrying <c>shouldExit: true</c> arrives after
+    /// the command already timed out client-side — the daemon handled it, so the exit signal must
+    /// not be lost (e.g. <c>/quit</c> after a long-running slash command).
+    /// </summary>
+    public event Action? LateCommandShouldExit;
+
     private readonly ClientSessionConnection _connection;
     private readonly ILogger? _logger;
     private readonly Channel<ServerEventEnvelope> _inbox = Channel.CreateUnbounded<ServerEventEnvelope>(
@@ -49,6 +59,9 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly object _sync = new();
     private readonly List<Func<AgentHarnessEvent, CancellationToken, Task>> _listeners = [];
+    private readonly ConcurrentDictionary<string, IAgentTool?> _resolvedTools = new(StringComparer.Ordinal);
+    /// <summary>Arguments placeholder sent when a render request carries no arguments (result renders without a transcript row).</summary>
+    private static readonly JsonElement EmptyArguments = JsonDocument.Parse("{}").RootElement.Clone();
 
     private ClientSessionState _state = ClientSessionState.Empty;
     private ModelDescriptor? _model;
@@ -63,6 +76,24 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         _logger = logger;
         connection.EventReceived += OnEnvelope;
         _ = Task.Run(() => ProcessInboxAsync(_cts.Token), CancellationToken.None);
+        _ = Task.Run(() => DrainLateResponsesAsync(_cts.Token), CancellationToken.None);
+    }
+
+    private async Task DrainLateResponsesAsync(CancellationToken token)
+    {
+        try
+        {
+            await foreach (var response in _connection.LateResponses.ReadAllAsync(token))
+            {
+                if (response.Command != ServerCommandTypes.RunCommand) continue;
+                if (FromServerPayload<ServerCommandResult>(response.Data)?.ShouldExit == true)
+                    LateCommandShouldExit?.Invoke();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // disposed
+        }
     }
 
     // --- ITuiRuntimeFacade ---
@@ -273,6 +304,68 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             : [];
     }
 
+    // --- remote tool resolution + rendering (resolve_tool / render_tool_call / render_tool_result) ---
+
+    /// <summary>
+    /// Resolves a daemon-hosted extension tool over <c>resolve_tool</c>, caching per name so the
+    /// TUI's per-event render path does not re-round-trip. Sync-over-async matches the
+    /// <c>CompleteCommand</c> wiring pattern in InteractiveMode; a failed resolution caches null so
+    /// the TUI keeps its text-row fallback instead of re-querying the daemon every event.
+    /// </summary>
+    public IAgentTool? ResolveTool(string name)
+    {
+        if (_resolvedTools.TryGetValue(name, out var cached)) return cached;
+        var tool = ResolveToolCoreAsync(name, CancellationToken.None).GetAwaiter().GetResult();
+        _resolvedTools.TryAdd(name, tool);
+        return tool;
+    }
+
+    private async Task<IAgentTool?> ResolveToolCoreAsync(string name, CancellationToken token)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.ResolveTool, ServerSessionId: RequireSessionId()),
+            new { name },
+            token);
+        if (!response.Success) return null;
+        var wire = FromServerPayload<ExtensionToolWire>(response.Data);
+        return wire is null ? null : new RemoteRegisteredTool(wire, this);
+    }
+
+    /// <summary>
+    /// Asks the daemon to render a tool-call line for the named tool. Returns null when the daemon
+    /// cannot render (unknown tool, missing renderer, or a failed command) so the TUI falls back to
+    /// its plain text row.
+    /// </summary>
+    public async Task<ToolRenderResult?> RenderToolCallAsync(string name, ToolRenderRequest request, CancellationToken token = default)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.RenderToolCall, ServerSessionId: RequireSessionId()),
+            new RenderToolRequest(ServerCommandTypes.RenderToolCall, null, RequireSessionId(), name, request.ToolCallId, request.Arguments ?? EmptyArguments, IsCall: true, IsError: false, IsExpanded: request.Expanded, Width: request.Width),
+            token);
+        return ReadRenderLines(response);
+    }
+
+    /// <summary>
+    /// Asks the daemon to render a tool-result line for the named tool. Returns null when the daemon
+    /// cannot render (unknown tool, missing renderer, or a failed command) so the TUI falls back to
+    /// its plain text row.
+    /// </summary>
+    public async Task<ToolRenderResult?> RenderToolResultAsync(string name, ToolRenderRequest request, CancellationToken token = default)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.RenderToolResult, ServerSessionId: RequireSessionId()),
+            new RenderToolRequest(ServerCommandTypes.RenderToolResult, null, RequireSessionId(), name, request.ToolCallId, request.Arguments ?? EmptyArguments, IsCall: false, IsError: request.IsError, IsExpanded: request.Expanded, Width: request.Width),
+            token);
+        return ReadRenderLines(response);
+    }
+
+    private static ToolRenderResult? ReadRenderLines(ServerResponse response)
+    {
+        if (!response.Success) return null;
+        var wire = FromServerPayload<RenderLinesWire>(response.Data);
+        return wire is null ? null : new ToolRenderResult(wire.Lines ?? []);
+    }
+
     public async Task<TuiInputHookResult> ProcessInputAsync(string text, IReadOnlyList<ImageContent>? images, string source, CancellationToken token = default)
     {
         var response = await SendAsync(
@@ -348,16 +441,15 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             token);
         if (!response.Success) return [];
 
-        var items = FromServerPayload<IReadOnlyList<ShortcutWire>>(response.Data) ?? [];
+        var items = FromServerPayload<IReadOnlyList<ExtensionShortcutWire>>(response.Data) ?? [];
         var shortcuts = new List<OwnedExtensionRegistration<ExtensionShortcutRegistration>>(items.Count);
         foreach (var item in items)
         {
-            if (item.Value is null || string.IsNullOrWhiteSpace(item.Id)) continue;
-            // The handler delegate is not serializable; remote shortcut invocation is a no-op for now.
+            if (string.IsNullOrWhiteSpace(item.Id) || string.IsNullOrWhiteSpace(item.Keys)) continue;
             shortcuts.Add(new OwnedExtensionRegistration<ExtensionShortcutRegistration>(
                 item.Id,
                 item.SourceId ?? item.Id,
-                new ExtensionShortcutRegistration(item.Value.Keys, item.Value.Description, static (_, _) => Task.CompletedTask)));
+                new ExtensionShortcutRegistration(item.Keys, item.Description, (args, ct) => InvokeExtensionShortcutAsync(item, args, ct))));
         }
 
         return shortcuts;
@@ -365,12 +457,39 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
     public async Task<ExtensionRegistry?> GetExtensionRegistryAsync(CancellationToken token = default)
     {
-        // The registry graph is not constructible client-side (delegate registrations); on any
-        // trouble the TUI falls back to no registry.
-        await SendAsync(
+        var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetExtensionRegistry, ServerSessionId: RequireSessionId()),
             token);
-        return null;
+        if (!response.Success) return null;
+
+        var wire = FromServerPayload<ExtensionRegistryWire>(response.Data);
+        if (wire is null) return null;
+
+        var registry = new ExtensionRegistry();
+        foreach (var tool in wire.Tools)
+        {
+            if (string.IsNullOrWhiteSpace(tool.Name)) continue;
+            registry.RegisterTool(tool.Name, new RemoteToolSummary(tool));
+        }
+
+        foreach (var shortcut in wire.Shortcuts)
+        {
+            if (string.IsNullOrWhiteSpace(shortcut.Keys)) continue;
+
+            var sourceId = shortcut.SourceId ?? shortcut.Id;
+            registry.RegisterShortcut(sourceId, new ExtensionShortcutRegistration(shortcut.Keys, shortcut.Description, (args, ct) => InvokeExtensionShortcutAsync(shortcut, args, ct)));
+        }
+
+        return registry;
+    }
+
+    private async Task InvokeExtensionShortcutAsync(ExtensionShortcutWire shortcut, string args, CancellationToken ct)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.InvokeExtensionShortcut, ServerSessionId: RequireSessionId()),
+            new { keys = shortcut.Keys, args }, ct);
+        if (!response.Success)
+            throw new InvalidOperationException($"Extension shortcut '{shortcut.Keys}' failed: {response.Error?.Code}: {response.Error?.Message}");
     }
 
     public async Task<TuiExtensionLoadStatus> GetExtensionLoadStatusAsync(CancellationToken token = default)
@@ -404,7 +523,13 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.PostStartupChecks, ServerSessionId: RequireSessionId()),
             token);
-        ThrowOnFailure(response, "post_startup_checks");
+        if (!response.Success)
+        {
+            // Older or delegate-less daemons answer not_available; startup-check lines then arrive
+            // as system_message events on the normal stream (or never) — not a client failure.
+            _logger?.LogDebug("post_startup_checks not available: {Code}: {Message}", response.Error?.Code, response.Error?.Message);
+            return;
+        }
     }
 
     public async Task CycleThinkingLevelAsync(CancellationToken token = default)
@@ -665,10 +790,32 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         public void Dispose() => Interlocked.Exchange(ref _dispose, null)?.Invoke();
     }
 
+    /// <summary>
+    /// Metadata-only client-side stand-in for a remotely-hosted registry tool (the daemon executes
+    /// the real tool over the wire, so this proxy intentionally has no executable body).
+    /// </summary>
+    private sealed class RemoteToolSummary(ExtensionToolWire wire) : IAgentTool
+    {
+        public string Name => wire.Name;
+        public string Label => wire.Label;
+        public string Description => wire.Description;
+        public string? PromptSnippet => wire.PromptSnippet;
+        public IReadOnlyList<string> PromptGuidelines => wire.PromptGuidelines ?? [];
+        public JsonElement ParametersSchema => wire.ParametersSchema;
+        public ToolExecutionMode? ExecutionMode => wire.ExecutionMode;
+        public JsonElement PrepareArguments(JsonElement args) => args;
+
+        public Task<AgentToolResult<object?>> ExecuteAsync(
+            string toolCallId,
+            JsonElement parameters,
+            CancellationToken cancellationToken = default,
+            AgentToolUpdateCallback<object?>? onUpdate = null)
+            => Task.FromResult(new AgentToolResult<object?>([], null));
+    }
+
     // --- wire payload shapes for response Data ---
 
-    private sealed record ShortcutWire(string Id, string? SourceId, ShortcutValueWire? Value);
-    private sealed record ShortcutValueWire(string Keys, string Description);
     private sealed record ThinkingLevelWire(string? Level);
     private sealed record TextWire(string? Text);
+    private sealed record RenderLinesWire(IReadOnlyList<string>? Lines);
 }

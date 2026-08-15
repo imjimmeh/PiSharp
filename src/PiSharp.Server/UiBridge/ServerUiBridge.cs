@@ -17,6 +17,18 @@ namespace PiSharp.Server.UiBridge;
 public sealed class ServerUiBridge : IServerUiBridge
 {
     private static readonly TimeSpan ResponseTimeout = TimeSpan.FromSeconds(5);
+    /// <summary>Default window for interactive kinds answered by a human over the wire: generous so
+    /// a dialog that takes a while to answer is not auto-cancelled server-side.</summary>
+    internal static readonly TimeSpan InteractiveKindTimeout = TimeSpan.FromMinutes(5);
+    private static readonly HashSet<string> InteractiveKinds = new(StringComparer.Ordinal)
+    {
+        "select", "input", "editor", "confirm", "custom", "custom_update", "permission_request"
+    };
+
+    /// <summary>Per-kind default response timeout: interactive kinds get <see cref="InteractiveKindTimeout"/>,
+    /// everything else keeps the bridge's short <see cref="ResponseTimeout"/>.</summary>
+    internal static TimeSpan TimeoutFor(string kind)
+        => InteractiveKinds.Contains(kind) ? InteractiveKindTimeout : ResponseTimeout;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerUiResponse>> _pending = new(StringComparer.Ordinal);
     private readonly ServerSessionRegistry _registry;
     private readonly ILogger<ServerUiBridge> _logger;
@@ -29,7 +41,19 @@ public sealed class ServerUiBridge : IServerUiBridge
         _themes = themeRegistry ?? new ThemeRegistry();
     }
 
-    public async Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
+    public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
+        => RequestUiAsyncCore(intent, target: null, responseTimeout: null, cancellationToken);
+
+    public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, LiveServerSession target, TimeSpan? responseTimeout, CancellationToken ct = default)
+        => RequestUiAsyncCore(intent, target, responseTimeout, ct);
+
+    /// <summary>
+    /// Shared request pipeline: registers a pending response keyed by the intent's request id, emits
+    /// the <c>ui_request</c> onto <paramref name="target"/> (falling back to the most recent session
+    /// when null), and auto-cancels after <paramref name="responseTimeout"/> (the bridge default when
+    /// null) unless a client resolves it first.
+    /// </summary>
+    private async Task<ServerUiResponse> RequestUiAsyncCore(ServerUiIntent intent, LiveServerSession? target, TimeSpan? responseTimeout, CancellationToken cancellationToken)
     {
         // Theme UI kinds are answered daemon-side from the ThemeRegistry (plan C8) — never
         // forwarded to an attached client, because themes are daemon-resident.
@@ -40,9 +64,9 @@ public sealed class ServerUiBridge : IServerUiBridge
         _pending[intent.RequestId] = tcs;
         try
         {
-            EmitUiRequest(intent);
+            EmitUiRequest(intent, target);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(ResponseTimeout);
+            timeout.CancelAfter(responseTimeout ?? TimeoutFor(intent.Kind));
             using var registration = timeout.Token.Register(() => tcs.TrySetResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true)));
             try
             {
@@ -64,9 +88,9 @@ public sealed class ServerUiBridge : IServerUiBridge
         if (_pending.TryGetValue(requestId, out var tcs)) tcs.TrySetResult(new ServerUiResponse(requestId, value, cancelled));
     }
 
-    private void EmitUiRequest(ServerUiIntent intent)
+    private void EmitUiRequest(ServerUiIntent intent, LiveServerSession? target)
     {
-        var session = SelectSession();
+        var session = target ?? SelectSession();
         if (session is null)
         {
             _logger.LogDebug("UI request {RequestId} has no target session; treating as cancelled", intent.RequestId);

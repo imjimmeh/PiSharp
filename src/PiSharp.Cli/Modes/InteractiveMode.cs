@@ -25,6 +25,12 @@ public static class InteractiveMode
 {
     private static ILogger? _footerLogger;
 
+    /// <summary>
+    /// create_session triggers daemon-side extension discovery (native + TS) and can exceed the
+    /// 30s default command timeout, so it gets a longer per-command override.
+    /// </summary>
+    private static readonly TimeSpan CreateSessionTimeout = TimeSpan.FromSeconds(90);
+
     public static async Task<int> RunAsync(SessionRuntime runtime, CancellationToken cancellationToken = default, bool local = false)
     {
         var options = CreateTuiHostOptions(runtime);
@@ -252,6 +258,15 @@ public static class InteractiveMode
     }
 
     /// <summary>
+    /// Resolves the user's keybindings.json for the remote TUI, mirroring the local path's
+    /// <c>KeybindingsPath</c> option. <c>TuiHost</c> loads it at startup and watches it via
+    /// <c>KeybindingsWatcher</c>.
+    /// </summary>
+    internal static string? ResolveRemoteKeybindingsPath(string cwd)
+        => PiAgentPaths.FromCwd(cwd).KeybindingsPath;
+
+
+    /// <summary>
     /// Runs the TUI against a daemon-hosted session over the wire. The daemon session stays live
     /// after this client exits so a later client can re-attach (Task4.3).
     /// </summary>
@@ -268,7 +283,14 @@ public static class InteractiveMode
         await using var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection, loggerFactory?.CreateLogger<RemoteTuiBackend>());
 
+        var logger = loggerFactory?.CreateLogger(nameof(InteractiveMode));
+        void OnLateCommandShouldExit() => logger?.LogWarning(
+            "A run_command completed after the client-side timeout; the daemon already handled it (ShouldExit lost).");
+        backend.LateCommandShouldExit += OnLateCommandShouldExit;
+
         var cwd = Directory.GetCurrentDirectory();
+        var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: loggerFactory);
+
         var attachId = runtimeArgs.Attach;
         string? runtimeSessionId = null;
         var remoteReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -343,6 +365,19 @@ public static class InteractiveMode
             }
         }
 
+        TuiFooterSnapshot CreateRemoteFooterSnapshot(TuiRenderState state)
+        {
+            try
+            {
+                return footerSnapshotProvider.CreateSnapshotFromSessionEntries(state, cwd, state.SessionBranchEntries);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogDebug(ex, "Branch metadata snapshot failed, using static footer");
+                return footerSnapshotProvider.CreateSnapshot(state, cwd);
+            }
+        }
+
         var options = new TuiHostOptions(
             backend,
             SessionId: "connecting",
@@ -351,7 +386,7 @@ public static class InteractiveMode
             DispatchCommandAsync: backend.DispatchCommandAsync,
             CompleteCommand: text => backend.CompleteCommandAsync(text, CancellationToken.None).GetAwaiter().GetResult(),
             WorkingDirectory: cwd,
-            FooterSnapshot: null,
+            FooterSnapshot: CreateRemoteFooterSnapshot,
             ConfigureUiBridge: bridge =>
             {
                 backend.UiRequestHandler = async (intent, ct) =>
@@ -369,11 +404,12 @@ public static class InteractiveMode
                 await backend.PostStartupChecksAsync(inject, ct);
             },
             Theme: null,
+            KeybindingsPath: ResolveRemoteKeybindingsPath(cwd),
             GetExtensionShortcuts: () => backend.ServerSessionId is null
                 ? []
                 : backend.GetExtensionShortcutsAsync(CancellationToken.None).GetAwaiter().GetResult(),
             GetExtensionRegistry: () => null,
-            ResolveTool: _ => null,
+            ResolveTool: backend.ResolveTool,
             CycleThinkingLevelAsync: backend.CycleThinkingLevelAsync,
             ProcessFileReferencesAsync: async (text, workingDirectory, token) =>
             {
@@ -399,6 +435,7 @@ public static class InteractiveMode
         }
         finally
         {
+            backend.LateCommandShouldExit -= OnLateCommandShouldExit;
             var lastAppliedSequence = connection.LastAppliedSequence;
             await backend.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(runtimeSessionId))
@@ -427,7 +464,7 @@ public static class InteractiveMode
             NoThemes: runtimeArgs.NoThemes,
             NoContextFiles: runtimeArgs.NoContextFiles);
 
-        var response = await connection.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.CreateSession), request, cancellationToken);
+        var response = await connection.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.CreateSession), request, cancellationToken, CreateSessionTimeout);
         if (!response.Success)
         {
             throw new InvalidOperationException($"create_session failed: {response.Error?.Code}: {response.Error?.Message}");

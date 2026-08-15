@@ -24,6 +24,23 @@ public sealed class ClientWebSocketTransport : IClientTransport
 {
     private static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// Per-command default timeouts: slow lanes (slash commands, input processing, session
+    /// creation) get long polling windows instead of the blanket default. An explicit
+    /// <c>timeoutOverride</c> on a send always takes precedence over this table.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, TimeSpan> CommandTimeouts = new Dictionary<string, TimeSpan>(StringComparer.Ordinal)
+    {
+        [ServerCommandTypes.RunCommand] = TimeSpan.FromMinutes(10),
+        [ServerCommandTypes.ProcessInput] = TimeSpan.FromMinutes(10),
+        [ServerCommandTypes.CreateSession] = TimeSpan.FromSeconds(90),
+        [ServerCommandTypes.CompleteCommand] = TimeSpan.FromSeconds(15),
+        [ServerCommandTypes.GetAvailableModels] = TimeSpan.FromSeconds(15),
+        [ServerCommandTypes.GetTheme] = TimeSpan.FromSeconds(15),
+        [ServerCommandTypes.ListSessions] = TimeSpan.FromSeconds(15),
+        [ServerCommandTypes.Attach] = TimeSpan.FromSeconds(15),
+    };
+
     // AgentSessionEvent is deliberately write-only on the wire: its JSON converter throws on Read.
     // Wire envelopes are therefore rebuilt from the raw frame with the payload preserved as a
     // JsonElement — exactly the shape ClientEventReducer documents for envelopes "arrived over the wire".
@@ -32,6 +49,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
     private readonly ClientWebSocket _socket = new();
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerResponse>> _pending = new();
     private readonly Channel<ServerEventEnvelope> _events = Channel.CreateUnbounded<ServerEventEnvelope>();
+    private readonly Channel<ServerResponse> _late = Channel.CreateBounded<ServerResponse>(64);
     private readonly CancellationTokenSource _readerCts = new();
     private readonly TimeSpan _commandTimeout;
     private readonly ILogger? _logger;
@@ -45,6 +63,8 @@ public sealed class ClientWebSocketTransport : IClientTransport
 
     public ChannelReader<ServerEventEnvelope> Events => _events.Reader;
 
+    /// <summary>Responses that arrived after their command timed out (see <see cref="IClientTransport.LateResponses"/>).</summary>
+    public ChannelReader<ServerResponse> LateResponses => _late.Reader;
     public async Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct)
     {
         // The daemon serves the socket at /ws; accept a bare ws://host:port uri as shorthand.
@@ -57,13 +77,13 @@ public sealed class ClientWebSocketTransport : IClientTransport
         _ = Task.Run(() => ReadLoopAsync(_readerCts.Token), CancellationToken.None);
     }
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
-        => SendCommandCoreAsync(envelope, payload: null, ct);
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
+        => SendCommandCoreAsync(envelope, payload: null, ct, timeoutOverride);
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
-        => SendCommandCoreAsync(envelope, payload, ct);
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
+        => SendCommandCoreAsync(envelope, payload, ct, timeoutOverride);
 
-    private async Task<ServerResponse> SendCommandCoreAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
+    private async Task<ServerResponse> SendCommandCoreAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
     {
         if (envelope.Id is null)
             throw new ArgumentException("Envelope Id is required for command correlation.", nameof(envelope));
@@ -78,8 +98,10 @@ public sealed class ClientWebSocketTransport : IClientTransport
             _logger?.LogDebug("WebSocket command sent: {Command}", envelope.Type);
             await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct);
 
+            var effectiveTimeout = timeoutOverride
+                ?? (CommandTimeouts.TryGetValue(envelope.Type, out var tableTimeout) ? tableTimeout : _commandTimeout);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            linked.CancelAfter(_commandTimeout);
+            linked.CancelAfter(effectiveTimeout);
             try
             {
                 return await tcs.Task.WaitAsync(linked.Token);
@@ -87,7 +109,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 return ServerResponse.Fail(envelope.Id, envelope.Type, "timeout",
-                    $"No response for command '{envelope.Type}' within {_commandTimeout.TotalSeconds:0.#}s.");
+                    $"No response for command '{envelope.Type}' within {effectiveTimeout.TotalSeconds:0.#}s.");
             }
         }
         finally
@@ -225,9 +247,19 @@ public sealed class ClientWebSocketTransport : IClientTransport
 
     private void ResolveResponse(ServerResponse response)
     {
-        if (response.Id is null || !_pending.TryRemove(response.Id, out var tcs)) return; // unknown or duplicate id
-        _logger?.LogDebug("WebSocket response received: {Command}", response.Command);
-        tcs.TrySetResult(response);
+        if (response.Id is null) return;
+        if (_pending.TryRemove(response.Id, out var tcs))
+        {
+            _logger?.LogDebug("WebSocket response received: {Command}", response.Command);
+            tcs.TrySetResult(response);
+            return;
+        }
+
+        // Late answer for a timed-out command: surface instead of discarding (ShouldExit, session
+        // creation results, etc. must not be lost). The client has no per-session destroy command,
+        // so a timed-out create_session still relies on the server's 5-minute idle sweep — the 90s
+        // window plus that sweep bound the orphan window.
+        _late.Writer.TryWrite(response);
     }
 
     private static ServerEventEnvelope ParseEventEnvelope(JsonElement root)

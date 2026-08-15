@@ -211,6 +211,16 @@ public sealed class TuiHost(TuiHostOptions options)
             () => runtime.Phase,
             OnAbortRequested: () => onAbortRequested?.Invoke()),
             options.LoggerFactory);
+        // Wire interactive UI requests (select/input/confirm from daemon slash
+        // commands or server extension UI) to the local dialog pipeline. With no
+        // handlers the bridge keeps its canned non-interactive defaults.
+        bridge.SelectAction = SelectInlineWithLoggingAsync;
+        bridge.InputAction = (string prompt, string? initialValue, CancellationToken ct)
+            => PromptDialog.InputAsync(prompt, initialValue, ct, dispatcher: appContext);
+        bridge.ConfirmAction = (string title, string? message, CancellationToken ct)
+            => ConfirmDialog.ConfirmAsync(title, message, ct, dispatcher: appContext);
+        bridge.ApprovalAction = async (string title, string? message, CancellationToken ct)
+            => await ConfirmDialog.ConfirmAsync(title, message, ct, dispatcher: appContext) ? "allow" : "deny";
 
         var sessionContext = new TuiSessionContext { CurrentRuntime = runtime, HeaderExpanded = headerExpanded };
         var stateGateway = new TuiStateGateway(() => state, s => state = s, renderCoordinator, appContext, cancellationToken);

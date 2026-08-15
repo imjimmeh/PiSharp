@@ -23,7 +23,13 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
     internal Action<Action>? DispatchUi { get; set; }
     internal Action<string>? ShowNotification { get; set; }
     public Func<string, string?, int?, int?, string?, CancellationToken, Task<ExtensionCustomUiSnapshot>>? SendCustomUiInputAsync { get; set; }
-
+    public Func<string, IReadOnlyList<string>?, CancellationToken, Task<string?>>? SelectAction { get; set; }
+    public Func<string, string?, CancellationToken, Task<string?>>? InputAction { get; set; }
+    public Func<string, string?, CancellationToken, Task<bool>>? ConfirmAction { get; set; }
+    /// <summary>Renders a permission approval and returns the user's verdict as a string value
+    /// (<c>"allow"</c>/<c>"deny"</c>), matching how the daemon's <c>permission_request</c> lane is
+    /// consumed on the server. With no action the request auto-cancels (the safe deny).</summary>
+    public Func<string, string?, CancellationToken, Task<string?>>? ApprovalAction { get; set; }
     private Action<Action> UiPost => DispatchUi ?? TerminalGuiDispatcher.Instance.Post;
 
     private void InvokeOnUiThread(Action action)
@@ -34,6 +40,20 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
         try
         {
             await TuiDispatcherExtensions.InvokeAsync(UiPost, action, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Extension UI dispatch failed");
+            throw;
+        }
+    }
+
+    private async Task<T> InvokeOnUiThreadAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var innerTask = await TuiDispatcherExtensions.InvokeAsync(UiPost, action, cancellationToken).ConfigureAwait(false);
+            return await innerTask.ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -262,7 +282,19 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
             "confirm" => Confirm(intent, cancellationToken),
             "input" => Input(intent, cancellationToken),
             "editor" => Input(intent, cancellationToken),
+            "permission_request" => Approval(intent, cancellationToken),
             "status" => Status(intent, cancellationToken),
+            "title" => Title(intent, cancellationToken),
+            "working_message" => WorkingMessage(intent, cancellationToken),
+            "working_visible" => WorkingVisible(intent, cancellationToken),
+            "working_indicator" => WorkingIndicator(intent, cancellationToken),
+            "register_menu_item" => RegisterMenuItem(intent, cancellationToken),
+            "editor_get_text" => EditorGetText(intent, cancellationToken),
+            "editor_set_text" => EditorSetText(intent, cancellationToken),
+            "tools_expanded_get" => ToolsExpandedGet(intent, cancellationToken),
+            "tools_expanded_set" => ToolsExpandedSet(intent, cancellationToken),
+            "editor_component_set" => EditorComponentSet(intent, cancellationToken),
+            "editor_component_get" => EditorComponentGet(intent, cancellationToken),
             "widget" => Widget(intent, cancellationToken),
             "footer" or "setFooter" => Footer(intent, cancellationToken),
             "header" or "setHeader" => Header(intent, cancellationToken),
@@ -276,14 +308,65 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
         return new ExtensionUiIntentResult(intent.RequestId, true);
     }
 
-    private static Task<ExtensionUiIntentResult> Select(ExtensionUiIntent intent, CancellationToken cancellationToken)
-        => Task.FromResult(new ExtensionUiIntentResult(intent.RequestId, intent.Options?.FirstOrDefault(), intent.Options is null || intent.Options.Count == 0));
+    private async Task<ExtensionUiIntentResult> Select(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var selectAction = SelectAction;
+        if (selectAction is null)
+            return new ExtensionUiIntentResult(intent.RequestId, intent.Options?.FirstOrDefault(), intent.Options is null || intent.Options.Count == 0);
+        var value = await InvokeOnUiThreadAsync(() => selectAction(intent.Title, intent.Options, cancellationToken), cancellationToken).ConfigureAwait(false);
+        return new ExtensionUiIntentResult(intent.RequestId, value, value is null);
+    }
 
-    private static Task<ExtensionUiIntentResult> Confirm(ExtensionUiIntent intent, CancellationToken cancellationToken)
-        => Task.FromResult(new ExtensionUiIntentResult(intent.RequestId, true));
+    private async Task<ExtensionUiIntentResult> Confirm(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var confirmAction = ConfirmAction;
+        if (confirmAction is null)
+            return new ExtensionUiIntentResult(intent.RequestId, true);
+        var confirmed = await InvokeOnUiThreadAsync(() => confirmAction(intent.Title, intent.Message, cancellationToken), cancellationToken).ConfigureAwait(false);
+        return new ExtensionUiIntentResult(intent.RequestId, confirmed, !confirmed);
+    }
 
-    private static Task<ExtensionUiIntentResult> Input(ExtensionUiIntent intent, CancellationToken cancellationToken)
-        => Task.FromResult(new ExtensionUiIntentResult(intent.RequestId, intent.Message ?? string.Empty));
+    private async Task<ExtensionUiIntentResult> Approval(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var approvalAction = ApprovalAction;
+        if (approvalAction is null)
+            return new ExtensionUiIntentResult(intent.RequestId, null, Cancelled: true);
+
+        var verdict = await InvokeOnUiThreadAsync(
+            () => approvalAction(ApprovalTitle(intent), ApprovalMessage(intent), cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+        return new ExtensionUiIntentResult(intent.RequestId, verdict, verdict is null);
+    }
+
+    private static string ApprovalTitle(ExtensionUiIntent intent)
+        => string.IsNullOrWhiteSpace(intent.Title) ? "Permission Request" : intent.Title;
+
+    private static string? ApprovalMessage(ExtensionUiIntent intent)
+    {
+        if (intent.Component is JsonElement { ValueKind: JsonValueKind.Object } component)
+        {
+            var reason = GetString(component, "reason");
+            var tool = GetString(component, "tool");
+            if (reason is not null || tool is not null)
+            {
+                var lines = new List<string>(2);
+                if (reason is not null) lines.Add(reason);
+                if (tool is not null) lines.Add($"Tool: {tool}");
+                return string.Join(Environment.NewLine, lines);
+            }
+        }
+
+        return intent.Message ?? intent.Title;
+    }
+
+    private async Task<ExtensionUiIntentResult> Input(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var inputAction = InputAction;
+        if (inputAction is null)
+            return new ExtensionUiIntentResult(intent.RequestId, intent.Message ?? string.Empty);
+        var value = await InvokeOnUiThreadAsync(() => inputAction(intent.Message ?? intent.Title, intent.Message, cancellationToken), cancellationToken).ConfigureAwait(false);
+        return new ExtensionUiIntentResult(intent.RequestId, value, value is null);
+    }
 
     private async Task<ExtensionUiIntentResult> Status(ExtensionUiIntent intent, CancellationToken cancellationToken)
     {
@@ -314,6 +397,114 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
         var content = intent.Component?.ToString() ?? intent.Message;
         if (content is null) return null;
         return new ExtensionWidgetState("text", content, intent.Title);
+    }
+
+    private async Task<ExtensionUiIntentResult> Title(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await SetTitleAsync(GetPayloadString(intent, "title") ?? intent.Message ?? intent.Title, cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> WorkingMessage(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await SetWorkingMessageAsync(intent.Message, cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> WorkingVisible(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await SetWorkingVisibleAsync(GetPayloadBool(intent, "visible"), cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> WorkingIndicator(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await SetWorkingIndicatorAsync(IntentWorkingIndicator(intent), cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> RegisterMenuItem(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await RegisterMenuItemAsync(intent.ExtensionId ?? string.Empty, IntentMenuItem(intent), cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> EditorGetText(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var text = await GetEditorTextAsync(cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, text, text is null);
+    }
+
+    private async Task<ExtensionUiIntentResult> EditorSetText(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await SetEditorTextAsync(GetPayloadString(intent, "text") ?? intent.Message ?? string.Empty, cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> ToolsExpandedGet(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var expanded = await GetToolsExpandedAsync(cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, expanded);
+    }
+
+    private async Task<ExtensionUiIntentResult> ToolsExpandedSet(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await SetToolsExpandedAsync(GetPayloadBool(intent, "expanded"), cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> EditorComponentSet(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        await SetEditorComponentAsync(intent.ExtensionId ?? string.Empty, IntentEditorComponent(intent), cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, true);
+    }
+
+    private async Task<ExtensionUiIntentResult> EditorComponentGet(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var component = await GetEditorComponentAsync(intent.ExtensionId ?? string.Empty, cancellationToken);
+        return new ExtensionUiIntentResult(intent.RequestId, component, component is null);
+    }
+
+    private static JsonElement? PayloadElement(ExtensionUiIntent intent)
+        => intent.Component is JsonElement element && element.ValueKind == JsonValueKind.Object ? element : null;
+
+    private static string? GetPayloadString(ExtensionUiIntent intent, string property)
+        => PayloadElement(intent) is { } payload ? GetString(payload, property) : null;
+
+    private static bool GetPayloadBool(ExtensionUiIntent intent, string property)
+        => PayloadElement(intent) is { } payload ? GetBoolean(payload, property) : false;
+
+    private static ExtensionWorkingIndicator? IntentWorkingIndicator(ExtensionUiIntent intent)
+    {
+        if (PayloadElement(intent) is not { } payload || !payload.TryGetProperty("indicator", out var indicator) || indicator.ValueKind != JsonValueKind.Object)
+            return null;
+
+        return new ExtensionWorkingIndicator(
+            GetString(indicator, "message"),
+            GetNullableBoolean(indicator, "visible"),
+            GetString(indicator, "spinner"));
+    }
+
+    private static ExtensionMenuItem IntentMenuItem(ExtensionUiIntent intent)
+    {
+        var payload = PayloadElement(intent);
+        var menu = payload is null ? null : GetString(payload.Value, "menu");
+        var label = payload is null ? null : GetString(payload.Value, "label");
+        var command = payload is null ? null : GetString(payload.Value, "command");
+        var shortcut = payload is null ? null : GetString(payload.Value, "shortcut");
+        return new ExtensionMenuItem(
+            menu ?? "Extensions",
+            label ?? intent.ExtensionId ?? string.Empty,
+            command ?? string.Empty,
+            shortcut);
+    }
+
+    private static ExtensionWidgetState? IntentEditorComponent(ExtensionUiIntent intent)
+    {
+        if (PayloadElement(intent) is not { } payload) return null;
+        var content = GetString(payload, "component") ?? GetString(payload, "message");
+        if (content is null) return null;
+        return new ExtensionWidgetState("text", content, GetString(payload, "title"));
     }
 
     private async Task<ExtensionUiIntentResult> Custom(ExtensionUiIntent intent, CancellationToken cancellationToken)
@@ -589,6 +780,13 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
            && (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False)
             ? value.GetBoolean()
             : false;
+
+    private static bool? GetNullableBoolean(JsonElement payload, string property)
+        => payload.ValueKind == JsonValueKind.Object
+           && payload.TryGetProperty(property, out var value)
+           && (value.ValueKind == JsonValueKind.True || value.ValueKind == JsonValueKind.False)
+            ? value.GetBoolean()
+            : null;
 
     private static object? GetValue(JsonElement payload, string property)
         => payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty(property, out var value)

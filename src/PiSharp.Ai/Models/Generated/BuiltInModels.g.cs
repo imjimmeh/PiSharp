@@ -3452,6 +3452,46 @@ public static class BuiltInModels
 
         // cloudflare-workers-ai
 
+        new("cloudflare-workers-ai", "@cf/deepseek-ai/deepseek-v4-flash-0731", new ModelDescriptor(
+            Provider: "cloudflare-workers-ai",
+            Id: "@cf/deepseek-ai/deepseek-v4-flash-0731",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Flash 0731",
+            BaseUrl: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 1048576,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.44m, Output: 1.32m, CacheRead: 0.014m))),
+
+        new("cloudflare-workers-ai", "@cf/deepseek-ai/deepseek-v4-pro-0813", new ModelDescriptor(
+            Provider: "cloudflare-workers-ai",
+            Id: "@cf/deepseek-ai/deepseek-v4-pro-0813",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Pro 0813",
+            BaseUrl: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 1048576,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.32m, Output: 3.96m, CacheRead: 0.044m))),
+
         new("cloudflare-workers-ai", "@cf/google/gemma-4-26b-a4b-it", new ModelDescriptor(
             Provider: "cloudflare-workers-ai",
             Id: "@cf/google/gemma-4-26b-a4b-it",
@@ -12143,9 +12183,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 393216,
+            MaxTokens: 384000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.14m, Output: 0.28m, CacheRead: 0.028m))),
+            Cost: new ModelCost(Input: 0.06566m, Output: 0.13132m, CacheRead: 0.013132m))),
 
         new("openrouter", "deepseek/deepseek-v4-flash-0731", new ModelDescriptor(
             Provider: "openrouter",
@@ -12182,6 +12222,18 @@ public static class BuiltInModels
             MaxTokens: 384000,
             Input: ["text"],
             Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
+
+        new("openrouter", "dots-studio/dots-3-note-preview:free", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "dots-studio/dots-3-note-preview:free",
+            Api: "openai-completions",
+            Name: "Dots Studio: Dots3-Note Preview (free)",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 512000,
+            MaxTokens: 512000,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0m, Output: 0m))),
 
         new("openrouter", "google/gemini-2.5-flash", new ModelDescriptor(
             Provider: "openrouter",
@@ -12731,9 +12783,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: false,
             ContextWindow: 1048576,
-            MaxTokens: 4096,
+            MaxTokens: 16384,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.2m, Output: 0.696m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 0.8m))),
 
         new("openrouter", "meta-llama/llama-4-scout", new ModelDescriptor(
             Provider: "openrouter",
@@ -13117,7 +13169,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.5605m, Output: 2.36m, CacheRead: 0.0944m))),
+            Cost: new ModelCost(Input: 0.5415m, Output: 2.28m, CacheRead: 0.0912m))),
 
         new("openrouter", "moonshotai/kimi-k2.7-code", new ModelDescriptor(
             Provider: "openrouter",
@@ -13283,9 +13335,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1000000,
-            MaxTokens: 131072,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0m, Output: 0m))),
+            Cost: new ModelCost(Input: 0.1m, Output: 0.25m, CacheRead: 0.05m))),
 
         new("openrouter", "nvidia/nemotron-3.5-lightning:free", new ModelDescriptor(
             Provider: "openrouter",
@@ -15027,6 +15079,18 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 2m, Output: 6m, CacheRead: 0.25m))),
 
+        new("openrouter", "qwen/qwen3.8-27b", new ModelDescriptor(
+            Provider: "openrouter",
+            Id: "qwen/qwen3.8-27b",
+            Api: "openai-completions",
+            Name: "Qwen: Qwen3.8 27B",
+            BaseUrl: "https://openrouter.ai/api/v1",
+            Reasoning: true,
+            ContextWindow: 262144,
+            MaxTokens: 131072,
+            Input: ["text"],
+            Cost: new ModelCost(Input: 0.45m, Output: 3.2m))),
+
         new("openrouter", "qwen/qwen3.8-max", new ModelDescriptor(
             Provider: "openrouter",
             Id: "qwen/qwen3.8-max",
@@ -15145,7 +15209,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 4096,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.063m, Output: 0.21m, CacheRead: 0.021m))),
+            Cost: new ModelCost(Input: 0.18m, Output: 0.6m, CacheRead: 0.06m))),
 
         new("openrouter", "thedrummer/unslopnemo-12b", new ModelDescriptor(
             Provider: "openrouter",
@@ -15395,9 +15459,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 204800,
-            MaxTokens: 131072,
+            MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.95m, Output: 2.55m, CacheRead: 0.2m))),
+            Cost: new ModelCost(Input: 0.6m, Output: 1.92m, CacheRead: 0.12m))),
 
         new("openrouter", "z-ai/glm-5-turbo", new ModelDescriptor(
             Provider: "openrouter",
@@ -15419,9 +15483,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 204800,
-            MaxTokens: 131072,
+            MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.4m, Output: 4.4m, CacheRead: 0.26m))),
+            Cost: new ModelCost(Input: 0.966m, Output: 3.036m, CacheRead: 0.1794m))),
 
         new("openrouter", "z-ai/glm-5.2", new ModelDescriptor(
             Provider: "openrouter",
@@ -15431,9 +15495,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 262144,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.19m, Output: 3.74m, CacheRead: 0.221m))),
+            Cost: new ModelCost(Input: 0.462m, Output: 1.452m, CacheRead: 0.0858m))),
 
         new("openrouter", "z-ai/glm-5.2:batch", new ModelDescriptor(
             Provider: "openrouter",
@@ -15515,9 +15579,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 131072,
+            MaxTokens: 384000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.0798m, Output: 0.1596m, CacheRead: 0.01596m))),
+            Cost: new ModelCost(Input: 0.06846m, Output: 0.13692m, CacheRead: 0.013692m))),
 
         new("openrouter", "~google/gemini-flash-latest", new ModelDescriptor(
             Provider: "openrouter",

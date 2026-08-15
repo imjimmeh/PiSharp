@@ -51,6 +51,7 @@ public static class ExtensionEventNames
     public const string SettingsChanged = "settings_changed";
     public const string ResourcesUpdate = "resources_update";
     public const string AdvisorNote = "advisor_note";
+    public const string SystemMessage = "system_message";
     public const string PackagesChanged = "extensions_changed";   // package install/update/remove (daemon-facing name)
     public const string SkillsChanged = "skills_changed";          // skill set changed (register/discover/managed store)
     public const string SkillExecutionStart = "skill_execution_start";
@@ -218,6 +219,7 @@ public static class ExtensionEventMapper
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.RuntimeEvent runtimeEvent } => runtimeEvent.Name,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionStart } => ExtensionEventNames.SkillExecutionStart,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SkillExecutionEnd } => ExtensionEventNames.SkillExecutionEnd,
+        AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SystemMessage } => ExtensionEventNames.SystemMessage,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.AdvisorNote } => ExtensionEventNames.AdvisorNote,
         AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CustomEvent customEvent } => customEvent.Name,
         _ => throw new NotSupportedException($"Unsupported extension event '{evt.GetType().Name}'.")

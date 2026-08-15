@@ -311,6 +311,182 @@ public sealed class ExtensionUiBridgeHostTests
         Assert.Null(await host.GetEditorComponentAsync("ext-a"));
     }
 
+    [Fact]
+    public async Task SelectIntentWithActionReturnsChosenOption()
+    {
+        string? capturedTitle = null;
+        IReadOnlyList<string>? capturedOptions = null;
+        var host = new ExtensionUiBridgeHost(new Window())
+        {
+            DispatchUi = action => action(),
+            SelectAction = (title, options, _) =>
+            {
+                capturedTitle = title;
+                capturedOptions = options;
+                return Task.FromResult(options?[1]);
+            }
+        };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-1", "select", "Pick", null, new[] { "one", "two" }, null));
+
+        Assert.False(result.Cancelled);
+        Assert.Equal("two", result.Value);
+        Assert.Equal("Pick", capturedTitle);
+        Assert.Equal(new[] { "one", "two" }, capturedOptions);
+    }
+
+    [Fact]
+    public async Task SelectIntentWithActionIsInvokedThroughUiDispatch()
+    {
+        var dispatchCount = 0;
+        var host = new ExtensionUiBridgeHost(new Window())
+        {
+            DispatchUi = action => { dispatchCount++; action(); },
+            SelectAction = (_, options, _) => Task.FromResult(options?.FirstOrDefault())
+        };
+
+        await host.HandleAsync(new ExtensionUiIntent("req-2", "select", "Pick", null, new[] { "one" }, null));
+
+        Assert.Equal(1, dispatchCount);
+    }
+
+    [Fact]
+    public async Task InputIntentWithActionReturnsTypedValue()
+    {
+        string? capturedPrompt = null;
+        string? capturedInitial = null;
+        var host = new ExtensionUiBridgeHost(new Window())
+        {
+            DispatchUi = action => action(),
+            InputAction = (prompt, initial, _) =>
+            {
+                capturedPrompt = prompt;
+                capturedInitial = initial;
+                return Task.FromResult("typed answer");
+            }
+        };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-3", "input", "Ask", "please type", null, null));
+
+        Assert.False(result.Cancelled);
+        Assert.Equal("typed answer", result.Value);
+        Assert.Equal("please type", capturedPrompt);
+        Assert.Equal("please type", capturedInitial);
+    }
+
+    [Fact]
+    public async Task EditorIntentRoutesThroughInputAction()
+    {
+        var host = new ExtensionUiBridgeHost(new Window())
+        {
+            DispatchUi = action => action(),
+            InputAction = (prompt, initial, _) => Task.FromResult("edited content")
+        };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-4", "editor", "Edit", "draft", null, null));
+
+        Assert.False(result.Cancelled);
+        Assert.Equal("edited content", result.Value);
+    }
+
+    [Fact]
+    public async Task ConfirmIntentWithActionReflectsUserDecision()
+    {
+        string? capturedTitle = null;
+        string? capturedMessage = null;
+        var host = new ExtensionUiBridgeHost(new Window())
+        {
+            DispatchUi = action => action(),
+            ConfirmAction = (title, message, _) =>
+            {
+                capturedTitle = title;
+                capturedMessage = message;
+                return Task.FromResult(false);
+            }
+        };
+        var intent = new ExtensionUiIntent("req-5", "confirm", "Sure?", "proceed?", null, null);
+
+        var declined = await host.HandleAsync(intent);
+
+        Assert.True(declined.Cancelled);
+        Assert.False((bool)declined.Value!);
+        Assert.Equal("Sure?", capturedTitle);
+        Assert.Equal("proceed?", capturedMessage);
+
+        host.ConfirmAction = (_, _, _) => Task.FromResult(true);
+        var accepted = await host.HandleAsync(intent);
+
+        Assert.False(accepted.Cancelled);
+        Assert.True((bool)accepted.Value!);
+    }
+
+    [Fact]
+    public async Task PermissionRequest_WithApprovalAction_ReturnsStringVerdictNotBool()
+    {
+        string? capturedMessage = null;
+        var host = new ExtensionUiBridgeHost(new Window())
+        {
+            DispatchUi = action => action(),
+            ApprovalAction = (_, message, _) =>
+            {
+                capturedMessage = message;
+                return Task.FromResult<string?>("allow");
+            }
+        };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent(
+            "req-approval", "permission_request", "Permission Request",
+            null, null, JsonSerializer.SerializeToElement(new { tool = "bash", reason = "run a command" })));
+
+        Assert.False(result.Cancelled);
+        Assert.IsType<string>(result.Value);
+        Assert.Equal("allow", result.Value);
+        Assert.Contains("run a command", capturedMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PermissionRequest_DefaultAction_AutoCancels()
+    {
+        var host = new ExtensionUiBridgeHost(new Window()) { DispatchUi = action => action() };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-approval", "permission_request", "Permission Request", null, null, null));
+
+        Assert.True(result.Cancelled);
+        Assert.Null(result.Value);
+    }
+
+    [Fact]
+    public async Task SelectIntentWithoutActionKeepsCannedFirstOptionBehavior()
+    {
+        var host = new ExtensionUiBridgeHost(new Window()) { DispatchUi = action => action() };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-6", "select", "Pick", null, new[] { "one", "two" }, null));
+
+        Assert.False(result.Cancelled);
+        Assert.Equal("one", result.Value);
+    }
+
+    [Fact]
+    public async Task InputIntentWithoutActionKeepsEchoedMessageBehavior()
+    {
+        var host = new ExtensionUiBridgeHost(new Window()) { DispatchUi = action => action() };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-7", "input", "Ask", "echo me", null, null));
+
+        Assert.False(result.Cancelled);
+        Assert.Equal("echo me", result.Value);
+    }
+
+    [Fact]
+    public async Task ConfirmIntentWithoutActionKeepsCannedAlwaysTrue()
+    {
+        var host = new ExtensionUiBridgeHost(new Window()) { DispatchUi = action => action() };
+
+        var result = await host.HandleAsync(new ExtensionUiIntent("req-8", "confirm", "Sure?", null, null, null));
+
+        Assert.False(result.Cancelled);
+        Assert.True((bool)result.Value!);
+    }
     private static Task InvokeForwardCustomUiInputAsync(ExtensionUiBridgeHost host, string data, CancellationToken ct)
     {
         var method = typeof(ExtensionUiBridgeHost)
