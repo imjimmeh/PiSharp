@@ -1,12 +1,14 @@
+using System.Text;
 using PiSharp.Extensions;
 
 namespace PiSharp.Permissions;
 
-/// <summary>
 /// Session-persisted grants over <see cref="IExtensionStateApi"/> (P02 State, daemon-resident).
-/// Keys follow <c>grant.&lt;action&gt;.&lt;tool&gt;.&lt;session&gt;</c> (plan §3.5 adapted to the
-/// <c>[A-Za-z0-9_.-]</c> state-key charset, P29 §10 note); values carry the optional rule
-/// pattern and the expiry. Expired grants are pruned lazily on read.
+/// Keys are versioned (<c>grant.&lt;action&gt;.v2.&lt;tool&gt;.&lt;session&gt;</c> with each component
+/// encoded as unpadded base64url, so dotted tool names like <c>mcp.foo.read</c> are data, not
+/// delimiters) while remaining within the <c>[A-Za-z0-9_.-]</c> state-key charset (P29 §10 note).
+/// Legacy <c>grant.&lt;action&gt;.&lt;tool&gt;.&lt;session&gt;</c> keys stay readable; values carry the
+/// optional rule pattern and the expiry. Expired grants are pruned lazily on read.
 /// </summary>
 public sealed class GrantStore
 {
@@ -21,8 +23,12 @@ public sealed class GrantStore
         _time = time ?? TimeProvider.System;
     }
 
-    /// <summary>Builds the storage key for a grant.</summary>
+    /// <summary>Builds the storage key for a grant (v2 base64url-encoded components).</summary>
     public static string KeyFor(PermissionAction action, string tool, string sessionKey)
+        => $"{GrantPrefix}{action.ToString().ToLowerInvariant()}.v2.{EncodeComponent(Sanitize(tool))}.{EncodeComponent(Sanitize(sessionKey))}";
+
+    /// <summary>Builds the legacy pre-v2 storage key shape for a grant.</summary>
+    private static string LegacyKeyFor(PermissionAction action, string tool, string sessionKey)
         => $"{GrantPrefix}{action.ToString().ToLowerInvariant()}.{Sanitize(tool)}.{Sanitize(sessionKey)}";
 
     /// <summary>
@@ -41,6 +47,7 @@ public sealed class GrantStore
         {
             var key = KeyFor(action, tool, sessionKey);
             var stored = await _state.GetAsync<StoredGrant>(key, ExtensionStateScope.User, cancellationToken).ConfigureAwait(false);
+            stored ??= await _state.GetAsync<StoredGrant>(LegacyKeyFor(action, tool, sessionKey), ExtensionStateScope.User, cancellationToken).ConfigureAwait(false);
             if (stored is null) continue;
             if (stored.ExpiresAt <= now)
             {
@@ -67,6 +74,8 @@ public sealed class GrantStore
     {
         await _state.RemoveAsync(KeyFor(PermissionAction.Allow, tool, sessionKey), ExtensionStateScope.User, cancellationToken).ConfigureAwait(false);
         await _state.RemoveAsync(KeyFor(PermissionAction.Deny, tool, sessionKey), ExtensionStateScope.User, cancellationToken).ConfigureAwait(false);
+        await _state.RemoveAsync(LegacyKeyFor(PermissionAction.Allow, tool, sessionKey), ExtensionStateScope.User, cancellationToken).ConfigureAwait(false);
+        await _state.RemoveAsync(LegacyKeyFor(PermissionAction.Deny, tool, sessionKey), ExtensionStateScope.User, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -131,18 +140,55 @@ public sealed class GrantStore
         }
     }
 
+    /// <summary>
+    /// Parses a stored grant key in either shape: the legacy 4-part form
+    /// (<c>grant.&lt;action&gt;.&lt;tool&gt;.&lt;session&gt;</c>) or the v2 5-part form
+    /// (<c>grant.&lt;action&gt;.v2.&lt;tool&gt;.&lt;session&gt;</c> with base64url-encoded components).
+    /// </summary>
     private static bool TryParseKey(string key, out PermissionAction action, out string tool, out string session)
     {
         action = PermissionAction.Allow;
         tool = string.Empty;
         session = string.Empty;
         var parts = key.Split('.');
-        if (parts.Length != 4 || parts[0] != "grant") return false;
+        if (parts.Length is not (4 or 5) || parts[0] != "grant") return false;
         if (!Enum.TryParse<PermissionAction>(parts[1], true, out var parsed) || parsed == PermissionAction.Ask) return false;
         action = parsed;
+        if (parts.Length == 5)
+        {
+            if (parts[2] != "v2") return false;
+            if (!TryDecodeComponent(parts[3], out tool) || !TryDecodeComponent(parts[4], out session)) return false;
+            return true;
+        }
         tool = parts[2];
         session = parts[3];
         return true;
+    }
+
+    /// <summary>
+    /// Encodes a component as unpadded base64url, staying within the <c>[A-Za-z0-9_.-]</c>
+    /// state-key charset (standard base64 would introduce <c>+</c>, <c>/</c>, and <c>=</c>).
+    /// </summary>
+    private static string EncodeComponent(string value)
+    {
+        var raw = Encoding.UTF8.GetBytes(value);
+        return Convert.ToBase64String(raw).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static bool TryDecodeComponent(string encoded, out string value)
+    {
+        value = string.Empty;
+        var base64 = encoded.Replace('-', '+').Replace('_', '/');
+        base64 = base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=');
+        try
+        {
+            value = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     private static StoredGrant? ReadStoredGrant(object? value)
