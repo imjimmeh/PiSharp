@@ -319,6 +319,76 @@ public sealed class PiServerWebSocketHandlerTests
         Assert.Equal("ctrl+r", Assert.Single(wire.Shortcuts).Keys);
     }
     [Fact]
+    public async Task GetExtensionShortcuts_ReturnsFlatExtensionShortcutWire()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "g", type = ServerCommandTypes.GetExtensionShortcuts, serverSessionId = created.ServerSessionId
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.True(response.Success);
+        var wire = Assert.IsType<ExtensionShortcutWire[]>(response.Data);
+        var shortcut = Assert.Single(wire);
+        Assert.Equal("ext:test", shortcut.SourceId);
+        Assert.Equal("ctrl+r", shortcut.Keys);
+        Assert.Equal("Runs something", shortcut.Description);
+    }
+
+    [Fact]
+    public async Task InvokeExtensionShortcut_InvokesRegisteredHandlerAndReturnsOk()
+    {
+        string? receivedArgs = null;
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd,
+            new ExtensionShortcutRegistration("ctrl+r", "Runs something", (args, _) =>
+            {
+                receivedArgs = args;
+                return Task.CompletedTask;
+            })));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "s", type = ServerCommandTypes.InvokeExtensionShortcut, serverSessionId = created.ServerSessionId, keys = "ctrl+r", args = "hello"
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.True(response.Success);
+        Assert.Equal("hello", receivedArgs);
+    }
+
+    [Fact]
+    public async Task InvokeExtensionShortcut_UnknownKeys_ReturnsNotAvailable()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var createCommand = JsonSerializer.Serialize(new { id = "create", type = ServerCommandTypes.CreateSession, cwd = TempRoot() }, ServerJsonSerializer.Options);
+        var createResponse = await handler.DispatchTextCommandAsync(createCommand);
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var command = JsonSerializer.Serialize(new
+        {
+            id = "s", type = ServerCommandTypes.InvokeExtensionShortcut, serverSessionId = created.ServerSessionId, keys = "ctrl+x", args = ""
+        }, ServerJsonSerializer.Options);
+
+        var response = await handler.DispatchTextCommandAsync(command);
+
+        Assert.False(response.Success);
+        Assert.Equal("not_available", response.Error?.Code);
+    }
+
+    [Fact]
     public async Task ResolveTool_AnswersExtensionToolWire()
     {
         var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
@@ -476,8 +546,7 @@ public sealed class PiServerWebSocketHandlerTests
         var initial = await repo.CreateAsync(createOptions);
         return new PiSharp.Runtime.SessionRuntime(repo, createOptions, session => new AgentHarness<JsonlSessionMetadata>(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), FakeStream, FakeCompletion, [])), initial);
     }
-
-    private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeWithExtensionsAsync(string root)
+    private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeWithExtensionsAsync(string root, ExtensionShortcutRegistration? shortcut = null)
     {
         var repo = new JsonlSessionRepo(new SystemExecutionEnv(root), "sessions");
         var createOptions = new JsonlSessionCreateOptions(root);
@@ -492,7 +561,7 @@ public sealed class PiServerWebSocketHandlerTests
                 ExecutionMode: ToolExecutionMode.Parallel,
                 PromptSnippet: "Use fmt",
                 PromptGuidelines: ["guideline"]).ToAgentTool());
-        extensions.RegisterShortcut("ext:test", new ExtensionShortcutRegistration("ctrl+r", "Runs something", (_, _) => Task.CompletedTask));
+        extensions.RegisterShortcut("ext:test", shortcut ?? new ExtensionShortcutRegistration("ctrl+r", "Runs something", (_, _) => Task.CompletedTask));
         extensions.RegisterMessageRenderer("ext:test", new ExtensionMessageRendererRegistration(
             "custom-ren", RowType: ExtensionChatRowType.Custom, CustomType: "my-type", Override: ExtensionOverridePolicy.OverrideBuiltIn));
         extensions.RegisterMessageDecorator("ext:test", new ExtensionMessageDecoratorRegistration(

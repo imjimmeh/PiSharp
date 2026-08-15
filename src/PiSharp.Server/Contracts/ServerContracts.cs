@@ -40,6 +40,7 @@ public static class ServerCommandTypes
     public const string GetForkMessages = "get_fork_messages";
     public const string GetExtensionLoadStatus = "get_extension_load_status";
     public const string GetExtensionShortcuts = "get_extension_shortcuts";
+    public const string InvokeExtensionShortcut = "invoke_extension_shortcut";
     public const string GetExtensionRegistry = "get_extension_registry";
     public const string ResolveTool = "resolve_tool";
     public const string RenderToolCall = "render_tool_call";
@@ -268,6 +269,12 @@ public sealed record ExtensionRendererWire(string RowType, string? CustomType, E
 
 /// <summary>Serializable message-decorator projection for <see cref="ExtensionRegistryWire"/> (metadata only).</summary>
 public sealed record ExtensionDecoratorWire(string RowType, string? CustomType, ExtensionOverridePolicy Override);
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.InvokeExtensionShortcut"/>: invokes the registered
+/// extension shortcut matching <see cref="Keys"/> on the live session with <see cref="Args"/>.
+/// </summary>
+public sealed record InvokeExtensionShortcutRequest(string Type, string? Id, string ServerSessionId, string Keys, string Args);
 
 
 /// <summary>

@@ -15,6 +15,7 @@ using PiSharp.Server.Contracts;
 using PiSharp.Extensions;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.Serialization;
+using PiSharp.Server.Extensions;
 using PiSharp.Server.UiBridge;
 
 namespace PiSharp.Server.WebSockets;
@@ -164,6 +165,7 @@ public sealed class PiServerWebSocketHandler(
                 ServerCommandTypes.GetForkMessages => await GetForkMessagesAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetExtensionLoadStatus => await GetExtensionLoadStatusAsync(envelope),
                 ServerCommandTypes.GetExtensionShortcuts => await GetExtensionShortcutsAsync(envelope),
+                ServerCommandTypes.InvokeExtensionShortcut => await InvokeExtensionShortcutAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.GetExtensionRegistry => await GetExtensionRegistryAsync(envelope),
                 ServerCommandTypes.ResolveTool => await ResolveToolAsync(json, envelope),
                 ServerCommandTypes.RenderToolCall => await RenderToolCallAsync(json, envelope, cancellationToken),
@@ -648,9 +650,31 @@ public sealed class PiServerWebSocketHandler(
     {
         var live = RequireSession(RequiredSessionId(envelope));
         var manager = live.Runtime.ExtensionManager;
-        return Task.FromResult(manager is null
-            ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session.")
-            : ServerResponse.Ok(envelope.Id, envelope.Type, manager.Registry.Shortcuts));
+        if (manager is null) return Task.FromResult(ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session."));
+        var shortcuts = manager.Registry.Shortcuts
+            .Select(registration => new ExtensionShortcutWire(
+                registration.Id,
+                registration.SourceId,
+                registration.Value.Keys,
+                registration.Value.Description))
+            .ToArray();
+        return Task.FromResult(ServerResponse.Ok(envelope.Id, envelope.Type, shortcuts));
+    }
+
+    private async Task<ServerResponse> InvokeExtensionShortcutAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<InvokeExtensionShortcutRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var manager = live.Runtime.ExtensionManager;
+        if (manager is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session.");
+        var registration = manager.Registry.Shortcuts.FirstOrDefault(s => string.Equals(s.Value.Keys, command.Keys, StringComparison.Ordinal));
+        if (registration is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Extension shortcut '{command.Keys}' is not registered.");
+        var binding = live.Runtime.ExtensionBinding;
+        await registration.Value.InvokeAsync(new ExtensionCommandContext(
+            registration.Value.Keys, command.Args, binding.Ui,
+            UnavailableExtensionSessionApi.Instance, UnavailableExtensionModelApi.Instance, UnavailableExtensionToolApi.Instance,
+            binding.FlagValues, cancellationToken), cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type);
     }
 
     private Task<ServerResponse> GetExtensionRegistryAsync(ServerCommandEnvelope envelope)

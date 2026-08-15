@@ -258,6 +258,62 @@ public sealed class RemoteTuiBackendTests
         Assert.Equal("ctrl+r", shortcut.Value.Keys);
     }
     [Fact]
+    public async Task GetExtensionShortcuts_BuildsHandlersThatInvokeOverTheWire()
+    {
+        var wire = new[]
+        {
+            new ExtensionShortcutWire("shortcut:ctrl+r:ext:test", "ext:test", "ctrl+r", "Runs something"),
+        };
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.GetExtensionShortcuts
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var shortcuts = await backend.GetExtensionShortcutsAsync(CancellationToken.None);
+
+        var shortcut = Assert.Single(shortcuts);
+        Assert.Equal("ext:test", shortcut.SourceId);
+        Assert.Equal("ctrl+r", shortcut.Value.Keys);
+        await shortcut.Value.Handler("go", CancellationToken.None);
+
+        var sent = Assert.Single(transport.Commands.Where(command => command.Envelope.Type == ServerCommandTypes.InvokeExtensionShortcut));
+        Assert.Equal(ServerCommandTypes.InvokeExtensionShortcut, sent.Envelope.Type);
+        Assert.Equal(SessionId, sent.Envelope.ServerSessionId);
+        Assert.Equal("ctrl+r", PayloadValue(sent.Payload, "keys"));
+        Assert.Equal("go", PayloadValue(sent.Payload, "args"));
+    }
+
+    [Fact]
+    public async Task ExtensionShortcutHandler_ThrowsOnFailedInvokeResponse()
+    {
+        var wire = new[]
+        {
+            new ExtensionShortcutWire("shortcut:ctrl+r:ext:test", "ext:test", "ctrl+r", "Runs something"),
+        };
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.GetExtensionShortcuts
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Fail("st", type, "not_available", "Extension shortcut 'ctrl+r' is not registered."),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var shortcuts = await backend.GetExtensionShortcutsAsync(CancellationToken.None);
+
+        var shortcut = Assert.Single(shortcuts);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => shortcut.Value.Handler("go", CancellationToken.None));
+        Assert.Contains("not_available", exception.Message);
+        Assert.Contains("ctrl+r", exception.Message);
+    }
+
+
+    [Fact]
     public async Task ResolveTool_ReturnsRemoteRegisteredTool_WithWireCapabilities()
     {
         using var schema = JsonDocument.Parse("{\"type\":\"object\"}");

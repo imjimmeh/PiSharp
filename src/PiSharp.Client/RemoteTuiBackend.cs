@@ -441,16 +441,15 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             token);
         if (!response.Success) return [];
 
-        var items = FromServerPayload<IReadOnlyList<ShortcutWire>>(response.Data) ?? [];
+        var items = FromServerPayload<IReadOnlyList<ExtensionShortcutWire>>(response.Data) ?? [];
         var shortcuts = new List<OwnedExtensionRegistration<ExtensionShortcutRegistration>>(items.Count);
         foreach (var item in items)
         {
-            if (item.Value is null || string.IsNullOrWhiteSpace(item.Id)) continue;
-            // The handler delegate is not serializable; remote shortcut invocation is a no-op for now.
+            if (string.IsNullOrWhiteSpace(item.Id) || string.IsNullOrWhiteSpace(item.Keys)) continue;
             shortcuts.Add(new OwnedExtensionRegistration<ExtensionShortcutRegistration>(
                 item.Id,
                 item.SourceId ?? item.Id,
-                new ExtensionShortcutRegistration(item.Value.Keys, item.Value.Description, static (_, _) => Task.CompletedTask)));
+                new ExtensionShortcutRegistration(item.Keys, item.Description, (args, ct) => InvokeExtensionShortcutAsync(item, args, ct))));
         }
 
         return shortcuts;
@@ -476,13 +475,23 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         foreach (var shortcut in wire.Shortcuts)
         {
             if (string.IsNullOrWhiteSpace(shortcut.Keys)) continue;
-            // Remote shortcut invocation is a no-op for now (handler delegate is not wireable).
+
             var sourceId = shortcut.SourceId ?? shortcut.Id;
-            registry.RegisterShortcut(sourceId, new ExtensionShortcutRegistration(shortcut.Keys, shortcut.Description, static (_, _) => Task.CompletedTask));
+            registry.RegisterShortcut(sourceId, new ExtensionShortcutRegistration(shortcut.Keys, shortcut.Description, (args, ct) => InvokeExtensionShortcutAsync(shortcut, args, ct)));
         }
 
         return registry;
     }
+
+    private async Task InvokeExtensionShortcutAsync(ExtensionShortcutWire shortcut, string args, CancellationToken ct)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.InvokeExtensionShortcut, ServerSessionId: RequireSessionId()),
+            new { keys = shortcut.Keys, args }, ct);
+        if (!response.Success)
+            throw new InvalidOperationException($"Extension shortcut '{shortcut.Keys}' failed: {response.Error?.Code}: {response.Error?.Message}");
+    }
+
     public async Task<TuiExtensionLoadStatus> GetExtensionLoadStatusAsync(CancellationToken token = default)
     {
         var response = await SendAsync(
@@ -806,8 +815,6 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
     // --- wire payload shapes for response Data ---
 
-    private sealed record ShortcutWire(string Id, string? SourceId, ShortcutValueWire? Value);
-    private sealed record ShortcutValueWire(string Keys, string Description);
     private sealed record ThinkingLevelWire(string? Level);
     private sealed record TextWire(string? Text);
     private sealed record RenderLinesWire(IReadOnlyList<string>? Lines);
