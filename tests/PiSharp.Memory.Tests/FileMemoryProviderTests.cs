@@ -7,14 +7,27 @@ namespace PiSharp.Memory.Tests;
 public sealed class FileMemoryProviderTests : IDisposable
 {
     private readonly string _root = MemoryTestHelpers.TempDir();
+    private readonly List<FileMemoryProvider> _providers = [];
 
     public void Dispose()
     {
+        // Dispose providers first: the debounced background flush would otherwise re-create
+        // records.jsonl inside the deleted root after this test class cleans up.
+        foreach (var provider in _providers)
+        {
+            try { provider.Dispose(); }
+            catch { /* best-effort */ }
+        }
         try { Directory.Delete(_root, recursive: true); }
         catch { /* best-effort */ }
     }
 
-    private FileMemoryProvider Provider(string cwd = @"C:\proj\one") => new(_root, MemoryProjectKeys.Encode(cwd));
+    private FileMemoryProvider Provider(string cwd = @"C:\proj\one")
+    {
+        var provider = new FileMemoryProvider(_root, MemoryProjectKeys.Encode(cwd));
+        _providers.Add(provider);
+        return provider;
+    }
 
     private static MemoryRecord Record(
         string key,
@@ -118,6 +131,8 @@ public sealed class FileMemoryProviderTests : IDisposable
         var providerA = Provider();
         await providerA.PutAsync(MemoryScope.Project, Record("facts/oauth-setup", content: "device flow"));
         await providerA.PutAsync(MemoryScope.Project, Record("lessons/build", kind: MemoryKind.Lesson, content: "build first"));
+        // Flush (dispose) so a brand-new provider over the same root sees the same records.
+        await providerA.DisposeAsync();
 
         // A brand-new provider over the same root must see the same records.
         var providerB = Provider();
@@ -144,6 +159,8 @@ public sealed class FileMemoryProviderTests : IDisposable
         var providerA = Provider(@"C:\proj\one");
         var providerB = Provider(@"C:\proj\two");
         await providerA.PutAsync(MemoryScope.User, Record("facts/global"));
+        // Flush (dispose) so the second provider over the same user scope sees the record.
+        await providerA.DisposeAsync();
 
         Assert.NotNull(await providerB.GetAsync(MemoryScope.User, "facts/global"));
         Assert.Null(await providerB.GetAsync(MemoryScope.Project, "facts/global"));
@@ -212,9 +229,11 @@ public sealed class FileMemoryProviderTests : IDisposable
         var summaryPath = Path.Combine(_root, "projects", MemoryProjectKeys.Encode(@"C:\proj\one"), "memory_summary.md");
 
         await provider.PutAsync(MemoryScope.Project, Record("facts/plain", kind: MemoryKind.Fact));
+        await provider.FlushAsync();
         Assert.False(File.Exists(summaryPath));
 
         await provider.PutAsync(MemoryScope.Project, Record("summaries/week-1", kind: MemoryKind.Summary, content: "All oauth flows reviewed"));
+        await provider.FlushAsync();
         Assert.True(File.Exists(summaryPath));
         var content = await File.ReadAllTextAsync(summaryPath);
         Assert.Contains("summaries/week-1", content);
@@ -227,10 +246,12 @@ public sealed class FileMemoryProviderTests : IDisposable
     {
         var provider = Provider();
         await provider.PutAsync(MemoryScope.Project, Record("summaries/week-1", kind: MemoryKind.Summary));
+        await provider.FlushAsync();
         var summaryPath = Path.Combine(_root, "projects", MemoryProjectKeys.Encode(@"C:\proj\one"), "memory_summary.md");
         Assert.True(File.Exists(summaryPath));
 
         await provider.DeleteAsync(MemoryScope.Project, "summaries/week-1");
+        await provider.FlushAsync();
 
         Assert.False(File.Exists(summaryPath));
     }
@@ -238,13 +259,18 @@ public sealed class FileMemoryProviderTests : IDisposable
     // --- robustness ---
 
     [Fact]
-    public async Task CorruptJsonlLine_ThrowsInvalidData()
+    public async Task CorruptJsonlLine_IsSkippedAndKeepsRest()
     {
         var provider = Provider();
         var recordsPath = Path.Combine(_root, "projects", MemoryProjectKeys.Encode(@"C:\proj\one"), "records.jsonl");
         Directory.CreateDirectory(Path.GetDirectoryName(recordsPath)!);
-        await File.WriteAllTextAsync(recordsPath, "{ not json }\n");
+        await File.WriteAllTextAsync(recordsPath,
+            "{ not json }\n" +
+            "{\"recordKey\":\"facts/ok\",\"kind\":\"fact\",\"title\":\"Title\",\"content\":\"Content\",\"tags\":[],\"createdAt\":\"2024-01-01T00:00:00+00:00\",\"updatedAt\":\"2024-01-01T00:00:00+00:00\"}\n");
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => provider.ListAsync(MemoryScope.Project, new MemoryQuery()));
+        var records = await provider.ListAsync(MemoryScope.Project, new MemoryQuery());
+
+        var record = Assert.Single(records);
+        Assert.Equal("facts/ok", record.RecordKey);
     }
 }

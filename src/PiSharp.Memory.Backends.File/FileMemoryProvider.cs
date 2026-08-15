@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PiSharp.Memory.Abstractions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using IOFile = System.IO.File;
 namespace PiSharp.Memory.Backends.File;
 
@@ -9,13 +11,23 @@ namespace PiSharp.Memory.Backends.File;
 /// JSONL-backed memory backend. Records live in <c>&lt;root&gt;/projects/&lt;projectKey&gt;/records.jsonl</c>
 /// (Project scope) and <c>&lt;root&gt;/user/records.jsonl</c> (User scope), one JSON object per line.
 /// Summary and mental-model records are mirrored into a diffable <c>memory_summary.md</c> in the same
-/// directory. Writes are serialized and atomic (temp file + rename); keyword search ranks by token hits
-/// in title/tags (2x) and content (1x).
+/// directory. Writes are atomic (temp file + rename); keyword search ranks by token hits in
+/// title/tags (2x) and content (1x).
+///
+/// Reads serve from an in-memory index built once per scope on first access; mutations update the
+/// index immediately and mark the scope dirty. A single flush writes <c>records.jsonl</c> (ordered by
+/// record key) and regenerates <c>memory_summary.md</c> once per dirty scope. Flushing happens on
+/// explicit <see cref="FlushAsync"/>, on dispose (flush-before-return), and as a short debounced
+/// background safety net for hosts that never dispose providers. Unflushed writes are lost on hard
+/// crash; the loss is bounded by the debounce window.
 /// </summary>
-public sealed class FileMemoryProvider : IMemoryProvider
+public sealed class FileMemoryProvider : IMemoryProvider, IDisposable, IAsyncDisposable
 {
     public const string RecordsFileName = "records.jsonl";
     public const string SummaryFileName = "memory_summary.md";
+
+    /// <summary>Background safety-net delay: a dirty scope is flushed this long after its last mutation even if nobody disposes.</summary>
+    private static readonly TimeSpan FlushDebounceDelay = TimeSpan.FromMilliseconds(250);
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -26,13 +38,27 @@ public sealed class FileMemoryProvider : IMemoryProvider
     private readonly string _rootDir;
     private readonly string _projectKey;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly ILogger _logger;
 
-    public FileMemoryProvider(string rootDir, string projectKey)
+    // Lazy in-memory index per scope: loaded once on first access, then served without file I/O.
+    private readonly Dictionary<MemoryScope, Dictionary<string, MemoryRecord>> _index = new();
+    private readonly HashSet<MemoryScope> _dirty = new();
+
+    private readonly CancellationTokenSource _flushCts = new();
+    private CancellationTokenSource? _pendingFlush;
+
+    private bool _disposed;
+
+    /// <summary>Number of full records.jsonl rewrites (temp + rename) performed by this instance; diagnostic probe for tests.</summary>
+    internal int RecordsWriteCount { get; private set; }
+
+    public FileMemoryProvider(string rootDir, string projectKey, ILogger<FileMemoryProvider>? logger = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootDir);
         ArgumentException.ThrowIfNullOrWhiteSpace(projectKey);
         _rootDir = rootDir;
         _projectKey = projectKey;
+        _logger = logger ?? NullLogger<FileMemoryProvider>.Instance;
     }
 
     public string Id => "file";
@@ -45,8 +71,8 @@ public sealed class FileMemoryProvider : IMemoryProvider
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var records = Load(scope);
-            return records.TryGetValue(recordKey, out var record) ? record : null;
+            ThrowIfDisposed();
+            return Index(scope).TryGetValue(recordKey, out var record) ? record : null;
         }
         finally
         {
@@ -61,14 +87,14 @@ public sealed class FileMemoryProvider : IMemoryProvider
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var records = Load(scope);
+            ThrowIfDisposed();
+            var records = Index(scope);
             // Idempotent upsert: a stable key keeps its original CreatedAt (birth), only content moves.
             var stored = records.TryGetValue(record.RecordKey, out var existing)
                 ? record with { CreatedAt = existing.CreatedAt }
                 : record;
             records[record.RecordKey] = stored;
-            Save(scope, records);
-            RegenerateSummary(scope, records);
+            MarkDirty(scope);
         }
         finally
         {
@@ -82,10 +108,9 @@ public sealed class FileMemoryProvider : IMemoryProvider
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var records = Load(scope);
-            if (!records.Remove(recordKey)) return false;
-            Save(scope, records);
-            RegenerateSummary(scope, records);
+            ThrowIfDisposed();
+            if (!Index(scope).Remove(recordKey)) return false;
+            MarkDirty(scope);
             return true;
         }
         finally
@@ -105,14 +130,14 @@ public sealed class FileMemoryProvider : IMemoryProvider
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var records = Load(scope);
+            ThrowIfDisposed();
+            var records = Index(scope);
             var existing = records.TryGetValue(recordKey, out var current)
                 ? current
                 : new MemoryRecord(recordKey, MemoryKind.Fact, string.Empty, string.Empty, [], DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
             var updated = mutate(existing) with { UpdatedAt = DateTimeOffset.UtcNow };
             records[recordKey] = updated;
-            Save(scope, records);
-            RegenerateSummary(scope, records);
+            MarkDirty(scope);
             return updated;
         }
         finally
@@ -121,14 +146,14 @@ public sealed class FileMemoryProvider : IMemoryProvider
         }
     }
 
-
     public async Task<IReadOnlyList<MemoryRecord>> ListAsync(MemoryScope scope, MemoryQuery query, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(query);
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            return ApplyListFilters(Load(scope).Values, query);
+            ThrowIfDisposed();
+            return ApplyListFilters(Index(scope).Values, query);
         }
         finally
         {
@@ -143,11 +168,12 @@ public sealed class FileMemoryProvider : IMemoryProvider
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            ThrowIfDisposed();
             var tokens = Tokenize(text);
             if (tokens.Count == 0) return [];
 
             var scored = new List<MemorySearchResult>();
-            foreach (var record in Load(scope).Values)
+            foreach (var record in Index(scope).Values)
             {
                 if (record.IsInvalidated) continue;
                 var score = Score(record, tokens);
@@ -189,6 +215,60 @@ public sealed class FileMemoryProvider : IMemoryProvider
             .Take(limit)
             .ToArray();
     }
+    /// <summary>
+    /// Persists all pending mutations: writes <c>records.jsonl</c> (temp + rename, ordered by record
+    /// key) and regenerates <c>memory_summary.md</c> once per dirty scope.
+    /// </summary>
+    public async Task FlushAsync(CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            CancelPendingFlush();
+            await FlushLockedAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public void Dispose() => DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+    /// <summary>Flushes all pending mutations before returning (flush-before-return dispose contract).</summary>
+    public async ValueTask DisposeAsync()
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _flushCts.Cancel(); // stop the background safety net; this call flushes synchronously instead.
+            await FlushLockedAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+        _flushCts.Dispose();
+    }
+
+    // --- in-memory index ---
+
+    private Dictionary<string, MemoryRecord> Index(MemoryScope scope)
+    {
+        if (_index.TryGetValue(scope, out var records)) return records;
+        records = Load(scope);
+        _index[scope] = records; // cached only after a successful load.
+        return records;
+    }
+
+    private void MarkDirty(MemoryScope scope)
+    {
+        _dirty.Add(scope);
+        ScheduleDebouncedFlush();
+    }
 
     // --- persistence ---
 
@@ -198,22 +278,49 @@ public sealed class FileMemoryProvider : IMemoryProvider
         if (!IOFile.Exists(path)) return new Dictionary<string, MemoryRecord>(StringComparer.Ordinal);
 
         var records = new Dictionary<string, MemoryRecord>(StringComparer.Ordinal);
+        var lineIndex = 0;
         foreach (var line in IOFile.ReadLines(path))
+        {
+            lineIndex++;
             try
             {
                 var record = JsonSerializer.Deserialize<MemoryRecord>(line, SerializerOptions);
                 if (record is null)
-                    throw new InvalidDataException($"Corrupt memory record line in '{path}'.");
+                    throw new InvalidDataException("JSONL line deserialized to null.");
+                if (string.IsNullOrWhiteSpace(record.RecordKey))
+                    throw new InvalidDataException("Memory record is missing a record key.");
                 records[record.RecordKey] = record;
             }
-            catch (JsonException exception)
+            catch (Exception ex) when (ex is JsonException or InvalidDataException)
             {
-                throw new InvalidDataException($"Corrupt memory record line in '{path}': {exception.Message}", exception);
+                // Skip-and-log: a single corrupt line (e.g. a torn write or hand edit) must not
+                // brick the whole store. The line stays in place; a maintenance pass could rewrite
+                // the file without skipped lines (rewrite-if-repaired), but that is not done here.
+                _logger.LogWarning(
+                    "Skipping corrupt memory record line {LineIndex} in '{Path}': {Reason}",
+                    lineIndex, path, ex.Message);
             }
+        }
         return records;
     }
 
-    private void Save(MemoryScope scope, IReadOnlyDictionary<string, MemoryRecord> records)
+    private async Task FlushLockedAsync(CancellationToken ct)
+    {
+        if (_dirty.Count == 0) return;
+        ct.ThrowIfCancellationRequested();
+
+        // Snapshot under the gate: dirty scopes always have a loaded index.
+        var scopes = _dirty.ToArray();
+        foreach (var scope in scopes)
+        {
+            var records = _index[scope];
+            await WriteRecordsFileAsync(scope, records).ConfigureAwait(false);
+            await WriteSummaryFileAsync(scope, records).ConfigureAwait(false);
+        }
+        _dirty.Clear();
+    }
+
+    private async Task WriteRecordsFileAsync(MemoryScope scope, IReadOnlyDictionary<string, MemoryRecord> records)
     {
         var dir = ScopeDir(scope);
         Directory.CreateDirectory(dir);
@@ -226,11 +333,12 @@ public sealed class FileMemoryProvider : IMemoryProvider
         }
 
         var temp = path + ".tmp";
-        IOFile.WriteAllText(temp, builder.ToString(), Encoding.UTF8);
+        await IOFile.WriteAllTextAsync(temp, builder.ToString(), Encoding.UTF8).ConfigureAwait(false);
         IOFile.Move(temp, path, overwrite: true);
+        RecordsWriteCount++;
     }
 
-    private void RegenerateSummary(MemoryScope scope, IReadOnlyDictionary<string, MemoryRecord> records)
+    private async Task WriteSummaryFileAsync(MemoryScope scope, IReadOnlyDictionary<string, MemoryRecord> records)
     {
         var dir = ScopeDir(scope);
         var path = Path.Combine(dir, SummaryFileName);
@@ -257,7 +365,7 @@ public sealed class FileMemoryProvider : IMemoryProvider
         }
 
         var temp = path + ".tmp";
-        IOFile.WriteAllText(temp, builder.ToString(), Encoding.UTF8);
+        await IOFile.WriteAllTextAsync(temp, builder.ToString(), Encoding.UTF8).ConfigureAwait(false);
         IOFile.Move(temp, path, overwrite: true);
     }
 
@@ -269,6 +377,47 @@ public sealed class FileMemoryProvider : IMemoryProvider
     };
 
     private string RecordsPath(MemoryScope scope) => Path.Combine(ScopeDir(scope), RecordsFileName);
+
+    // --- debounced background safety net ---
+
+    private void ScheduleDebouncedFlush()
+    {
+        _pendingFlush?.Cancel();
+        _pendingFlush?.Dispose();
+        var pending = CancellationTokenSource.CreateLinkedTokenSource(_flushCts.Token);
+        _pendingFlush = pending;
+        _ = FlushAfterDelayAsync(pending);
+    }
+
+    private void CancelPendingFlush()
+    {
+        _pendingFlush?.Cancel();
+        _pendingFlush?.Dispose();
+        _pendingFlush = null;
+    }
+
+    private async Task FlushAfterDelayAsync(CancellationTokenSource pending)
+    {
+        try
+        {
+            await Task.Delay(FlushDebounceDelay, pending.Token).ConfigureAwait(false);
+            await FlushAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer mutation, an explicit flush, or dispose.
+        }
+        catch (Exception)
+        {
+            // Best-effort background safety net; failures surface on explicit FlushAsync/Dispose.
+        }
+        finally
+        {
+            pending.Dispose(); // idempotent; the scheduler may already have disposed it.
+        }
+    }
+
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
     // --- keyword scoring ---
 

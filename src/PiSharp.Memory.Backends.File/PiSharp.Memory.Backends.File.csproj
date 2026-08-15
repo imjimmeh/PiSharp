@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PiSharp.Memory.Abstractions\PiSharp.Memory.Abstractions.csproj" />
     <ProjectReference Include="..\PiSharp.Extensions\PiSharp.Extensions.csproj" />
+    <InternalsVisibleTo Include="PiSharp.Memory.Tests" />
   </ItemGroup>
 
 </Project>
