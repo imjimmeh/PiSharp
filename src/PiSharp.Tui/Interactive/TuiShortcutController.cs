@@ -10,7 +10,19 @@ public sealed record TuiShortcutControllerOptions(
 
 public sealed class TuiShortcutController(TuiShortcutControllerOptions options)
 {
+    private IReadOnlyList<TuiExtensionShortcutBinding>? _cachedBindings;
+
+    /// <summary>
+    /// Builds the extension shortcut bindings, caching the result so the shortcut source
+    /// (which may be a remote round trip) is not consulted on every keystroke. Call
+    /// <see cref="InvalidateExtensionShortcuts"/> when the source changes (e.g. extensions load).
+    /// </summary>
     public IReadOnlyList<TuiExtensionShortcutBinding> BuildExtensionShortcutBindings()
+        => _cachedBindings ??= BuildCore();
+
+    public void InvalidateExtensionShortcuts() => _cachedBindings = null;
+
+    private IReadOnlyList<TuiExtensionShortcutBinding> BuildCore()
     {
         var registrations = options.GetExtensionShortcuts();
         var bindings = new List<TuiExtensionShortcutBinding>();

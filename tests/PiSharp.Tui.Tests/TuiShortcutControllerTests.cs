@@ -53,6 +53,31 @@ public sealed class TuiShortcutControllerTests
         Assert.Equal(string.Empty, capturedArgs);
     }
 
+    [Fact]
+    public void BuildExtensionShortcutBindingsCachesUntilInvalidated()
+    {
+        var calls = 0;
+        var controller = new TuiShortcutController(new TuiShortcutControllerOptions(
+            () =>
+            {
+                calls++;
+                return [Registration("extension:ok", "ctrl+k")];
+            },
+            NoExtensionUi.Instance,
+            _ => { }));
+
+        var first = controller.BuildExtensionShortcutBindings();
+        var second = controller.BuildExtensionShortcutBindings();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, calls);
+
+        controller.InvalidateExtensionShortcuts();
+
+        _ = controller.BuildExtensionShortcutBindings();
+        Assert.Equal(2, calls);
+    }
+
     private static OwnedExtensionRegistration<ExtensionShortcutRegistration> Registration(string sourceId, string keys)
         => new($"shortcut:{keys}:{sourceId}", sourceId, new ExtensionShortcutRegistration(keys, "Run", (_, _) => Task.CompletedTask));
 }

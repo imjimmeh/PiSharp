@@ -303,6 +303,25 @@ public sealed class PromptEditorTests
     }
 
     [Fact]
+    public void InlineSelectionArrowDoesNotScrollTranscriptBeforeSuggestionsLoad()
+    {
+        var transcriptScrolls = new List<int>();
+        var prompt = new PromptEditor
+        {
+            AllowEmptySubmit = true,
+            CompleteText = _ => []
+        };
+        prompt.TranscriptScrollRequested += transcriptScrolls.Add;
+        prompt.SetPromptText(string.Empty);
+
+        prompt.NewKeyDownEvent(Key.CursorDown);
+
+        // While an inline selection is active, arrow keys belong to the picker — they must
+        // never be hijacked into transcript scrolling, even before async suggestions arrive.
+        Assert.Empty(transcriptScrolls);
+    }
+
+    [Fact]
     public void EscapeDismissesVisibleSuggestionsBeforeClearingPromptText()
     {
         var prompt = new PromptEditor

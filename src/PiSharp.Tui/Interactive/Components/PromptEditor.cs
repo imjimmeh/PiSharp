@@ -239,6 +239,10 @@ public sealed class PromptEditor : TextView, IPromptEditorSurface
     private bool TryRequestTranscriptScroll(Key key)
     {
         if (TranscriptScrollRequested is null) return false;
+        // While an inline selection is active the arrow keys belong to the picker, not the
+        // transcript. Without this guard, arrows are hijacked into transcript scrolling during
+        // the brief window before async suggestions have loaded (Suggestions.Count == 0).
+        if (_controller.AllowEmptySubmit) return false;
         if (key.IsCtrl || key.IsAlt) return false;
         if (key.KeyCode is not (KeyCode.CursorUp or KeyCode.CursorDown)) return false;
         if (Suggestions.Count > 0) return false;

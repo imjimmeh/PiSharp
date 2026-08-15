@@ -178,6 +178,9 @@ public sealed class TuiHost(TuiHostOptions options)
         var shortcutController = new TuiShortcutController(new TuiShortcutControllerOptions(
             () => options.GetExtensionShortcuts?.Invoke() ?? [], extensionUi, _ => { }));
         _ = shortcutController.BuildExtensionShortcutBindings();
+        // Extension shortcuts are cached so the (potentially remote) source isn't consulted on
+        // every keystroke; refresh the cache whenever the extension load state changes.
+        renderCoordinator.OnExtensionShortcutsChanged = () => shortcutController.InvalidateExtensionShortcuts();
 
         // sessionRefresh / onAbortRequested are set after construction to break circular dependency with commandController.
         Func<CancellationToken, Task>? sessionRefresh = null;

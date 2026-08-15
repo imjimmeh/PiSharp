@@ -87,6 +87,10 @@ internal sealed class TuiRenderCoordinator : IDisposable
 
     public Func<InlineSelectionSession?>? SelectionSessionGetter { set => _getSelectionSession = value ?? (() => null); }
     public Func<bool>? IsInputCaptured { get; set; }
+    // Invoked on the UI thread whenever the extension load status changes, so subscribers (e.g.
+    // the extension-shortcut cache) can refresh state that is only valid while extensions are stable.
+    public Action? OnExtensionShortcutsChanged { get; set; }
+
 
     public void Render()
     {
@@ -245,16 +249,19 @@ internal sealed class TuiRenderCoordinator : IDisposable
 
     private void UpdateExtensionLoadStatus(TuiExtensionLoadStatus? latest)
     {
-        var previous = _extensionLoadStatus;
-        if (Equals(previous, latest)) return;
-
         if (latest is null)
         {
             _extensionLoadWasActive = false;
             _extensionLoadStatus = null;
+            OnExtensionShortcutsChanged?.Invoke();
             RequestRender();
             return;
         }
+
+        var previous = _extensionLoadStatus;
+        if (Equals(previous, latest)) return;
+
+        OnExtensionShortcutsChanged?.Invoke();
 
         _extensionLoadStatus = latest;
         var isActive = latest.IsLoading;
