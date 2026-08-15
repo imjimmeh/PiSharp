@@ -218,6 +218,9 @@ public sealed class PiServerWebSocketHandler(
         logger.LogDebug("Created server session in {ElapsedMilliseconds:0.0} ms", elapsedMilliseconds);
         if (registry.TryGet(created.ServerSessionId, out var live))
         {
+            // Bind the daemon-side extension UI forwarder so extension UI requests (permission
+            // approvals, confirmations, custom UI) round-trip to this client's session lane.
+            EnsureExtensionUiBound(live);
             // Feed the daemon theme registry from this session's theme resources so list_themes/
             // get_theme can answer before any explicit set_theme. Discovery is not a precondition
             // for the client session response.
@@ -249,9 +252,23 @@ public sealed class PiServerWebSocketHandler(
     {
         var command = JsonSerializer.Deserialize<AttachCommand>(json, ServerJsonSerializer.Options)!;
         var live = RequireSession(command.ServerSessionId);
+        EnsureExtensionUiBound(live);
         var replay = live.EventLog.ReplayFrom(command.SinceSequence);
         if (ensureEventPump is not null) await ensureEventPump(live, command.SinceSequence);
         return ServerResponse.Ok(envelope.Id, envelope.Type, new AttachResult(live.Id, replay.FromSequence, replay.HeadSequence, replay.Gap, replay.Events.Count));
+    }
+
+    /// <summary>
+    /// Binds the daemon-side extension UI forwarder to the session's extension binding so
+    /// extension UI requests (permission approvals, confirmations, custom UI) round-trip to the
+    /// attached interactive client over the <c>ui_request</c>/<c>ui_response</c> lane. Sessions
+    /// with no attached client keep the immediate hard deny (see <see cref="DaemonExtensionUi"/>).
+    /// </summary>
+    private void EnsureExtensionUiBound(LiveServerSession live)
+    {
+        var binding = live.Runtime.ExtensionBinding;
+        if (binding.Ui is DaemonExtensionUi) return;
+        binding.SetUi(new DaemonExtensionUi(live, Bridge), true);
     }
 
     private async Task<ServerResponse> DisposeSessionAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)

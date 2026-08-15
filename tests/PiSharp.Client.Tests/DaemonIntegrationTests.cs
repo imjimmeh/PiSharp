@@ -1,9 +1,12 @@
 using System.Text.Json;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Client;
+using PiSharp.Extensions;
+using PiSharp.Permissions;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Hosting;
 using PiSharp.Server.Serialization;
+using PiSharp.Server.UiBridge;
 using Xunit;
 
 namespace PiSharp.Client.Tests;
@@ -271,8 +274,81 @@ public sealed class DaemonIntegrationTests
             ServerSessionId = sessionId,
         };
 
+
         // A delegate-less daemon answers not_available; the client must tolerate it instead of throwing.
         await backend.PostStartupChecksAsync(_ => Task.CompletedTask);
+    }
+
+    [Fact]
+    public async Task DaemonSession_WithAttachedClient_ApprovalClient_ReturnsAllow()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: sessionId),
+            new { sinceSequence = 0L },
+            CancellationToken.None);
+
+        // The daemon session the interactive client created/attached must carry a working
+        // extension UI (P01): ApprovalClient's permission_request round-trips to this client.
+        var live = Assert.Single(host.Registry.Sessions);
+        var binding = live.Runtime.ExtensionBinding;
+        Assert.IsType<DaemonExtensionUi>(binding.Ui);
+        Assert.True(binding.HasUi);
+        await WaitUntilAsync(() => live.AttachedClients > 0, TimeSpan.FromSeconds(8));
+
+        var uiRequestTcs = new TaskCompletionSource<ServerUiIntent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        conn.EventReceived += envelope =>
+        {
+            if (envelope.Event.Type == "ui_request")
+                uiRequestTcs.TrySetResult(ClientToTuiAdapter.FromPayload<ServerUiIntent>(envelope.Event.Data)!);
+        };
+
+        // Back the real ApprovalClient with the session's real extension API (binding-backed),
+        // exactly as a daemon-loaded permissions extension would be.
+        var captured = new CapturingExtension();
+        await live.Runtime.ExtensionManager!.InitializeAsync(
+            new ExtensionDescriptor("itest-approval", "ITest Approval", "1.0.0"),
+            captured,
+            binding,
+            CancellationToken.None);
+        var approvals = new ApprovalClient(captured.Api!);
+
+        var approvalTask = approvals.RequestApprovalAsync(
+            "bash",
+            JsonSerializer.SerializeToElement(new { command = "echo hi" }),
+            "run a command",
+            "s1");
+
+        var intent = await uiRequestTcs.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.Equal(ApprovalClient.PermissionRequestKind, intent.Kind);
+
+        // The attached client answers "allow"; the approval must resolve to Allow (today:
+        // NoExtensionUi hard-denies and ApprovalClient returns Deny).
+        await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.UiResponse, ServerSessionId: sessionId),
+            new { requestId = intent.RequestId, value = "allow", cancelled = false },
+            CancellationToken.None);
+
+        var verdict = await approvalTask.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.Equal(ApprovalVerdict.Allow, verdict);
     }
 
     // --- helpers ---
@@ -295,6 +371,30 @@ public sealed class DaemonIntegrationTests
         var root = Path.Combine(Path.GetTempPath(), "pisharp-daemon-itest-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         return root;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!condition())
+        {
+            if (DateTime.UtcNow >= deadline) throw new TimeoutException("Condition not met within timeout.");
+            await Task.Delay(15);
+        }
+    }
+
+    /// <summary>Captures the <see cref="IExtensionApi"/> a real <c>ExtensionManager</c> hands to
+    /// the extension, so a test can drive <see cref="ApprovalClient"/> through the session's
+    /// binding-backed API exactly like a daemon-loaded extension would.</summary>
+    private sealed class CapturingExtension : IExtension
+    {
+        public IExtensionApi? Api { get; private set; }
+
+        public Task InitializeAsync(IExtensionApi api, CancellationToken cancellationToken = default)
+        {
+            Api = api;
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>Matches the <c>{ text = ... }</c> body of a <c>system_message</c> server event.</summary>
