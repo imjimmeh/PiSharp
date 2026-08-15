@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace PiSharp.Coordination;
 
-public sealed class CoordinationJsonlStore
+public sealed class CoordinationJsonlStore : IDisposable
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -14,10 +16,12 @@ public sealed class CoordinationJsonlStore
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> WriteLocks = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly string _directory;
+    private readonly ILogger _logger;
 
-    public CoordinationJsonlStore(string directory)
+    public CoordinationJsonlStore(string directory, ILogger<CoordinationJsonlStore>? logger = null)
     {
         _directory = directory;
+        _logger = logger ?? NullLogger<CoordinationJsonlStore>.Instance;
     }
 
     private string FilePath => Path.GetFullPath(Path.Combine(_directory, "events.jsonl"));
@@ -48,23 +52,31 @@ public sealed class CoordinationJsonlStore
         var lines = await File.ReadAllLinesAsync(FilePath);
         var records = new List<CoordinationRecord>(lines.Length);
 
-        foreach (var line in lines)
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
+            var line = lines[lineIndex];
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
-            using var document = JsonDocument.Parse(line);
-            var root = document.RootElement;
+            CoordinationRecord record;
+            try
+            {
+                record = DeserializeRecord(line);
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+            {
+                // Skip-and-log: a single corrupt or unknown line (e.g. written by a newer version)
+                // must not brick the store for every other record in the file. The line stays in
+                // place; a future maintenance pass could rewrite the file without skipped lines
+                // (rewrite-if-repaired), but that is deliberately not done here.
+                _logger.LogWarning(
+                    "Skipping corrupt coordination record at line {LineIndex} of '{FilePath}': {Reason}",
+                    lineIndex + 1, FilePath, ex.Message);
+                continue;
+            }
 
-            if (!root.TryGetProperty("type", out var typeElement))
-                throw new InvalidOperationException("JSONL record missing 'type' discriminator.");
-
-            var type = typeElement.GetString();
-
-            if (string.IsNullOrWhiteSpace(type))
-                throw new InvalidOperationException("JSONL record has a blank 'type' discriminator.");
-
-            var record = DeserializeRecord(line, type);
+            // Strict validation stays for known types: a well-typed record missing required fields
+            // indicates a writer bug and still surfaces as an error rather than being silently dropped.
             ValidateRecord(record);
             records.Add(record);
         }
@@ -72,8 +84,19 @@ public sealed class CoordinationJsonlStore
         return records;
     }
 
-    private static CoordinationRecord DeserializeRecord(string json, string type)
+    private static CoordinationRecord DeserializeRecord(string json)
     {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        if (!root.TryGetProperty("type", out var typeElement))
+            throw new InvalidOperationException("JSONL record missing 'type' discriminator.");
+
+        var type = typeElement.GetString();
+
+        if (string.IsNullOrWhiteSpace(type))
+            throw new InvalidOperationException("JSONL record has a blank 'type' discriminator.");
+
         CoordinationRecord? record = type switch
         {
             "agent_registered" => JsonSerializer.Deserialize<AgentRegisteredRecord>(json, SerializerOptions),
@@ -92,6 +115,13 @@ public sealed class CoordinationJsonlStore
 
         return record;
     }
+
+    /// <summary>
+    /// Releases the process-wide write lock entry for this store's file path. In-flight appends
+    /// already hold their own <see cref="SemaphoreSlim"/> reference, so removing the entry cannot
+    /// break them; it only stops short-lived stores from accumulating entries in the static map.
+    /// </summary>
+    public void Dispose() => WriteLocks.TryRemove(FilePath, out _);
 
     private static void ValidateRecord(CoordinationRecord record)
     {

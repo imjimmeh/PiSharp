@@ -1,4 +1,5 @@
 using Xunit;
+using Microsoft.Extensions.Logging;
 
 namespace PiSharp.Coordination.Tests;
 
@@ -31,18 +32,23 @@ public sealed class CoordinationJsonlStoreTests
     }
 
     [Fact]
-    public async Task ReadAllThrowsForUnknownRecordType()
+    public async Task ReadAllSkipsUnknownRecordTypeAndLogsWarning()
     {
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var store = new CoordinationJsonlStore(directory);
+        var logger = new ListLogger();
+        var store = new CoordinationJsonlStore(directory, logger);
 
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(
             Path.Combine(directory, "events.jsonl"),
             "{\"type\":\"unknown_type\",\"timestamp\":\"2024-01-01T00:00:00+00:00\"}\n");
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => store.ReadAllAsync());
-        Assert.Contains("unknown_type", ex.Message);
+        var records = await store.ReadAllAsync();
+
+        Assert.Empty(records);
+        var warning = Assert.Single(logger.Messages);
+        Assert.Contains("unknown_type", warning);
+        Assert.Contains("line 1", warning);
     }
 
     [Fact]
@@ -91,33 +97,41 @@ public sealed class CoordinationJsonlStoreTests
     }
 
     [Fact]
-    public async Task ReadAllThrowsForBlankTypeDiscriminator()
+    public async Task ReadAllSkipsBlankTypeDiscriminatorAndLogsWarning()
     {
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var store = new CoordinationJsonlStore(directory);
+        var logger = new ListLogger();
+        var store = new CoordinationJsonlStore(directory, logger);
 
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(
             Path.Combine(directory, "events.jsonl"),
             "{\"type\":\"\",\"timestamp\":\"2024-01-01T00:00:00+00:00\"}\n");
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => store.ReadAllAsync());
-        Assert.Contains("blank", ex.Message, StringComparison.OrdinalIgnoreCase);
+        var records = await store.ReadAllAsync();
+
+        Assert.Empty(records);
+        var warning = Assert.Single(logger.Messages);
+        Assert.Contains("blank", warning, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task ReadAllThrowsForMissingTypeDiscriminator()
+    public async Task ReadAllSkipsMissingTypeDiscriminatorAndLogsWarning()
     {
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var store = new CoordinationJsonlStore(directory);
+        var logger = new ListLogger();
+        var store = new CoordinationJsonlStore(directory, logger);
 
         Directory.CreateDirectory(directory);
         await File.WriteAllTextAsync(
             Path.Combine(directory, "events.jsonl"),
             "{\"timestamp\":\"2024-01-01T00:00:00+00:00\"}\n");
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => store.ReadAllAsync());
-        Assert.Contains("type", ex.Message, StringComparison.OrdinalIgnoreCase);
+        var records = await store.ReadAllAsync();
+
+        Assert.Empty(records);
+        var warning = Assert.Single(logger.Messages);
+        Assert.Contains("type", warning, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -531,5 +545,46 @@ public sealed class CoordinationJsonlStoreTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => store.ReadAllAsync());
         Assert.Contains("Unknown", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("subagents:unknown", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ReadAllSkipsGarbageAndUnknownTypeLinesButKeepsValidRecords()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var logger = new ListLogger();
+        var store = new CoordinationJsonlStore(directory, logger);
+
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "events.jsonl"),
+            "this is not json\n" +
+            "{\"type\":\"unknown_type\",\"timestamp\":\"2024-01-01T00:00:00+00:00\"}\n" +
+            "{\"type\":\"agent_heartbeat\",\"agentId\":\"a1\",\"timestamp\":\"1970-01-01T00:00:00+00:00\"}\n");
+
+        var records = await store.ReadAllAsync();
+
+        var replayed = Assert.Single(records);
+        Assert.IsType<AgentHeartbeatRecord>(replayed);
+        Assert.Equal(2, logger.Messages.Count);
+        Assert.Contains(logger.Messages, message => message.Contains("line 1"));
+        Assert.Contains(logger.Messages, message => message.Contains("unknown_type"));
+        Assert.Contains(logger.Messages, message => message.Contains("line 2"));
+    }
+
+    private sealed class ListLogger : ILogger<CoordinationJsonlStore>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Messages.Add(formatter(state, exception));
     }
 }
