@@ -205,19 +205,21 @@ public sealed class TuiCommandControllerTests
     public async Task SetStateRoutesThroughAtomicUpdaterWhenProvided()
     {
         var store = new RenderStateStore(Empty());
+        var renderRequests = 0;
         var controller = new TuiCommandController(new TuiCommandControllerOptions(
             () => store.Snapshot(),
             store.Replace,
             () => { },
             () => { },
             () => "HOTKEYS",
-            UpdateState: store.Update));
+            UpdateState: update => { var next = store.Update(update); Interlocked.Increment(ref renderRequests); return next; }));
 
         var results = await Task.WhenAll(Enumerable.Range(0, 50)
             .Select(_ => Task.Run(() => controller.TryHandleCommandAsync("/help", CancellationToken.None))));
 
         Assert.All(results, Assert.True);
         Assert.Equal(50, store.Snapshot().Transcript.Count);
+        Assert.Equal(50, Volatile.Read(ref renderRequests));
     }
 
     private static async Task WaitUntilAsync(Func<bool> predicate)

@@ -226,7 +226,7 @@ public sealed class TuiHost(TuiHostOptions options)
             token => sessionRefresh?.Invoke(token) ?? Task.CompletedTask,
             () => runtime.Phase,
             OnAbortRequested: () => onAbortRequested?.Invoke(),
-            UpdateState: stateStore.Update),
+            UpdateState: update => { var next = stateStore.Update(update); renderCoordinator.RequestRender(); return next; }),
             options.LoggerFactory);
         // Wire interactive UI requests (select/input/confirm from daemon slash
         // commands or server extension UI) to the local dialog pipeline. With no
