@@ -34,21 +34,23 @@ public sealed class ClientSessionConnection : IAsyncDisposable
     /// Sends a command, assigning a fresh <see cref="ServerCommandEnvelope.Id"/> when the caller
     /// omitted one, and returns the server's response.
     /// </summary>
-    public Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, CancellationToken ct = default)
-        => SendAsync(envelope, payload: null, ct);
+    public Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, CancellationToken ct = default, TimeSpan? timeoutOverride = null)
+        => SendAsync(envelope, payload: null, ct, timeoutOverride);
 
     /// <summary>
     /// Sends a command, assigning a fresh <see cref="ServerCommandEnvelope.Id"/> when the caller
     /// omitted one, and returns the server's response. The optional <paramref name="payload"/> object's
     /// properties are merged into the frame (see <see cref="IClientTransport.SendCommandAsync(ServerCommandEnvelope, object?, CancellationToken)"/>).
+    /// When <paramref name="timeoutOverride"/> is provided it replaces the transport's default command
+    /// timeout for this call only.
     /// </summary>
-    public async Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct = default)
+    public async Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct = default, TimeSpan? timeoutOverride = null)
     {
         if (envelope.Id is null)
         {
             envelope = envelope with { Id = Guid.NewGuid().ToString("N") };
         }
-        return await _transport.SendCommandAsync(envelope, payload, ct);
+        return await _transport.SendCommandAsync(envelope, payload, ct, timeoutOverride);
     }
 
     public async ValueTask DisposeAsync()

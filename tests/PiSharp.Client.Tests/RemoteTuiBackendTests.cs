@@ -221,10 +221,10 @@ public sealed class RemoteTuiBackendTests
 
         public Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct) => Task.CompletedTask;
 
-        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
-            => SendCommandAsync(envelope, payload: null, ct);
+        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
+            => SendCommandAsync(envelope, payload: null, ct, timeoutOverride);
 
-        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
+        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
         {
             Commands.Add((envelope, payload));
             return Task.FromResult(Responder?.Invoke(envelope.Type) ?? ServerResponse.Ok(envelope.Id, envelope.Type));

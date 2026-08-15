@@ -57,13 +57,13 @@ public sealed class ClientWebSocketTransport : IClientTransport
         _ = Task.Run(() => ReadLoopAsync(_readerCts.Token), CancellationToken.None);
     }
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
-        => SendCommandCoreAsync(envelope, payload: null, ct);
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
+        => SendCommandCoreAsync(envelope, payload: null, ct, timeoutOverride);
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
-        => SendCommandCoreAsync(envelope, payload, ct);
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
+        => SendCommandCoreAsync(envelope, payload, ct, timeoutOverride);
 
-    private async Task<ServerResponse> SendCommandCoreAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
+    private async Task<ServerResponse> SendCommandCoreAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
     {
         if (envelope.Id is null)
             throw new ArgumentException("Envelope Id is required for command correlation.", nameof(envelope));
@@ -78,8 +78,9 @@ public sealed class ClientWebSocketTransport : IClientTransport
             _logger?.LogDebug("WebSocket command sent: {Command}", envelope.Type);
             await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct);
 
+            var effectiveTimeout = timeoutOverride ?? _commandTimeout;
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            linked.CancelAfter(_commandTimeout);
+            linked.CancelAfter(effectiveTimeout);
             try
             {
                 return await tcs.Task.WaitAsync(linked.Token);
@@ -87,7 +88,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 return ServerResponse.Fail(envelope.Id, envelope.Type, "timeout",
-                    $"No response for command '{envelope.Type}' within {_commandTimeout.TotalSeconds:0.#}s.");
+                    $"No response for command '{envelope.Type}' within {effectiveTimeout.TotalSeconds:0.#}s.");
             }
         }
         finally

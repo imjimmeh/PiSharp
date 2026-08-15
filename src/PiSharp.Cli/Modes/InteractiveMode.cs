@@ -25,6 +25,12 @@ public static class InteractiveMode
 {
     private static ILogger? _footerLogger;
 
+    /// <summary>
+    /// create_session triggers daemon-side extension discovery (native + TS) and can exceed the
+    /// 30s default command timeout, so it gets a longer per-command override.
+    /// </summary>
+    private static readonly TimeSpan CreateSessionTimeout = TimeSpan.FromSeconds(90);
+
     public static async Task<int> RunAsync(SessionRuntime runtime, CancellationToken cancellationToken = default, bool local = false)
     {
         var options = CreateTuiHostOptions(runtime);
@@ -427,7 +433,7 @@ public static class InteractiveMode
             NoThemes: runtimeArgs.NoThemes,
             NoContextFiles: runtimeArgs.NoContextFiles);
 
-        var response = await connection.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.CreateSession), request, cancellationToken);
+        var response = await connection.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.CreateSession), request, cancellationToken, CreateSessionTimeout);
         if (!response.Success)
         {
             throw new InvalidOperationException($"create_session failed: {response.Error?.Code}: {response.Error?.Message}");

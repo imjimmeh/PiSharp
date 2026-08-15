@@ -75,10 +75,10 @@ public sealed class FakeTransport : IClientTransport
         return Task.CompletedTask;
     }
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct)
-        => SendCommandAsync(envelope, payload: null, ct);
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
+        => SendCommandAsync(envelope, payload: null, ct, timeoutOverride);
 
-    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct)
+    public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
     {
         LastCommand = envelope;
         LastPayload = payload;
