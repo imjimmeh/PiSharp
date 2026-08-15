@@ -1,0 +1,258 @@
+diff --git a/src/PiSharp.Server/UiBridge/IServerUiBridge.cs b/src/PiSharp.Server/UiBridge/IServerUiBridge.cs
+index 0bb298c..0cae098 100644
+--- a/src/PiSharp.Server/UiBridge/IServerUiBridge.cs
++++ b/src/PiSharp.Server/UiBridge/IServerUiBridge.cs
+@@ -1,17 +1,23 @@
++using PiSharp.Server.Runtime;
+ using PiSharp.Server.Contracts;
+ 
+ namespace PiSharp.Server.UiBridge;
+ 
+ /// <summary>
+ /// Bidirectional bridge for extension UI requests between the daemon and attached clients.
+ /// Server-side callers register a pending request (keyed by <see cref="ServerUiIntent.RequestId"/>);
+ /// the request is pushed to the target session as a <c>ui_request</c> event, and a client's
+ /// <c>ui_response</c> command completes it via <see cref="ResolveUiAsync"/>. When no client answers
+ /// within the bridge's response timeout, the pending request resolves as cancelled so extension
+ /// turns do not hang.
+ /// </summary>
+ public interface IServerUiBridge
+ {
+     Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default);
++    /// <summary>
++    /// Session-scoped request: emits the <c>ui_request</c> onto <paramref name="target"/> and honors
++    /// <paramref name="responseTimeout"/> (falling back to the bridge default when null).
++    /// </summary>
++    Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, LiveServerSession target, TimeSpan? responseTimeout, CancellationToken ct = default);
+     void ResolveUiAsync(string requestId, string? value, bool cancelled);
+ }
+diff --git a/src/PiSharp.Server/UiBridge/ServerUiBridge.cs b/src/PiSharp.Server/UiBridge/ServerUiBridge.cs
+index 5cf1685..38450d2 100644
+--- a/src/PiSharp.Server/UiBridge/ServerUiBridge.cs
++++ b/src/PiSharp.Server/UiBridge/ServerUiBridge.cs
+@@ -22,34 +22,46 @@ public sealed class ServerUiBridge : IServerUiBridge
+     private readonly ILogger<ServerUiBridge> _logger;
+     private readonly ThemeRegistry _themes;
+ 
+     public ServerUiBridge(ServerSessionRegistry registry, ILogger<ServerUiBridge>? logger = null, ThemeRegistry? themeRegistry = null)
+     {
+         _registry = registry;
+         _logger = logger ?? NullLogger<ServerUiBridge>.Instance;
+         _themes = themeRegistry ?? new ThemeRegistry();
+     }
+ 
+-    public async Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
++    public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
++        => RequestUiAsyncCore(intent, target: null, responseTimeout: null, cancellationToken);
++
++    public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, LiveServerSession target, TimeSpan? responseTimeout, CancellationToken ct = default)
++        => RequestUiAsyncCore(intent, target, responseTimeout, ct);
++
++    /// <summary>
++    /// Shared request pipeline: registers a pending response keyed by the intent's request id, emits
++    /// the <c>ui_request</c> onto <paramref name="target"/> (falling back to the most recent session
++    /// when null), and auto-cancels after <paramref name="responseTimeout"/> (the bridge default when
++    /// null) unless a client resolves it first.
++    /// </summary>
++    private async Task<ServerUiResponse> RequestUiAsyncCore(ServerUiIntent intent, LiveServerSession? target, TimeSpan? responseTimeout, CancellationToken cancellationToken)
+     {
+         // Theme UI kinds are answered daemon-side from the ThemeRegistry (plan C8) — never
+         // forwarded to an attached client, because themes are daemon-resident.
+         var intercepted = await TryInterceptThemeRequestAsync(intent, cancellationToken);
+         if (intercepted is not null) return intercepted;
+ 
+         var tcs = new TaskCompletionSource<ServerUiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+         _pending[intent.RequestId] = tcs;
+         try
+         {
+-            EmitUiRequest(intent);
++            EmitUiRequest(intent, target);
+             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+-            timeout.CancelAfter(ResponseTimeout);
++            timeout.CancelAfter(responseTimeout ?? ResponseTimeout);
+             using var registration = timeout.Token.Register(() => tcs.TrySetResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true)));
+             try
+             {
+                 return await tcs.Task.ConfigureAwait(false);
+             }
+             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+             {
+                 return new ServerUiResponse(intent.RequestId, null, Cancelled: true);
+             }
+         }
+@@ -57,23 +69,23 @@ public sealed class ServerUiBridge : IServerUiBridge
+         {
+             _pending.TryRemove(intent.RequestId, out _);
+         }
+     }
+ 
+     public void ResolveUiAsync(string requestId, string? value, bool cancelled)
+     {
+         if (_pending.TryGetValue(requestId, out var tcs)) tcs.TrySetResult(new ServerUiResponse(requestId, value, cancelled));
+     }
+ 
+-    private void EmitUiRequest(ServerUiIntent intent)
++    private void EmitUiRequest(ServerUiIntent intent, LiveServerSession? target)
+     {
+-        var session = SelectSession();
++        var session = target ?? SelectSession();
+         if (session is null)
+         {
+             _logger.LogDebug("UI request {RequestId} has no target session; treating as cancelled", intent.RequestId);
+             return;
+         }
+ 
+         session.EmitEvent(AgentSessionEvent.FromServer("ui_request", new
+         {
+             requestId = intent.RequestId,
+             kind = intent.Kind,
+diff --git a/src/PiSharp.Server/WebSockets/PiServerWebSocketHandler.cs b/src/PiSharp.Server/WebSockets/PiServerWebSocketHandler.cs
+index b93636e..09badeb 100644
+--- a/src/PiSharp.Server/WebSockets/PiServerWebSocketHandler.cs
++++ b/src/PiSharp.Server/WebSockets/PiServerWebSocketHandler.cs
+@@ -28,20 +28,22 @@ public sealed class PiServerWebSocketHandler(
+     TelemetryMetricsAggregator? metrics = null)
+ {
+     private IServerUiBridge Bridge => uiBridge ?? NoOpServerUiBridge.Instance;
+     private ThemeRegistry Themes => themeRegistry ?? new ThemeRegistry();
+ 
+     private sealed class NoOpServerUiBridge : IServerUiBridge
+     {
+         public static NoOpServerUiBridge Instance { get; } = new();
+         public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
+             => Task.FromResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
++        public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, LiveServerSession target, TimeSpan? responseTimeout, CancellationToken ct = default)
++            => Task.FromResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
+         public void ResolveUiAsync(string requestId, string? value, bool cancelled) { }
+     }
+ 
+     public async Task HandleHttpAsync(HttpContext context)
+     {
+         if (!apiKeys.Validate(context))
+         {
+             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+             await context.Response.WriteAsync("Missing or invalid API key.");
+             return;
+diff --git a/tests/PiSharp.Server.Tests/PiServerUiBridgeTests.cs b/tests/PiSharp.Server.Tests/PiServerUiBridgeTests.cs
+new file mode 100644
+index 0000000..2b40bf3
+--- /dev/null
++++ b/tests/PiSharp.Server.Tests/PiServerUiBridgeTests.cs
+@@ -0,0 +1,117 @@
++using System.Runtime.CompilerServices;
++using System.Text.Json;
++using PiSharp.Abstractions.Messages;
++using PiSharp.Abstractions.Options;
++using PiSharp.Abstractions.Sessions;
++using PiSharp.Agent.Core;
++using PiSharp.Agent.Core.Models;
++using PiSharp.Agent.Core.Streaming;
++using PiSharp.Agent.Harness;
++using PiSharp.Agent.Sessions;
++using PiSharp.Runtime.IO;
++using PiSharp.Server.Contracts;
++using PiSharp.Server.Runtime;
++using PiSharp.Server.UiBridge;
++using Xunit;
++
++namespace PiSharp.Server.Tests;
++
++/// <summary>
++/// Session-scoped UI bridge overloads: a request driven through the target-scoped
++/// <c>RequestUiAsync(intent, target, responseTimeout, ct)</c> overload must emit its
++/// <c>ui_request</c> onto the specific <see cref="LiveServerSession"/> (not the global
++/// most-recent session) and honor an explicit per-call response timeout instead of the bridge's
++/// fixed auto-cancel window. The "client" here is a raw event reader on the target session that
++/// answers by calling <c>ResolveUiAsync</c> — the same resolution the server's <c>ui_response</c>
++/// command invokes on the wire.
++/// </summary>
++public sealed class PiServerUiBridgeTests
++{
++    [Fact]
++    public async Task Select_ThroughTargetScopedOverload_ResolvesToAnsweredValue()
++    {
++        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
++        var bridge = new ServerUiBridge(registry);
++        var target = await CreateSessionAsync(registry);
++
++        var intent = new ServerUiIntent("ui-select-1", "select", "Pick", "Choose one", ["alpha", "beta"], null);
++        var responseTask = bridge.RequestUiAsync(intent, target, TimeSpan.FromSeconds(30), CancellationToken.None);
++
++        // The client reads the ui_request off the target session's event lane and answers.
++        await foreach (var envelope in target.ReadEventsAsync(0, CancellationToken.None))
++        {
++            if (envelope.Event.Type != "ui_request") continue;
++            var requestId = JsonDocument.Parse(JsonSerializer.Serialize(envelope.Event.Data))
++                .RootElement.GetProperty("requestId").GetString();
++            Assert.Equal(intent.RequestId, requestId);
++            bridge.ResolveUiAsync(requestId!, "beta", cancelled: false);
++            break;
++        }
++
++        var response = await responseTask;
++        Assert.False(response.Cancelled);
++        Assert.Equal("beta", response.Value);
++    }
++
++    [Fact]
++    public async Task Select_GenerousResponseTimeout_DoesNotAutoCancelBeforeClientAnswers()
++    {
++        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
++        var bridge = new ServerUiBridge(registry);
++        var target = await CreateSessionAsync(registry);
++
++        var intent = new ServerUiIntent("ui-select-2", "select", "Pick", "Choose one", ["alpha"], null);
++        var responseTask = bridge.RequestUiAsync(intent, target, TimeSpan.FromSeconds(30), CancellationToken.None);
++
++        // Answer only after the bridge's default 5s auto-cancel would have fired: a generous
++        // per-call timeout must keep the request pending until the client responds.
++        await foreach (var envelope in target.ReadEventsAsync(0, CancellationToken.None))
++        {
++            if (envelope.Event.Type != "ui_request") continue;
++            await Task.Delay(TimeSpan.FromSeconds(5).Add(TimeSpan.FromMilliseconds(300)));
++            bridge.ResolveUiAsync(intent.RequestId, "alpha", cancelled: false);
++            break;
++        }
++
++        var response = await responseTask;
++        Assert.False(response.Cancelled);
++        Assert.Equal("alpha", response.Value);
++    }
++
++    // --- shared helpers (mirrors ServerUiBridgeThemeTests) ---
++
++    private static async Task<LiveServerSession> CreateSessionAsync(ServerSessionRegistry registry)
++    {
++        var root = Path.Combine(Path.GetTempPath(), "pisharp-ui-bridge-" + Guid.NewGuid().ToString("N"));
++        Directory.CreateDirectory(root);
++        var created = await registry.CreateAsync(new CreateServerSessionRequest(
++            Cwd: root,
++            NoTools: true,
++            NoBuiltinTools: true,
++            NoExtensions: true,
++            NoSkills: true,
++            NoPromptTemplates: true,
++            NoThemes: true,
++            NoContextFiles: true), CancellationToken.None);
++        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
++        return live!;
++    }
++
++    private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeAsync(string root)
++    {
++        var repo = new JsonlSessionRepo(new SystemExecutionEnv(root), "sessions");
++        var createOptions = new JsonlSessionCreateOptions(root);
++        var initial = await repo.CreateAsync(createOptions);
++        return new PiSharp.Runtime.SessionRuntime(repo, createOptions, session => new AgentHarness<JsonlSessionMetadata>(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), FakeStream, FakeCompletion, [])), initial);
++    }
++
++    private static AgentCompletionAsync FakeCompletion => (_, _, _, _) => Task.FromResult(AgentMessages.Assistant("ok"));
++
++    private static async IAsyncEnumerable<AssistantMessageEvent> FakeStream(ModelDescriptor _, AgentContext __, AgentStreamOptions ___, [EnumeratorCancellation] CancellationToken ____ = default)
++    {
++        await Task.Yield();
++        var message = AgentMessages.Assistant("ok");
++        yield return new AssistantMessageEvent.Start(message);
++        yield return new AssistantMessageEvent.Done(message);
++    }
++}

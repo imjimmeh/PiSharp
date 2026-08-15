@@ -27,26 +27,34 @@ namespace PiSharp.Server.Tests;
 /// </summary>
 public sealed class PiServerUiBridgeTests
 {
+    /// <summary>Fail-fast window for the event readers: if a <c>ui_request</c> never arrives the
+    /// reader's cancellation fires and the test fails instead of hanging the suite.</summary>
+    private static readonly TimeSpan ReaderTimeout = TimeSpan.FromSeconds(15);
+
     [Fact]
-    public async Task Select_ThroughTargetScopedOverload_ResolvesToAnsweredValue()
+    public async Task Select_ThroughTargetScopedOverload_EmitsOnTargetNotNewestSession_AndResolves()
     {
         var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
         var bridge = new ServerUiBridge(registry);
         var target = await CreateSessionAsync(registry);
+        _ = await CreateSessionAsync(registry); // created AFTER target
+        var newest = registry.Sessions.MaxBy(session => session.Id, StringComparer.Ordinal)!;
+        Assert.NotSame(target, newest); // the global fallback lane must point at a different session
 
         var intent = new ServerUiIntent("ui-select-1", "select", "Pick", "Choose one", ["alpha", "beta"], null);
         var responseTask = bridge.RequestUiAsync(intent, target, TimeSpan.FromSeconds(30), CancellationToken.None);
 
         // The client reads the ui_request off the target session's event lane and answers.
-        await foreach (var envelope in target.ReadEventsAsync(0, CancellationToken.None))
-        {
-            if (envelope.Event.Type != "ui_request") continue;
-            var requestId = JsonDocument.Parse(JsonSerializer.Serialize(envelope.Event.Data))
-                .RootElement.GetProperty("requestId").GetString();
-            Assert.Equal(intent.RequestId, requestId);
-            bridge.ResolveUiAsync(requestId!, "beta", cancelled: false);
-            break;
-        }
+        using var readerCts = new CancellationTokenSource(ReaderTimeout);
+        var targetRequestId = await ReadFirstUiRequestIdAsync(target, readerCts.Token);
+        Assert.Equal(intent.RequestId, targetRequestId);
+
+        // The globally-most-recent session must NOT have received the request: the target-scoped
+        // overload must not fall back to SelectSession().
+        Assert.DoesNotContain(newest.EventLog.ReplayFrom(0).Events,
+            envelope => envelope.Event.Type == "ui_request");
+
+        bridge.ResolveUiAsync(intent.RequestId, "beta", cancelled: false);
 
         var response = await responseTask;
         Assert.False(response.Cancelled);
@@ -59,23 +67,42 @@ public sealed class PiServerUiBridgeTests
         var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
         var bridge = new ServerUiBridge(registry);
         var target = await CreateSessionAsync(registry);
+        _ = await CreateSessionAsync(registry);
+        var newest = registry.Sessions.MaxBy(session => session.Id, StringComparer.Ordinal)!;
+        Assert.NotSame(target, newest);
 
         var intent = new ServerUiIntent("ui-select-2", "select", "Pick", "Choose one", ["alpha"], null);
         var responseTask = bridge.RequestUiAsync(intent, target, TimeSpan.FromSeconds(30), CancellationToken.None);
 
+        using var readerCts = new CancellationTokenSource(ReaderTimeout);
+        var targetRequestId = await ReadFirstUiRequestIdAsync(target, readerCts.Token);
+        Assert.Equal(intent.RequestId, targetRequestId);
+
         // Answer only after the bridge's default 5s auto-cancel would have fired: a generous
         // per-call timeout must keep the request pending until the client responds.
-        await foreach (var envelope in target.ReadEventsAsync(0, CancellationToken.None))
-        {
-            if (envelope.Event.Type != "ui_request") continue;
-            await Task.Delay(TimeSpan.FromSeconds(5).Add(TimeSpan.FromMilliseconds(300)));
-            bridge.ResolveUiAsync(intent.RequestId, "alpha", cancelled: false);
-            break;
-        }
+        await Task.Delay(TimeSpan.FromSeconds(5).Add(TimeSpan.FromMilliseconds(300)));
+        bridge.ResolveUiAsync(intent.RequestId, "alpha", cancelled: false);
 
         var response = await responseTask;
         Assert.False(response.Cancelled);
         Assert.Equal("alpha", response.Value);
+
+        Assert.DoesNotContain(newest.EventLog.ReplayFrom(0).Events,
+            envelope => envelope.Event.Type == "ui_request");
+    }
+
+    /// <summary>Reads the session's event lane and returns the request id of the first
+    /// <c>ui_request</c> it sees (null if the lane ends first). Cancellation is provided by the
+    /// caller so a missing emission fails fast instead of hanging.</summary>
+    private static async Task<string?> ReadFirstUiRequestIdAsync(LiveServerSession session, CancellationToken cancellationToken)
+    {
+        await foreach (var envelope in session.ReadEventsAsync(0, cancellationToken))
+        {
+            if (envelope.Event.Type != "ui_request") continue;
+            return JsonDocument.Parse(JsonSerializer.Serialize(envelope.Event.Data))
+                .RootElement.GetProperty("requestId").GetString();
+        }
+        return null;
     }
 
     // --- shared helpers (mirrors ServerUiBridgeThemeTests) ---
