@@ -354,9 +354,11 @@ public sealed class RemoteTuiBackendTests
             HasRenderCall: true, HasRenderResult: false,
             RendererName: null, RenderShell: null,
             ExecutionMode: ToolExecutionMode.Parallel, PromptSnippet: "Use fmt", PromptGuidelines: ["guideline"]);
+        // An explicitly-gated reply: the wire round trip stays stalled until the gate is released.
+        var replyGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var transport = new BackendFakeTransport
         {
-            ResponseDelay = TimeSpan.FromMilliseconds(200),
+            ReplyGate = replyGate,
             Responder = type => type == ServerCommandTypes.ResolveTool
                 ? ServerResponse.Ok("st", type, wire)
                 : ServerResponse.Ok("st", type),
@@ -364,8 +366,20 @@ public sealed class RemoteTuiBackendTests
         var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
 
-        // Must complete asynchronously: the caller's thread is never blocked on the wire reply.
-        var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
+        // Fire the resolve without awaiting: the transport gates the wire reply on ReplyGate, so
+        // the round trip cannot complete until the gated reply is explicitly released below.
+        var resolveTask = backend.ResolveToolAsync("fmt", CancellationToken.None);
+
+        // While the reply is still gated the task must be incomplete. A regressed
+        // .GetAwaiter().GetResult() would block this thread here until release (never), so reaching
+        // this assertion with control back on the test thread proves the caller did not block.
+        await Task.Delay(100);
+        Assert.False(resolveTask.IsCompleted);
+
+        // Release the stalled reply; the resolve then completes on its own.
+        replyGate.TrySetResult();
+
+        var tool = await resolveTask;
 
         Assert.NotNull(tool);
         Assert.Equal("fmt", tool!.Name);
@@ -529,6 +543,7 @@ public sealed class RemoteTuiBackendTests
         public List<(ServerCommandEnvelope Envelope, object? Payload)> Commands { get; } = [];
         public Func<string, ServerResponse>? Responder { get; set; }
         public TimeSpan? ResponseDelay { get; set; }
+        public TaskCompletionSource? ReplyGate { get; set; }
 
         ChannelReader<ServerEventEnvelope> IClientTransport.Events => Events.Reader;
         ChannelReader<ServerResponse> IClientTransport.LateResponses => Late.Reader;
@@ -541,6 +556,7 @@ public sealed class RemoteTuiBackendTests
         public async Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
         {
             if (ResponseDelay is { } delay) await Task.Delay(delay, ct);
+            if (ReplyGate is { } gate) await gate.Task;
             Commands.Add((envelope, payload));
             return Responder?.Invoke(envelope.Type) ?? ServerResponse.Ok(envelope.Id, envelope.Type);
         }

@@ -438,6 +438,7 @@ public static class InteractiveMode
             catch (Exception exception)
             {
                 logger?.LogDebug(exception, "Remote command completion refresh failed; keeping previous cache");
+                lock (completionCacheGate) if (completionCache.TryGetValue(text, out var cached) && cached.Count == 0) completionCache.Remove(text);
             }
         }
 
