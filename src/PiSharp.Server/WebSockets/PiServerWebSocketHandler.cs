@@ -35,6 +35,8 @@ public sealed class PiServerWebSocketHandler(
         public static NoOpServerUiBridge Instance { get; } = new();
         public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
             => Task.FromResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
+        public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, LiveServerSession target, TimeSpan? responseTimeout, CancellationToken ct = default)
+            => Task.FromResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
         public void ResolveUiAsync(string requestId, string? value, bool cancelled) { }
     }
 

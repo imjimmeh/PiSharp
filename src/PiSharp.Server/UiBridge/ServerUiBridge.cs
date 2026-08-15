@@ -29,7 +29,19 @@ public sealed class ServerUiBridge : IServerUiBridge
         _themes = themeRegistry ?? new ThemeRegistry();
     }
 
-    public async Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
+    public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, CancellationToken cancellationToken = default)
+        => RequestUiAsyncCore(intent, target: null, responseTimeout: null, cancellationToken);
+
+    public Task<ServerUiResponse> RequestUiAsync(ServerUiIntent intent, LiveServerSession target, TimeSpan? responseTimeout, CancellationToken ct = default)
+        => RequestUiAsyncCore(intent, target, responseTimeout, ct);
+
+    /// <summary>
+    /// Shared request pipeline: registers a pending response keyed by the intent's request id, emits
+    /// the <c>ui_request</c> onto <paramref name="target"/> (falling back to the most recent session
+    /// when null), and auto-cancels after <paramref name="responseTimeout"/> (the bridge default when
+    /// null) unless a client resolves it first.
+    /// </summary>
+    private async Task<ServerUiResponse> RequestUiAsyncCore(ServerUiIntent intent, LiveServerSession? target, TimeSpan? responseTimeout, CancellationToken cancellationToken)
     {
         // Theme UI kinds are answered daemon-side from the ThemeRegistry (plan C8) — never
         // forwarded to an attached client, because themes are daemon-resident.
@@ -40,9 +52,9 @@ public sealed class ServerUiBridge : IServerUiBridge
         _pending[intent.RequestId] = tcs;
         try
         {
-            EmitUiRequest(intent);
+            EmitUiRequest(intent, target);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(ResponseTimeout);
+            timeout.CancelAfter(responseTimeout ?? ResponseTimeout);
             using var registration = timeout.Token.Register(() => tcs.TrySetResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true)));
             try
             {
@@ -64,9 +76,9 @@ public sealed class ServerUiBridge : IServerUiBridge
         if (_pending.TryGetValue(requestId, out var tcs)) tcs.TrySetResult(new ServerUiResponse(requestId, value, cancelled));
     }
 
-    private void EmitUiRequest(ServerUiIntent intent)
+    private void EmitUiRequest(ServerUiIntent intent, LiveServerSession? target)
     {
-        var session = SelectSession();
+        var session = target ?? SelectSession();
         if (session is null)
         {
             _logger.LogDebug("UI request {RequestId} has no target session; treating as cancelled", intent.RequestId);
