@@ -3,8 +3,10 @@ using PiSharp.Cli.IO;
 using PiSharp.Cli.Parsing;
 using PiSharp.Client;
 using PiSharp.Extensions;
+using PiSharp.Logging;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Environment;
 using PiSharp.Abstractions.Sessions;
@@ -25,6 +27,9 @@ namespace PiSharp.Cli.Modes;
 public static class InteractiveMode
 {
     private static ILogger? _footerLogger;
+
+    private static ILogger CursorLogger()
+        => _footerLogger ?? NullLogger.Instance;
 
     /// <summary>
     /// create_session triggers daemon-side extension discovery (native + TS) and can exceed the
@@ -278,19 +283,26 @@ public static class InteractiveMode
         ILoggerFactory? loggerFactory,
         CancellationToken cancellationToken)
     {
+        var activeLoggerFactory = loggerFactory ?? LoggerFactory.Create(builder =>
+        {
+            builder
+                .SetMinimumLevel(LogLevel.Debug)
+                .AddDebug();
+            _ = CliFileLogging.AddConfiguredFileLogging(builder, Directory.GetCurrentDirectory());
+        });
         await using var transport = new ClientWebSocketTransport(
-            TimeSpan.FromSeconds(30),
-            loggerFactory?.CreateLogger<ClientWebSocketTransport>());
-        await using var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection, loggerFactory?.CreateLogger<RemoteTuiBackend>());
+            activeLoggerFactory.CreateLogger<ClientWebSocketTransport>(),
+            TimeSpan.FromSeconds(30));
+        await using var connection = new ClientSessionConnection(transport, activeLoggerFactory.CreateLogger<ClientSessionConnection>());
+        await using var backend = new RemoteTuiBackend(connection, activeLoggerFactory.CreateLogger<RemoteTuiBackend>());
 
-        var logger = loggerFactory?.CreateLogger(nameof(InteractiveMode));
+        var logger = activeLoggerFactory.CreateLogger(nameof(InteractiveMode));
         void OnLateCommandShouldExit() => logger?.LogWarning(
             "A run_command completed after the client-side timeout; the daemon already handled it (ShouldExit lost).");
         backend.LateCommandShouldExit += OnLateCommandShouldExit;
 
         var cwd = Directory.GetCurrentDirectory();
-        var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: loggerFactory);
+        var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: activeLoggerFactory);
 
         var attachId = runtimeArgs.Attach;
         string? runtimeSessionId = null;
@@ -361,6 +373,9 @@ public static class InteractiveMode
             }
             catch (Exception exception)
             {
+                logger.LogError(exception,
+                    "Remote TUI startup failed leasePort={LeasePort} attachId={AttachId} serverSessionId={ServerSessionId}",
+                    lease.Port, attachId ?? "(none)", backend.ServerSessionId ?? "(none)");
                 remoteReady.TrySetException(exception);
                 throw;
             }
@@ -401,6 +416,7 @@ public static class InteractiveMode
             {
                 var fetched = await backend.GetExtensionShortcutsAsync(CancellationToken.None).ConfigureAwait(false);
                 lock (shortcutCacheGate) shortcutCache = fetched;
+                logger.LogDebug("Remote extension shortcut cache refreshed shortcutCount={ShortcutCount}", fetched.Count);
             }
             catch (Exception exception)
             {
@@ -418,6 +434,7 @@ public static class InteractiveMode
             {
                 var fetched = await backend.GetExtensionLoadStatusAsync(CancellationToken.None).ConfigureAwait(false);
                 lock (loadStatusCacheGate) loadStatusCache = fetched;
+                logger.LogDebug("Remote extension load status cache refreshed total={Total} active={Active} ready={Ready} failed={Failed}", fetched.Total, fetched.Active, fetched.Ready, fetched.Failed);
             }
             catch (Exception exception)
             {
@@ -435,6 +452,7 @@ public static class InteractiveMode
             {
                 var completions = await backend.CompleteCommandAsync(text, CancellationToken.None).ConfigureAwait(false);
                 lock (completionCacheGate) completionCache[text] = completions;
+                logger.LogDebug("Remote command completion cache refreshed textLength={TextLength} completionCount={CompletionCount}", text.Length, completions.Count);
             }
             catch (Exception exception)
             {
@@ -517,7 +535,7 @@ public static class InteractiveMode
             ForkFromEntryAsync: backend.ForkFromEntryAsync,
             GetExtensionLoadStatus: GetCachedRemoteLoadStatus,
             ExtensionLoadCommandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" },
-            LoggerFactory: loggerFactory)
+            LoggerFactory: activeLoggerFactory)
         {
             StartupAsync = StartRemoteAsync
         };
@@ -534,7 +552,14 @@ public static class InteractiveMode
             await backend.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(runtimeSessionId))
             {
-                WriteCursorSequence(runtimeSessionId, cwd, lastAppliedSequence);
+                try
+                {
+                    WriteCursorSequence(runtimeSessionId, cwd, lastAppliedSequence);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    logger.LogWarning(exception, "Failed to persist resume cursor sessionId={SessionId} cursorPath={CursorPath}", runtimeSessionId, CursorPath(runtimeSessionId, cwd, homeDirectory: null));
+                }
             }
         }
     }
@@ -594,6 +619,7 @@ public static class InteractiveMode
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            CursorLogger().LogWarning(ex, "Failed to read resume cursor sessionId={SessionId} cursorPath={CursorPath}", sessionId, path);
             return 0;
         }
     }
@@ -615,6 +641,10 @@ public static class InteractiveMode
         {
             File.WriteAllText(tempPath, sequence.ToString());
             File.Move(tempPath, path, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            CursorLogger().LogWarning(ex, "Failed to persist resume cursor sessionId={SessionId} cursorPath={CursorPath}", sessionId, path);
         }
         finally
         {

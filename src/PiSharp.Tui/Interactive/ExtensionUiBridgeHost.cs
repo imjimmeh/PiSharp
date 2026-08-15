@@ -175,6 +175,7 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
                 _customUiOverlay.SourceId = extensionId;
                 BindCustomUiInputForwarding(_customUiOverlay, cancellationToken);
                 _customUiOverlay.UpdateSnapshot(snapshot);
+                _logger.LogDebug("Custom UI overlay opened requestId={RequestId} extensionId={ExtensionId} width={Width} height={Height}", snapshot.RequestId, extensionId, snapshot.Width, snapshot.Height);
                 _customUiOverlay.SetFocus();
 
                 if (snapshot.Completed)
@@ -756,6 +757,7 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
     private void CloseCustomUiOverlay(ExtensionCustomUiOverlay overlay)
     {
         if (!ReferenceEquals(_customUiOverlay, overlay)) return;
+        _logger.LogDebug("Custom UI overlay closed requestId={RequestId}", overlay.Snapshot?.RequestId);
 
         if (overlay.Snapshot is not null)
         {

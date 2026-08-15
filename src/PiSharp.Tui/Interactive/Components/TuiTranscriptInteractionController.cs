@@ -91,7 +91,7 @@ internal sealed class TuiTranscriptInteractionController
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Clipboard write failed");
+            _logger.LogWarning(ex, "Clipboard write failed");
             copied = false;
         }
 

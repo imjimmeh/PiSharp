@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
@@ -17,8 +19,11 @@ public static class RpcMode
 {
     private static readonly Dictionary<string, TaskCompletionSource<RpcExtensionUiResponseCommand>> PendingExtensionUi = new(StringComparer.Ordinal);
 
-    public static async Task<int> RunAsync(SessionRuntime runtime, IConsoleIO console, CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(SessionRuntime runtime, IConsoleIO console, CancellationToken cancellationToken = default, ILoggerFactory? loggerFactory = null)
     {
+        loggerFactory ??= NullLoggerFactory.Instance;
+        var logger = loggerFactory.CreateLogger(nameof(RpcMode));
+        logger.LogInformation("RPC mode started");
         await using var guard = StdoutGuard.TakeOver(console);
         var writer = new RpcJsonWriter(guard.ProtocolOut);
         var promptTasks = new List<Task>();
@@ -39,7 +44,7 @@ public static class RpcMode
             while ((line = await console.In.ReadLineAsync(cancellationToken)) is not null)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                await HandleLineAsync(runtime, writer, promptTasks, line, cancellationToken);
+                await HandleLineAsync(runtime, writer, promptTasks, line, logger, cancellationToken);
             }
 
             await Task.WhenAll(promptTasks);
@@ -51,7 +56,7 @@ public static class RpcMode
         }
     }
 
-    private static async Task HandleLineAsync(SessionRuntime runtime, RpcJsonWriter writer, List<Task> promptTasks, string line, CancellationToken cancellationToken)
+    private static async Task HandleLineAsync(SessionRuntime runtime, RpcJsonWriter writer, List<Task> promptTasks, string line, ILogger logger, CancellationToken cancellationToken)
     {
         var type = "unknown";
         string? id = null;
@@ -66,7 +71,8 @@ public static class RpcMode
             {
                 case "prompt":
                     var prompt = AgentJsonSerializer.Deserialize<RpcPromptCommand>(line)!;
-                    await StartPromptAsync(runtime, writer, promptTasks, id, prompt.Message, prompt.Images, cancellationToken);
+                    logger.LogDebug("RPC prompt submitted id={Id} length={Length} imageCount={ImageCount}", id, prompt.Message.Length, prompt.Images?.Count ?? 0);
+                    await StartPromptAsync(runtime, writer, promptTasks, id, prompt.Message, prompt.Images, logger, cancellationToken);
                     break;
                 case "steer":
                     runtime.Harness.Steer(AgentMessages.User(RequiredString(root, "message")));
@@ -208,6 +214,7 @@ public static class RpcMode
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            logger.LogError(ex, "RPC command failed type={Type} id={Id}", type, id);
             await writer.WriteAsync(RpcResponse.Fail(id, type, ex.Message), cancellationToken);
         }
     }
@@ -271,10 +278,11 @@ public static class RpcMode
         return null;
     }
 
-    private static async Task StartPromptAsync(SessionRuntime runtime, RpcJsonWriter writer, List<Task> promptTasks, string? id, string message, IReadOnlyList<ImageContent>? images, CancellationToken cancellationToken)
+    private static async Task StartPromptAsync(SessionRuntime runtime, RpcJsonWriter writer, List<Task> promptTasks, string? id, string message, IReadOnlyList<ImageContent>? images, ILogger logger, CancellationToken cancellationToken)
     {
         if (runtime.Harness.Phase != AgentHarnessPhase.Idle)
         {
+            logger.LogWarning("RPC prompt rejected; harness busy id={Id}", id);
             await writer.WriteAsync(RpcResponse.Fail(id, "prompt", "Harness is busy."), cancellationToken);
             return;
         }
@@ -283,7 +291,11 @@ public static class RpcMode
         promptTasks.Add(Task.Run(async () =>
         {
             try { await runtime.SubmitPromptAsync(message, images, "rpc", cancellationToken); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { await writer.WriteAsync(RpcResponse.Fail(id, "prompt", ex.Message), CancellationToken.None); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "RPC prompt failed id={Id}", id);
+                await writer.WriteAsync(RpcResponse.Fail(id, "prompt", ex.Message), CancellationToken.None);
+            }
         }, CancellationToken.None));
     }
 

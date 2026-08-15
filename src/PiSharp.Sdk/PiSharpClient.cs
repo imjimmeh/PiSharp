@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 using PiSharp.Client;
 using PiSharp.Compatibility.Settings;
+using PiSharp.Logging;
 using PiSharp.Server.Contracts;
 
 namespace PiSharp.Sdk;
@@ -50,15 +52,19 @@ public sealed class PiSharpClient : IAsyncDisposable
     private readonly DaemonLease _lease;
     private readonly ClientWebSocketTransport _transport;
     private readonly ClientSessionConnection _connection;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly bool _ownsLoggerFactory;
     private readonly List<SessionConnection> _attached = [];
     private readonly object _sync = new();
     private int _disposed;
 
-    private PiSharpClient(DaemonLease lease, ClientWebSocketTransport transport, ClientSessionConnection connection)
+    private PiSharpClient(DaemonLease lease, ClientWebSocketTransport transport, ClientSessionConnection connection, ILoggerFactory loggerFactory, bool ownsLoggerFactory)
     {
         _lease = lease;
         _transport = transport;
         _connection = connection;
+        _loggerFactory = loggerFactory;
+        _ownsLoggerFactory = ownsLoggerFactory;
     }
 
     /// <summary>The resolved P01 daemon lease (pid, port, api key, runtime version).</summary>
@@ -76,11 +82,16 @@ public sealed class PiSharpClient : IAsyncDisposable
     /// control WebSocket, and returns a connected <see cref="PiSharpClient"/>.
     /// </summary>
     /// <exception cref="SdkException">No compatible daemon is reachable and none could be started.</exception>
-    public static async Task<PiSharpClient> ConnectAsync(PiSharpClientOptions options, CancellationToken ct = default)
+    public static async Task<PiSharpClient> ConnectAsync(
+        PiSharpClientOptions options,
+        CancellationToken ct = default,
+        ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         var cwd = options.Cwd ?? Directory.GetCurrentDirectory();
+        var ownsLoggerFactory = loggerFactory is null;
+        loggerFactory ??= BuildFileLoggerFactory(cwd);
         var leaseDirectory = options.LeaseDirectory ?? PiAgentPaths.FromCwd(cwd).GlobalPiSharpDirectory;
         var store = new DaemonLeaseStore(leaseDirectory);
 
@@ -111,10 +122,10 @@ public sealed class PiSharpClient : IAsyncDisposable
             throw new SdkException($"Daemon at 127.0.0.1:{port.Value} is not responding to /health.");
         }
 
-        var transport = new ClientWebSocketTransport(CommandTimeout);
-        var connection = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(loggerFactory.CreateLogger<ClientWebSocketTransport>(), CommandTimeout);
+        var connection = new ClientSessionConnection(transport, loggerFactory.CreateLogger<ClientSessionConnection>());
         await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{port.Value}"), apiKey, ct);
-        return new PiSharpClient(lease, transport, connection);
+        return new PiSharpClient(lease, transport, connection, loggerFactory, ownsLoggerFactory);
     }
 
     /// <summary>Creates a daemon session with the given options.</summary>
@@ -152,8 +163,8 @@ public sealed class PiSharpClient : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(serverSessionId);
         options ??= new AttachOptions();
 
-        var transport = new ClientWebSocketTransport(CommandTimeout);
-        var connection = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(_loggerFactory.CreateLogger<ClientWebSocketTransport>(), CommandTimeout);
+        var connection = new ClientSessionConnection(transport, _loggerFactory.CreateLogger<ClientSessionConnection>());
         try
         {
             await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{_lease.Port}"), _lease.ApiKey, ct);
@@ -207,6 +218,11 @@ public sealed class PiSharpClient : IAsyncDisposable
         }
 
         await _connection.DisposeAsync();
+
+        if (_ownsLoggerFactory)
+        {
+            _loggerFactory.Dispose();
+        }
     }
 
     // --- endpoint resolution ---
@@ -284,6 +300,18 @@ public sealed class PiSharpClient : IAsyncDisposable
     }
 
     private static string RuntimeVersion() => $"{Environment.Version.Major}.{Environment.Version.Minor}";
+
+    /// <summary>
+    /// Fallback file-logging factory for hosts that pass no <see cref="ILoggerFactory"/>: the SDK
+    /// still writes structured logs to the shared <c>~/.pi/PiSharp/logs</c> directory instead of
+    /// silently dropping diagnostics.
+    /// </summary>
+    private static ILoggerFactory BuildFileLoggerFactory(string cwd)
+        => LoggerFactory.Create(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Debug);
+            CliFileLogging.AddConfiguredFileLogging(builder, cwd);
+        });
 
     private static int PickFreePort()
     {

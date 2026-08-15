@@ -1,5 +1,7 @@
 using System.Text.Json;
 using PiSharp.Cli.Parsing;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Cli.IO;
 using PiSharp.Runtime;
@@ -16,8 +18,11 @@ public static class AcpMode
 {
     public const int ProtocolVersion = 1;
 
-    public static async Task<int> RunAsync(SessionRuntime runtime, IConsoleIO console, AcpApprovalMode approvalMode, CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(SessionRuntime runtime, IConsoleIO console, AcpApprovalMode approvalMode, CancellationToken cancellationToken = default, ILoggerFactory? loggerFactory = null)
     {
+        loggerFactory ??= NullLoggerFactory.Instance;
+        var logger = loggerFactory.CreateLogger(nameof(AcpMode));
+        logger.LogInformation("ACP mode started approvalMode={ApprovalMode}", approvalMode);
         await using var guard = StdoutGuard.TakeOver(console);
         var writer = new AcpJsonWriter(guard.ProtocolOut);
 
@@ -32,7 +37,7 @@ public static class AcpMode
             while ((line = await console.In.ReadLineAsync(cancellationToken)) is not null)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                await HandleLineAsync(runtime, writer, line, sessionIdPrefix, () => activeSessionId, id => activeSessionId = id, () => turnActive, v => turnActive = v, cancellationToken);
+                await HandleLineAsync(runtime, writer, line, sessionIdPrefix, () => activeSessionId, id => activeSessionId = id, () => turnActive, v => turnActive = v, logger, cancellationToken);
             }
 
             return 0;
@@ -52,6 +57,7 @@ public static class AcpMode
         Action<string?> setActiveSession,
         Func<bool> getTurnActive,
         Action<bool> setTurnActive,
+        ILogger logger,
         CancellationToken cancellationToken)
     {
         JsonElement root;
@@ -70,6 +76,7 @@ public static class AcpMode
         var id = root.TryGetProperty("id", out var idProp) && idProp.ValueKind != JsonValueKind.Null ? (object?)idProp : null;
         var isNotification = !root.TryGetProperty("id", out _);
         JsonElement? paramsValue = root.TryGetProperty("params", out var p) ? p : null;
+        logger.LogDebug("ACP request received method={Method} id={Id}", method, id);
 
         if (method is null)
         {
@@ -96,6 +103,7 @@ public static class AcpMode
 
             case "session/new":
             {
+                logger.LogDebug("ACP session/new requested");
                 if (getActiveSession() is not null && getTurnActive())
                 {
                     await writer.WriteErrorAsync(id, -32000, "turn_in_progress");
@@ -137,22 +145,30 @@ public static class AcpMode
                 }
 
                 var text = ExtractPromptText(prompt);
+                logger.LogDebug("ACP session/prompt submitted length={Length}", text.Length);
                 setTurnActive(true);
                 try
                 {
                     var result = await runtime.SubmitPromptAsync(text, null, "acp", cancellationToken);
                     var stopReason = MapStopReason(result);
                     setTurnActive(false);
+                    logger.LogDebug("ACP session/prompt completed stopReason={StopReason}", stopReason);
                     await writer.WriteAsync(id, new { stopReason });
                 }
                 catch (OperationCanceledException)
                 {
                     setTurnActive(false);
+                    logger.LogDebug("ACP session/prompt cancelled");
                     await writer.WriteAsync(id, new { stopReason = "cancelled" });
+                }
+                catch (Exception exception)
+                {
+                    setTurnActive(false);
+                    logger.LogError(exception, "ACP session/prompt failed");
+                    throw;
                 }
                 break;
             }
-
             case "session/close":
                 runtime.Harness.Abort();
                 setActiveSession(null);

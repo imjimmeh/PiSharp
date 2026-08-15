@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -64,8 +65,17 @@ public sealed class PiServerWebSocketHandler(
             return;
         }
 
+        var stopwatch = Stopwatch.StartNew();
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
-        await RunSocketAsync(socket, context.RequestAborted);
+        logger.LogInformation("WebSocket connection accepted from {RemoteIpAddress}:{RemotePort}", context.Connection.RemoteIpAddress, context.Connection.RemotePort);
+        try
+        {
+            await RunSocketAsync(socket, context.RequestAborted);
+        }
+        finally
+        {
+            logger.LogInformation("WebSocket connection closed from {RemoteIpAddress}:{RemotePort} after {ElapsedMilliseconds} ms", context.Connection.RemoteIpAddress, context.Connection.RemotePort, stopwatch.ElapsedMilliseconds);
+        }
     }
 
     public async Task RunSocketAsync(WebSocket socket, CancellationToken cancellationToken)

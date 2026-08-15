@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Agent.Serialization;
 using PiSharp.Cli.IO;
@@ -15,26 +17,31 @@ public sealed record PrintModeOptions(
 
 public static class PrintMode
 {
-    public static async Task<int> RunAsync(SessionRuntime runtime, PrintModeOptions options, IConsoleIO console, CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(SessionRuntime runtime, PrintModeOptions options, IConsoleIO console, CancellationToken cancellationToken = default, ILoggerFactory? loggerFactory = null)
     {
+        loggerFactory ??= NullLoggerFactory.Instance;
+        var logger = loggerFactory.CreateLogger(nameof(PrintMode));
         var prompts = BuildPromptList(options);
+        logger.LogInformation("Print mode started mode={Mode} promptCount={PromptCount}", options.Mode, prompts.Count);
         if (prompts.Count == 0) return 0;
         return options.Mode == PrintOutputMode.Json
-            ? await RunJsonAsync(runtime, options, prompts, console, cancellationToken)
-            : await RunTextAsync(runtime, options, prompts, console, cancellationToken);
+            ? await RunJsonAsync(runtime, options, prompts, console, logger, cancellationToken)
+            : await RunTextAsync(runtime, options, prompts, console, logger, cancellationToken);
     }
 
-    private static async Task<int> RunTextAsync(SessionRuntime runtime, PrintModeOptions options, IReadOnlyList<string> prompts, IConsoleIO console, CancellationToken cancellationToken)
+    private static async Task<int> RunTextAsync(SessionRuntime runtime, PrintModeOptions options, IReadOnlyList<string> prompts, IConsoleIO console, ILogger logger, CancellationToken cancellationToken)
     {
         AssistantMessage? last = null;
-        foreach (var prompt in prompts)
+        for (var index = 0; index < prompts.Count; index++)
         {
-            var result = await runtime.SubmitPromptAsync(prompt, options.InitialImages, "rpc", cancellationToken);
+            logger.LogDebug("Print prompt submitted index={Index} length={Length}", index, prompts[index].Length);
+            var result = await runtime.SubmitPromptAsync(prompts[index], options.InitialImages, "rpc", cancellationToken);
             if (result is not null) last = result;
         }
         if (last is null) return 0;
         if (IsFailure(last))
         {
+            logger.LogError("Print mode agent failure stopReason={StopReason} hasError={HasError}", last.StopReason, !string.IsNullOrWhiteSpace(last.ErrorMessage));
             await console.Error.WriteLineAsync(last.ErrorMessage ?? last.StopReason ?? "Agent failed.");
             return 1;
         }
@@ -43,11 +50,15 @@ public static class PrintMode
         return 0;
     }
 
-    private static async Task<int> RunJsonAsync(SessionRuntime runtime, PrintModeOptions options, IReadOnlyList<string> prompts, IConsoleIO console, CancellationToken cancellationToken)
+    private static async Task<int> RunJsonAsync(SessionRuntime runtime, PrintModeOptions options, IReadOnlyList<string> prompts, IConsoleIO console, ILogger logger, CancellationToken cancellationToken)
     {
         await using var guard = StdoutGuard.TakeOver(console);
         using var subscription = runtime.Harness.Subscribe(async (evt, _) => await guard.ProtocolOut.WriteLineAsync(AgentJsonSerializer.Serialize(evt)));
-        foreach (var prompt in prompts) await runtime.SubmitPromptAsync(prompt, options.InitialImages, "rpc", cancellationToken);
+        for (var index = 0; index < prompts.Count; index++)
+        {
+            logger.LogDebug("Print prompt submitted index={Index} length={Length}", index, prompts[index].Length);
+            await runtime.SubmitPromptAsync(prompts[index], options.InitialImages, "rpc", cancellationToken);
+        }
         await guard.ProtocolOut.FlushAsync();
         return 0;
     }

@@ -234,7 +234,15 @@ internal sealed class TuiRenderCoordinator : IDisposable
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Failed to read extension load status.");
+                if (_extensionLoadStatus is { } lastStatus)
+                {
+                    _logger.LogWarning(exception, "Failed to read extension load status; last known: {LastTotal} total, {LastReady} ready, {LastActive} active.",
+                        lastStatus.Total, lastStatus.Ready, lastStatus.Active);
+                }
+                else
+                {
+                    _logger.LogWarning(exception, "Failed to read extension load status.");
+                }
             }
 
             _appContext.Post(() =>

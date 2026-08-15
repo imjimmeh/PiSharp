@@ -53,7 +53,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     public event Action? LateCommandShouldExit;
 
     private readonly ClientSessionConnection _connection;
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
     private readonly Channel<ServerEventEnvelope> _inbox = Channel.CreateUnbounded<ServerEventEnvelope>(
         new UnboundedChannelOptions { SingleReader = true });
     private readonly CancellationTokenSource _cts = new();
@@ -70,7 +70,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     private long _maxSequence;
     private bool _recovering;
 
-    public RemoteTuiBackend(ClientSessionConnection connection, ILogger? logger = null)
+    public RemoteTuiBackend(ClientSessionConnection connection, ILogger logger)
     {
         _connection = connection;
         _logger = logger;
@@ -155,12 +155,15 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             _listeners.Add(listener);
         }
 
+        _logger.LogInformation("TUI backend listener subscribed ({ListenerCount} active)", _listeners.Count);
         return new Subscription(() =>
         {
             lock (_sync)
             {
                 _listeners.Remove(listener);
             }
+
+            _logger.LogInformation("TUI backend listener unsubscribed ({ListenerCount} active)", _listeners.Count);
         });
     }
 
@@ -202,6 +205,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _logger.LogDebug("Disposing remote TUI backend; last applied sequence {LastAppliedSequence}", _connection.LastAppliedSequence);
         _connection.EventReceived -= OnEnvelope;
         _inbox.Writer.TryComplete();
         _cts.Cancel();
@@ -252,6 +256,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
                 new { sinceSequence },
                 token);
             Resynced?.Invoke();
+            _logger.LogInformation("Daemon event stream resynchronized from sequence {SinceSequence}", sinceSequence);
         }
         finally
         {
@@ -526,7 +531,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         {
             // Older or delegate-less daemons answer not_available; startup-check lines then arrive
             // as system_message events on the normal stream (or never) — not a client failure.
-            _logger?.LogDebug("post_startup_checks not available: {Code}: {Message}", response.Error?.Code, response.Error?.Message);
+            _logger.LogDebug("post_startup_checks not available: {Code}: {Message}", response.Error?.Code, response.Error?.Message);
             return;
         }
     }
@@ -594,7 +599,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _logger?.LogError(ex, "Failed to apply daemon envelope {Sequence} ({Type})", envelope.Sequence, envelope.Event.Type);
+                    _logger.LogError(ex, "Failed to apply daemon envelope {Sequence} ({Type})", envelope.Sequence, envelope.Event.Type);
                 }
             }
         }
@@ -620,7 +625,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
             if (_maxSequence > 0 && envelope.Sequence > _maxSequence + 1)
             {
-                _logger?.LogWarning(
+                _logger.LogWarning(
                     "Gap in daemon event stream: last applied {Last}, received {Received}; resyncing",
                     _maxSequence, envelope.Sequence);
                 gap = true;
@@ -700,7 +705,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var handler = UiRequestHandler;
         if (handler is null)
         {
-            _logger?.LogDebug("No UI request handler configured; auto-cancelling request {RequestId}", intent.RequestId);
+            _logger.LogDebug("No UI request handler configured; auto-cancelling request {RequestId}", intent.RequestId);
             response = new ServerUiResponse(intent.RequestId, null, Cancelled: true);
         }
         else
@@ -711,7 +716,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger?.LogError(ex, "UI request handler failed for {RequestId}; cancelling", intent.RequestId);
+                _logger.LogError(ex, "UI request handler failed for {RequestId}; cancelling", intent.RequestId);
                 response = new ServerUiResponse(intent.RequestId, null, Cancelled: true);
             }
         }

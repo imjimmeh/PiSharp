@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Extensions;
 using Terminal.Gui;
 
@@ -6,10 +8,14 @@ namespace PiSharp.Tui.Interactive;
 public sealed record TuiShortcutControllerOptions(
     Func<IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>>> GetExtensionShortcuts,
     IExtensionUi ExtensionUi,
-    Action<string> ReportError);
+    Action<string> ReportError)
+{
+    public ILogger<TuiShortcutController> Logger { get; init; } = NullLogger<TuiShortcutController>.Instance;
+}
 
 public sealed class TuiShortcutController(TuiShortcutControllerOptions options)
 {
+    private readonly ILogger<TuiShortcutController> _logger = options.Logger;
     private readonly object _gate = new();
     private IReadOnlyList<TuiExtensionShortcutBinding>? _cachedBindings;
 
@@ -39,6 +45,7 @@ public sealed class TuiShortcutController(TuiShortcutControllerOptions options)
     /// </summary>
     public async Task RefreshExtensionShortcutsAsync(CancellationToken cancellationToken = default)
     {
+        _logger.LogDebug("Extension shortcuts refresh started");
         IReadOnlyList<TuiExtensionShortcutBinding> bindings;
         try
         {
@@ -53,11 +60,12 @@ public sealed class TuiShortcutController(TuiShortcutControllerOptions options)
         }
         catch (Exception exception)
         {
-            options.ReportError($"Failed to refresh extension shortcuts: {exception.Message}");
+            _logger.LogError(exception, "Failed to refresh extension shortcuts");
             return;
         }
 
         lock (_gate) _cachedBindings = bindings;
+        _logger.LogDebug("Extension shortcuts refresh completed bindings={BindingCount}", bindings.Count);
     }
 
     private IReadOnlyList<TuiExtensionShortcutBinding> BuildCore()
@@ -68,6 +76,7 @@ public sealed class TuiShortcutController(TuiShortcutControllerOptions options)
         {
             if (!TuiShortcutKeyParser.TryParse(registration.Value.Keys, out var terminalKeys))
             {
+                _logger.LogDebug("Skipping extension shortcut with invalid keys sourceId={SourceId} keys={Keys}", registration.SourceId, registration.Value.Keys);
                 options.ReportError($"Invalid extension shortcut '{registration.Value.Keys}' from {registration.SourceId}: unsupported key string.");
                 continue;
             }
@@ -77,6 +86,7 @@ public sealed class TuiShortcutController(TuiShortcutControllerOptions options)
                 .FirstOrDefault(action => action is not null);
             if (conflictingAction is not null)
             {
+                _logger.LogDebug("Skipping extension shortcut conflicting with built-in action sourceId={SourceId} keys={Keys} action={Action}", registration.SourceId, registration.Value.Keys, conflictingAction);
                 options.ReportError($"Extension shortcut '{registration.Value.Keys}' from {registration.SourceId} conflicts with built-in shortcut '{conflictingAction}' and was ignored.");
                 continue;
             }

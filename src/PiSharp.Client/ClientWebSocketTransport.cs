@@ -52,10 +52,10 @@ public sealed class ClientWebSocketTransport : IClientTransport
     private readonly Channel<ServerResponse> _late = Channel.CreateBounded<ServerResponse>(64);
     private readonly CancellationTokenSource _readerCts = new();
     private readonly TimeSpan _commandTimeout;
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
     private int _disposed;
 
-    public ClientWebSocketTransport(TimeSpan? commandTimeout = null, ILogger? logger = null)
+    public ClientWebSocketTransport(ILogger logger, TimeSpan? commandTimeout = null)
     {
         _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
         _logger = logger;
@@ -72,8 +72,19 @@ public sealed class ClientWebSocketTransport : IClientTransport
             ? new UriBuilder(uri) { Path = "/ws" }.Uri
             : uri;
 
-        _socket.Options.SetRequestHeader("Authorization", $"Bearer {apiKey}");
-        await _socket.ConnectAsync(endpoint, ct).ConfigureAwait(false);
+        _logger.LogInformation("Connecting to daemon at {Endpoint}", endpoint);
+        try
+        {
+            _socket.Options.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+            await _socket.ConnectAsync(endpoint, ct).ConfigureAwait(false);
+        }
+        catch (WebSocketException exception)
+        {
+            _logger.LogError(exception, "WebSocket connection to {Endpoint} failed", endpoint);
+            throw;
+        }
+
+        _logger.LogInformation("Connected to daemon at {Endpoint}", endpoint);
         _ = Task.Run(() => ReadLoopAsync(_readerCts.Token), CancellationToken.None);
     }
 
@@ -95,7 +106,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
 
         try
         {
-            _logger?.LogDebug("WebSocket command sent: {Command}", envelope.Type);
+            _logger.LogDebug("WebSocket command sent: {Command}", envelope.Type);
             await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct).ConfigureAwait(false);
 
             var effectiveTimeout = timeoutOverride
@@ -108,6 +119,9 @@ public sealed class ClientWebSocketTransport : IClientTransport
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
+                _logger.LogWarning(
+                    "Command {Command} ({Id}) timed out after {Timeout:0.#}s",
+                    envelope.Type, envelope.Id, effectiveTimeout.TotalSeconds);
                 return ServerResponse.Fail(envelope.Id, envelope.Type, "timeout",
                     $"No response for command '{envelope.Type}' within {effectiveTimeout.TotalSeconds:0.#}s.");
             }
@@ -170,7 +184,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
             while (!ct.IsCancellationRequested)
             {
                 var json = await ReceiveTextAsync(buffer, ct).ConfigureAwait(false);
-                if (json is null) return; // server sent a Close frame
+                if (json is null) break; // server sent a Close frame
 
                 try
                 {
@@ -179,9 +193,11 @@ public sealed class ClientWebSocketTransport : IClientTransport
                 catch (JsonException ex)
                 {
                     // Malformed frame — drop it; a missed frame is recoverable via event replay.
-                    System.Diagnostics.Debug.WriteLine($"Dropped malformed frame: {ex.Message}");
+                    _logger.LogWarning(ex, "Dropped malformed WebSocket frame: {Message}", ex.Message);
                 }
             }
+
+            _logger.LogInformation("WebSocket receive loop exited cleanly");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -197,10 +213,17 @@ public sealed class ClientWebSocketTransport : IClientTransport
         }
         catch (Exception exception)
         {
-            _logger?.LogError(exception, "WebSocket receive loop terminated unexpectedly");
+            _logger.LogError(exception, "WebSocket receive loop terminated unexpectedly");
         }
         finally
         {
+            if (_pending.Count > 0)
+            {
+                _logger.LogWarning(
+                    "WebSocket closed with {PendingCount} command(s) still awaiting a response",
+                    _pending.Count);
+            }
+
             _events.Writer.TryComplete();
         }
     }
@@ -250,7 +273,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         if (response.Id is null) return;
         if (_pending.TryRemove(response.Id, out var tcs))
         {
-            _logger?.LogDebug("WebSocket response received: {Command}", response.Command);
+            _logger.LogDebug("WebSocket response received: {Command}", response.Command);
             tcs.TrySetResult(response);
             return;
         }
@@ -259,6 +282,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         // creation results, etc. must not be lost). The client has no per-session destroy command,
         // so a timed-out create_session still relies on the server's 5-minute idle sweep — the 90s
         // window plus that sweep bound the orphan window.
+        _logger.LogDebug("Late response arrived for timed-out command {Command} ({Id}); surfacing on the late lane", response.Command, response.Id);
         _late.Writer.TryWrite(response);
     }
 

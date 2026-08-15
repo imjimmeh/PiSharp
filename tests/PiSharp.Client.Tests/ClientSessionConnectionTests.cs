@@ -1,7 +1,8 @@
 using System.Threading.Channels;
+using Xunit;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Server.Contracts;
-using Xunit;
 
 namespace PiSharp.Client.Tests;
 
@@ -11,7 +12,7 @@ public sealed class ClientSessionConnectionTests
     public async Task SendCommand_SendsEnvelope_ReturnsResponse()
     {
         var transport = new FakeTransport();
-        await using var conn = new ClientSessionConnection(transport);
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         var response = await conn.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.GetState, Id: "1", ServerSessionId: "srv_x"));
         Assert.True(response.Success);
         Assert.Equal("get_state", transport.LastCommand!.Type);
@@ -21,7 +22,7 @@ public sealed class ClientSessionConnectionTests
     public async Task Subscribe_AppliesEnvelopesInSequence()
     {
         var transport = new FakeTransport();
-        await using var conn = new ClientSessionConnection(transport);
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         var applied = 0L;
         conn.EventReceived += (envelope) => { applied = envelope.Sequence; };
         transport.Events.Writer.TryWrite(Envelope(1));
@@ -35,7 +36,7 @@ public sealed class ClientSessionConnectionTests
     public async Task SendCommand_AssignsId_WhenAbsent()
     {
         var transport = new FakeTransport();
-        await using var conn = new ClientSessionConnection(transport);
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         var response = await conn.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.GetState, ServerSessionId: "srv_x"));
         Assert.NotNull(transport.LastCommand!.Id);
         Assert.Equal(transport.LastCommand.Id, response.Id);
@@ -45,7 +46,7 @@ public sealed class ClientSessionConnectionTests
     public async Task SendCommand_WithPayload_ForwardsPayload()
     {
         var transport = new FakeTransport();
-        await using var conn = new ClientSessionConnection(transport);
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.Attach, Id: "1", ServerSessionId: "srv_x"),
             new AttachPayload(SinceSequence: 42));

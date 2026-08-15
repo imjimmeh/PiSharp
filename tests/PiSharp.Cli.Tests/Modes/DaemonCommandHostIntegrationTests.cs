@@ -1,9 +1,10 @@
 using System.Text.Json;
+using Xunit;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Client;
 using PiSharp.Cli.Modes;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Hosting;
-using Xunit;
 
 namespace PiSharp.Cli.Tests.Modes;
 
@@ -34,8 +35,8 @@ public sealed class DaemonCommandHostIntegrationTests
         host = new PiServerHost(options);
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(60));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(60));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(

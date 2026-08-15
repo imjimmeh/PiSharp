@@ -29,6 +29,8 @@ public sealed class ApiKeyValidator(ApiKeyOptions options)
         return value.StartsWith(BearerPrefix, StringComparison.OrdinalIgnoreCase) ? value[BearerPrefix.Length..].Trim() : null;
     }
 
+    // The query-string token is secret material equivalent to a bearer credential: it must never
+    // appear in logs. Never log this value, the raw query string, or request URLs containing it.
     private static string? ReadQueryToken(HttpContext context)
         => context.Request.Query.TryGetValue("access_token", out var value) ? value.ToString() : null;
 

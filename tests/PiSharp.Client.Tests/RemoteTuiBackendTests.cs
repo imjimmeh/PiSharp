@@ -13,6 +13,7 @@ using PiSharp.Agent.Harness;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
 using PiSharp.Tui.Interactive;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace PiSharp.Client.Tests;
@@ -26,8 +27,8 @@ public sealed class RemoteTuiBackendTests
     public async Task Subscribe_ForwardsMessageEventToListener()
     {
         var transport = new BackendFakeTransport();
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var received = new ConcurrentQueue<AgentHarnessEvent>();
         backend.Subscribe((evt, _) =>
@@ -51,8 +52,8 @@ public sealed class RemoteTuiBackendTests
     public async Task PromptAsync_SendsPromptCommand()
     {
         var transport = new BackendFakeTransport();
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var images = new List<ImageContent> { new("image/png", "aGVsbG8=") };
         await backend.PromptAsync("hello", images, CancellationToken.None);
@@ -67,8 +68,8 @@ public sealed class RemoteTuiBackendTests
     public async Task Abort_SendsAbortCommand()
     {
         var transport = new BackendFakeTransport();
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         backend.Abort();
         await WaitUntilAsync(() => transport.Commands.Count == 1);
@@ -95,8 +96,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, new ServerSessionSnapshot("s1", "/sess.jsonl", "Name", [entry]))
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var snapshot = await backend.GetSessionSnapshotAsync(CancellationToken.None);
 
@@ -120,8 +121,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, document.RootElement.Clone())
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var sessionName = await backend.GetSessionNameAsync(CancellationToken.None);
 
@@ -138,8 +139,8 @@ public sealed class RemoteTuiBackendTests
                     IsBusy: false, IsCompacting: false, MessageCount: 0, HighWatermark: 8))
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
         var resynced = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         backend.Resynced += () => resynced.TrySetResult();
 
@@ -157,8 +158,8 @@ public sealed class RemoteTuiBackendTests
     public async Task ModelAndPhase_DerivedFromState()
     {
         var transport = new BackendFakeTransport();
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         transport.Events.Writer.TryWrite(OwnEnvelope(1, new AgentHarnessOwnEvent.ModelSelect(TestModel, null, "test")));
         transport.Events.Writer.TryWrite(OwnEnvelope(2, new AgentHarnessOwnEvent.ThinkingLevelChanged(ThinkingLevel.Medium)));
@@ -176,8 +177,8 @@ public sealed class RemoteTuiBackendTests
     public async Task UiRequest_AutoCancelled_WhenNoHandler()
     {
         var transport = new BackendFakeTransport();
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var intent = new ServerUiIntent("r1", "notify", "Title", "message", null, null);
         transport.Events.Writer.TryWrite(ServerEventEnvelope.FromFlat(
@@ -193,8 +194,8 @@ public sealed class RemoteTuiBackendTests
     public async Task LateRunCommandWithShouldExit_RaisesLateCommandShouldExit()
     {
         var transport = new BackendFakeTransport();
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         backend.LateCommandShouldExit += () => fired.TrySetResult();
@@ -209,8 +210,8 @@ public sealed class RemoteTuiBackendTests
     public async Task LateResponseWithoutShouldExit_DoesNotRaiseEvent()
     {
         var transport = new BackendFakeTransport();
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         backend.LateCommandShouldExit += () => fired.TrySetResult();
@@ -244,8 +245,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, wire)
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var registry = await backend.GetExtensionRegistryAsync(CancellationToken.None);
 
@@ -270,8 +271,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, wire)
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var shortcuts = await backend.GetExtensionShortcutsAsync(CancellationToken.None);
 
@@ -300,8 +301,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, wire)
                 : ServerResponse.Fail("st", type, "not_available", "Extension shortcut 'ctrl+r' is not registered."),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var shortcuts = await backend.GetExtensionShortcutsAsync(CancellationToken.None);
 
@@ -328,8 +329,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, wire)
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
 
@@ -363,8 +364,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, wire)
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         // Fire the resolve without awaiting: the transport gates the wire reply on ReplyGate, so
         // the round trip cannot complete until the gated reply is explicitly released below.
@@ -400,8 +401,8 @@ public sealed class RemoteTuiBackendTests
                 ? ServerResponse.Ok("st", type, wire)
                 : ServerResponse.Ok("st", type),
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
 
@@ -428,8 +429,8 @@ public sealed class RemoteTuiBackendTests
                 _ => ServerResponse.Ok("st", type),
             },
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
         var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
@@ -464,8 +465,8 @@ public sealed class RemoteTuiBackendTests
                 _ => ServerResponse.Ok("st", type),
             },
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
         var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
@@ -499,8 +500,8 @@ public sealed class RemoteTuiBackendTests
                 _ => ServerResponse.Ok("st", type),
             },
         };
-        var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
 
         var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
         var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);

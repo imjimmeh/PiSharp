@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 namespace PiSharp.Tui.Interactive.Keybindings;
 
 /// <summary>
@@ -12,17 +14,19 @@ public sealed class KeybindingsWatcher : IDisposable
     private readonly TuiKeybindingStore _store;
     private readonly Action<Action> _uiPost;
     private readonly Action<string> _reportDiagnostic;
+    private readonly ILogger<KeybindingsWatcher> _logger;
     private readonly FileSystemWatcher? _watcher;
     private readonly object _gate = new();
     private Timer? _debounceTimer;
     private bool _disposed;
 
-    public KeybindingsWatcher(string path, TuiKeybindingStore store, Action<Action> uiPost, Action<string> reportDiagnostic)
+    public KeybindingsWatcher(string path, TuiKeybindingStore store, Action<Action> uiPost, Action<string> reportDiagnostic, ILogger<KeybindingsWatcher>? logger = null)
     {
         _path = path;
         _store = store;
         _uiPost = uiPost;
         _reportDiagnostic = reportDiagnostic;
+        _logger = logger ?? NullLogger<KeybindingsWatcher>.Instance;
 
         var directory = Path.GetDirectoryName(path);
         var fileName = Path.GetFileName(path);
@@ -68,6 +72,7 @@ public sealed class KeybindingsWatcher : IDisposable
         lock (_gate)
         {
             if (_disposed) return;
+            _logger.LogDebug("Keybindings change detected; reload scheduled path={Path}", _path);
             _debounceTimer?.Dispose();
             _debounceTimer = new Timer(_ => ReloadFromDisk(), null, DebounceDelay, Timeout.InfiniteTimeSpan);
         }
@@ -85,6 +90,7 @@ public sealed class KeybindingsWatcher : IDisposable
         if (!KeybindingsLoader.TryReadFile(_path, out var json, out var error))
         {
             var message = error ?? $"Failed to read keybindings file '{_path}'.";
+            _logger.LogWarning("Keybindings reload failed path={Path} error={Error}", _path, message);
             _uiPost(() => { if (!_disposed) _reportDiagnostic(message); });
             return;
         }
@@ -93,6 +99,7 @@ public sealed class KeybindingsWatcher : IDisposable
         {
             if (_disposed) return;
             _store.Reload(json);
+            _logger.LogDebug("Keybindings reloaded path={Path} bindings={BindingCount} diagnostics={DiagnosticCount}", _path, _store.CommandDescriptors.Count, _store.Diagnostics.Count);
             foreach (var diagnostic in _store.Diagnostics)
                 _reportDiagnostic(diagnostic);
         });

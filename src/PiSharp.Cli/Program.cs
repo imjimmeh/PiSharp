@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PiSharp.Ai.Auth;
 using PiSharp.Cli.Bootstrap;
@@ -62,14 +63,6 @@ public static class Program
         }
 
 
-        if (parsed.DaemonCommand is not null)
-        {
-            return await DaemonMode.RunAsync(parsed.DaemonCommand, console, cancellationToken);
-        }
-        if (parsed.StatsCommand is not null)
-        {
-            return await StatsMode.RunAsync(parsed.StatsCommand, console, cancellationToken);
-        }
         CliFileLoggingRegistration? fileLogging = null;
         var cwd = Directory.GetCurrentDirectory();
         using var loggerFactory = LoggerFactory.Create(builder =>
@@ -80,9 +73,60 @@ public static class Program
             fileLogging = CliFileLogging.AddConfiguredFileLogging(builder, cwd, profile?.Name);
         });
 
+        if (parsed.DaemonCommand is not null)
+        {
+            return await DaemonMode.RunAsync(parsed.DaemonCommand, console, cancellationToken, loggerFactory: loggerFactory);
+        }
+        if (parsed.StatsCommand is not null)
+        {
+            return await StatsMode.RunAsync(parsed.StatsCommand, console, cancellationToken, loggerFactory: loggerFactory);
+        }
+
+        var appLogger = loggerFactory.CreateLogger(nameof(Program));
         var mode = CliParser.SelectAppMode(parsed, console.IsInputRedirected);
         var env = new SystemExecutionEnv(cwd, loggerFactory);
         var runtimeArgs = parsed;
+        var stopwatch = Stopwatch.StartNew();
+        var logFilePath = fileLogging?.CurrentFilePath ?? CliFileLogging.GetDefaultLogFilePath();
+        appLogger.LogInformation(
+            "PiSharp {Version} starting args={Args} cwd={Cwd} profile={Profile} mode={Mode} logFile={LogFile}",
+            VersionInfo.Current,
+            string.Join(' ', args),
+            cwd,
+            profile?.Name ?? "(none)",
+            mode,
+            logFilePath);
+
+        int exitCode = 0;
+        try
+        {
+            return exitCode = await RunSelectedModeAsync(parsed, mode, cwd, profile?.Name, env, runtimeArgs, console, loggerFactory, fileLogging, appLogger, stopwatch, cancellationToken);
+        }
+        finally
+        {
+            appLogger.LogInformation("PiSharp exited exitCode={ExitCode} runtimeMs={RuntimeMs}", exitCode, stopwatch.ElapsedMilliseconds);
+        }
+    }
+
+    /// <summary>
+    /// Runs the selected app mode and returns its exit code. Kept separate from
+    /// <see cref="RunAsync"/> so the process-level exit log in the caller's finally block
+    /// observes every return path.
+    /// </summary>
+    private static async Task<int> RunSelectedModeAsync(
+        CliArgs parsed,
+        AppMode mode,
+        string cwd,
+        string? profileName,
+        SystemExecutionEnv env,
+        CliArgs runtimeArgs,
+        IConsoleIO console,
+        ILoggerFactory loggerFactory,
+        CliFileLoggingRegistration? fileLogging,
+        ILogger appLogger,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken)
+    {
         if (parsed.Resume && !parsed.Help && mode == AppMode.Interactive)
         {
             var resolved = await StartupResumeSelector.ResolveAsync(
@@ -100,16 +144,18 @@ public static class Program
             var lease = await InteractiveMode.SelectLeaseAsync(store, ct: cancellationToken);
             if (lease is not null)
             {
+                appLogger.LogInformation("Using daemon lease pid={Pid} port={Port}", lease.Pid, lease.Port);
                 return await InteractiveMode.RunRemoteAsync(lease, runtimeArgs, console, loggerFactory, cancellationToken);
             }
 
+            appLogger.LogInformation("Daemon unavailable; falling back to in-process mode");
             await console.Error.WriteLineAsync("daemon unavailable; falling back to in-process mode".AsMemory(), cancellationToken);
         }
 
         var runtimeOptions = CliRuntimeOptionsMapper.FromCliArgs(
             runtimeArgs with { HelpOnly = parsed.Help },
             env,
-            profile: profile?.Name);
+            profile: profileName);
         if (mode == AppMode.Interactive)
         {
             var extensionOptions = runtimeOptions.Extensions ?? new RuntimeExtensionOptions();
@@ -124,6 +170,10 @@ public static class Program
             loggerFactory: loggerFactory,
             cancellationToken: cancellationToken);
         fileLogging?.SetSessionPath(runtime.Session.Metadata.Path);
+        if (fileLogging is not null)
+        {
+            appLogger.LogInformation("Session log file retargeted path={LogFilePath}", fileLogging.CurrentFilePath);
+        }
 
         if (parsed.BenchmarkStartup && runtime.StartupBenchmark is not null)
         {
@@ -144,7 +194,7 @@ public static class Program
 
         if (parsed.LoginProvider is not null || parsed.Logout)
         {
-            return await HandleLoginLogoutAsync(parsed, env.Cwd, profile?.Name, cancellationToken);
+            return await HandleLoginLogoutAsync(parsed, env.Cwd, profileName, cancellationToken);
         }
 
         var fileReferences = parsed.FileArgsOrEmpty.Count == 0
@@ -153,16 +203,15 @@ public static class Program
 
         return mode switch
         {
-            AppMode.Rpc => await RpcMode.RunAsync(runtime, console, cancellationToken),
-            AppMode.Acp => await AcpMode.RunAsync(runtime, console, parsed.ApprovalMode ?? AcpApprovalMode.Ask, cancellationToken),
-            AppMode.SubagentJson => await SubagentJsonMode.RunAsync(runtime, new SubagentJsonModeOptions(InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty), console, cancellationToken),
-            AppMode.PrintJson => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Json, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
-            AppMode.PrintText => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Text, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken),
+            AppMode.Rpc => await RpcMode.RunAsync(runtime, console, cancellationToken, loggerFactory: loggerFactory),
+            AppMode.Acp => await AcpMode.RunAsync(runtime, console, parsed.ApprovalMode ?? AcpApprovalMode.Ask, cancellationToken, loggerFactory: loggerFactory),
+            AppMode.SubagentJson => await SubagentJsonMode.RunAsync(runtime, new SubagentJsonModeOptions(InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty), console, cancellationToken, loggerFactory: loggerFactory),
+            AppMode.PrintJson => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Json, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken, loggerFactory: loggerFactory),
+            AppMode.PrintText => await PrintMode.RunAsync(runtime, new PrintModeOptions(PrintOutputMode.Text, InitialMessage: fileReferences.Text, Messages: parsed.MessagesOrEmpty, InitialImages: fileReferences.Images), console, cancellationToken, loggerFactory: loggerFactory),
             AppMode.Interactive => await InteractiveMode.RunAsync(runtime, cancellationToken, parsed.Local),
             _ => 2
         };
     }
-
     private static async Task<int> HandlePackageCommandAsync(PackageCommandArgs cmd, IConsoleIO console, IPackageCommandRunner? runner, bool offline = false, string? profile = null)
     {
         runner ??= await CreateDefaultPackageCommandRunnerAsync(profile);

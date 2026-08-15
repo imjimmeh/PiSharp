@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
 using Xunit;
@@ -27,7 +28,7 @@ public sealed class ClientWebSocketTransportTimeoutTests
     public async Task CreateSession_WithTimeoutOverride_SucceedsBeyondDefault_AndOtherCommandsKeepDefault()
     {
         await using var server = await DelayedResponseServer.StartAsync(delay: TimeSpan.FromSeconds(1));
-        await using var transport = new ClientWebSocketTransport(TimeSpan.FromMilliseconds(300));
+        await using var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromMilliseconds(300));
 
         await transport.ConnectAsync(server.WsUri, "test-key", CancellationToken.None);
 
@@ -59,7 +60,7 @@ public sealed class ClientWebSocketTransportTimeoutTests
     public async Task CommandWithoutOverride_TimesOutAtTransportDefault()
     {
         await using var server = await DelayedResponseServer.StartAsync(delay: TimeSpan.FromSeconds(1));
-        await using var transport = new ClientWebSocketTransport(TimeSpan.FromMilliseconds(300));
+        await using var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromMilliseconds(300));
 
         await transport.ConnectAsync(server.WsUri, "test-key", CancellationToken.None);
 
@@ -89,7 +90,7 @@ public sealed class ClientWebSocketTransportTimeoutTests
             $"run_command should default to at least 10 minutes; got {timeout}");
 
         await using var server = await DelayedResponseServer.StartAsync(delay: TimeSpan.FromSeconds(1));
-        await using var transport = new ClientWebSocketTransport(TimeSpan.FromMilliseconds(300));
+        await using var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromMilliseconds(300));
         await transport.ConnectAsync(server.WsUri, "test-key", CancellationToken.None);
 
         var stopwatch = Stopwatch.StartNew();
@@ -111,7 +112,7 @@ public sealed class ClientWebSocketTransportTimeoutTests
     public async Task TimedOutResponse_IsNotDiscarded()
     {
         await using var server = await DelayedResponseServer.StartAsync(delay: TimeSpan.FromMilliseconds(150));
-        await using var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(5));
+        await using var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(5));
         await transport.ConnectAsync(server.WsUri, "test-key", CancellationToken.None);
 
         var envelope = new ServerCommandEnvelope(ServerCommandTypes.GetTheme, Id: Guid.NewGuid().ToString("N"));

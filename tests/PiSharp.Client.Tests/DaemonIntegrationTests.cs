@@ -8,6 +8,7 @@ using PiSharp.Server.Hosting;
 using PiSharp.Server.Serialization;
 using PiSharp.Server.UiBridge;
 using PiSharp.Tui.Interactive;
+using Microsoft.Extensions.Logging.Abstractions;
 using Terminal.Gui;
 using Xunit;
 
@@ -41,8 +42,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(
@@ -93,8 +94,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(
@@ -156,8 +157,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(90));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(90));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         // Explicit envelope id proves wire correlation: the real transport resolves the matching
@@ -181,7 +182,7 @@ public sealed class DaemonIntegrationTests
 
         // Post-create remote startup sequence driven through the real backend on the same
         // connection, mirroring what InteractiveMode runs after create_session.
-        await using var backend = new RemoteTuiBackend(conn)
+        await using var backend = new RemoteTuiBackend(conn, NullLogger.Instance)
         {
             ServerSessionId = created.ServerSessionId,
         };
@@ -211,8 +212,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(
@@ -227,7 +228,7 @@ public sealed class DaemonIntegrationTests
             new { sinceSequence = 0L },
             CancellationToken.None);
 
-        await using var backend = new RemoteTuiBackend(conn)
+        await using var backend = new RemoteTuiBackend(conn, NullLogger.Instance)
         {
             ServerSessionId = sessionId,
         };
@@ -260,8 +261,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(
@@ -271,7 +272,7 @@ public sealed class DaemonIntegrationTests
         Assert.True(createResp.Success, createResp.Error?.Message);
         var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
 
-        await using var backend = new RemoteTuiBackend(conn)
+        await using var backend = new RemoteTuiBackend(conn, NullLogger.Instance)
         {
             ServerSessionId = sessionId,
         };
@@ -294,8 +295,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(
@@ -305,7 +306,7 @@ public sealed class DaemonIntegrationTests
         Assert.True(createResp.Success, createResp.Error?.Message);
         var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
 
-        await using var backend = new RemoteTuiBackend(conn)
+        await using var backend = new RemoteTuiBackend(conn, NullLogger.Instance)
         {
             ServerSessionId = sessionId,
         };
@@ -326,8 +327,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(
@@ -337,7 +338,7 @@ public sealed class DaemonIntegrationTests
         Assert.True(createResp.Success, createResp.Error?.Message);
         var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
 
-        await using var backend = new RemoteTuiBackend(conn)
+        await using var backend = new RemoteTuiBackend(conn, NullLogger.Instance)
         {
             ServerSessionId = sessionId,
         };
@@ -358,8 +359,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(
@@ -390,7 +391,7 @@ public sealed class DaemonIntegrationTests
             DispatchUi = action => action(),
             ApprovalAction = (_, _, _) => Task.FromResult<string?>("allow"),
         };
-        await using var backend = new RemoteTuiBackend(conn) { ServerSessionId = sessionId };
+        await using var backend = new RemoteTuiBackend(conn, NullLogger.Instance) { ServerSessionId = sessionId };
         backend.UiRequestHandler = async (intent, ct) =>
         {
             var result = await bridge.HandleAsync(
@@ -442,8 +443,8 @@ public sealed class DaemonIntegrationTests
         });
         await host.StartAsync(0);
 
-        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
-        await using var conn = new ClientSessionConnection(transport);
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
         await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
 
         var createResp = await conn.SendAsync(

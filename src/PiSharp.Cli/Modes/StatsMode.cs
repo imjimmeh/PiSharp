@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Client;
 using PiSharp.Compatibility.Settings;
 using PiSharp.Cli.IO;
@@ -27,8 +29,12 @@ public static class StatsMode
         StatsCommandArgs options,
         IConsoleIO console,
         CancellationToken cancellationToken = default,
-        string? homeDirectory = null)
+        string? homeDirectory = null,
+        ILoggerFactory? loggerFactory = null)
     {
+        loggerFactory ??= NullLoggerFactory.Instance;
+        var logger = loggerFactory.CreateLogger(nameof(StatsMode));
+        logger.LogInformation("Stats mode started json={Json} live={Live} since={Since}", options.Json, options.Live, options.Since);
         var paths = PiAgentPaths.FromCwd(Directory.GetCurrentDirectory(), homeDirectory);
         var logsDirectory = Path.Combine(paths.GlobalPiSharpDirectory, "logs");
 
@@ -42,7 +48,7 @@ public static class StatsMode
                 return 1;
             }
 
-            var snapshot = await QueryLiveSnapshotAsync(lease, cancellationToken);
+            var snapshot = await QueryLiveSnapshotAsync(lease, loggerFactory, cancellationToken);
             if (snapshot is null)
             {
                 await console.Error.WriteLineAsync($"daemon get_metrics failed for pid {lease.Pid}".AsMemory(), cancellationToken);
@@ -62,14 +68,27 @@ public static class StatsMode
         return 0;
     }
 
-    private static async Task<MetricsSnapshot?> QueryLiveSnapshotAsync(DaemonLease lease, CancellationToken cancellationToken)
+    private static async Task<MetricsSnapshot?> QueryLiveSnapshotAsync(DaemonLease lease, ILoggerFactory loggerFactory, CancellationToken cancellationToken)
     {
-        await using var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(10));
-        await using var connection = new ClientSessionConnection(transport);
-        await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}/ws"), lease.ApiKey, cancellationToken);
-        var response = await connection.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.GetMetrics), cancellationToken);
-        if (!response.Success || response.Data is not JsonElement element) return null;
-        return JsonSerializer.Deserialize<MetricsSnapshot>(element.GetRawText(), ServerJsonSerializer.Options);
+        var logger = loggerFactory.CreateLogger(nameof(StatsMode));
+        try
+        {
+            await using var transport = new ClientWebSocketTransport(loggerFactory.CreateLogger<ClientWebSocketTransport>(), TimeSpan.FromSeconds(10));
+            await using var connection = new ClientSessionConnection(transport, loggerFactory.CreateLogger<ClientSessionConnection>());
+            await connection.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}/ws"), lease.ApiKey, cancellationToken);
+            var response = await connection.SendAsync(new ServerCommandEnvelope(ServerCommandTypes.GetMetrics), cancellationToken);
+            if (!response.Success || response.Data is not JsonElement element)
+            {
+                logger.LogWarning("Daemon get_metrics request failed pid={Pid} port={Port}", lease.Pid, lease.Port);
+                return null;
+            }
+            return JsonSerializer.Deserialize<MetricsSnapshot>(element.GetRawText(), ServerJsonSerializer.Options);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Daemon get_metrics failed pid={Pid} port={Port}", lease.Pid, lease.Port);
+            return null;
+        }
     }
 
     /// <summary>

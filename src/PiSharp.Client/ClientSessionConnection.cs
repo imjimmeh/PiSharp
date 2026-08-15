@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using PiSharp.Server.Contracts;
 
 namespace PiSharp.Client;
@@ -11,13 +12,15 @@ namespace PiSharp.Client;
 public sealed class ClientSessionConnection : IAsyncDisposable
 {
     private readonly IClientTransport _transport;
+    private readonly ILogger _logger;
     private readonly CancellationTokenSource _pumpCts = new();
     private readonly Task _pumpTask;
     private int _disposed;
 
-    public ClientSessionConnection(IClientTransport transport)
+    public ClientSessionConnection(IClientTransport transport, ILogger logger)
     {
         _transport = transport;
+        _logger = logger;
         _pumpTask = Task.Run(() => PumpEventsAsync(_pumpCts.Token), CancellationToken.None);
     }
 
@@ -81,13 +84,14 @@ public sealed class ClientSessionConnection : IAsyncDisposable
     {
         await foreach (var envelope in _transport.Events.ReadAllAsync(ct))
         {
-            LastAppliedSequence = envelope.Sequence;
             try
             {
                 EventReceived?.Invoke(envelope);
+                LastAppliedSequence = envelope.Sequence;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                _logger.LogError(exception, "Event subscriber threw while handling envelope {Sequence} ({Type})", envelope.Sequence, envelope.Event.Type);
                 // A misbehaving subscriber must not stall the event stream.
             }
         }

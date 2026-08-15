@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Cli.IO;
 using PiSharp.Logging;
 using PiSharp.Cli.Parsing;
@@ -21,27 +22,31 @@ public static class DaemonMode
         DaemonCommandArgs command,
         IConsoleIO console,
         CancellationToken cancellationToken = default,
-        string? leaseDirectory = null)
+        string? leaseDirectory = null,
+        ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(console);
 
+        loggerFactory ??= NullLoggerFactory.Instance;
         var store = new DaemonLeaseStore(leaseDirectory ?? PiAgentPaths.FromCwd(Directory.GetCurrentDirectory()).GlobalPiSharpDirectory);
 
         return command.Kind switch
         {
-            DaemonCommandKind.Start => await StartAsync(command, console, store, cancellationToken),
-            DaemonCommandKind.Stop => await StopAsync(console, store, cancellationToken),
-            DaemonCommandKind.Status => await StatusAsync(console, store, cancellationToken),
+            DaemonCommandKind.Start => await StartAsync(command, console, store, loggerFactory, cancellationToken),
+            DaemonCommandKind.Stop => await StopAsync(console, store, loggerFactory, cancellationToken),
+            DaemonCommandKind.Status => await StatusAsync(console, store, loggerFactory, cancellationToken),
             _ => 2
         };
     }
 
-    private static async Task<int> StartAsync(DaemonCommandArgs command, IConsoleIO console, DaemonLeaseStore store, CancellationToken cancellationToken)
+    private static async Task<int> StartAsync(DaemonCommandArgs command, IConsoleIO console, DaemonLeaseStore store, ILoggerFactory loggerFactory, CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger(nameof(DaemonMode));
         var port = ResolvePort(command.Port);
         if (port is null)
         {
+            logger.LogWarning("Daemon start requested with an invalid port portValue={PortValue}", command.Port ?? "(none)");
             await console.Error.WriteLineAsync("invalid port".AsMemory(), cancellationToken);
             return 1;
         }
@@ -52,6 +57,7 @@ public static class DaemonMode
         using var startLock = DaemonLock.TryAcquire(store.LockPath);
         if (startLock is null)
         {
+            logger.LogWarning("Daemon start requested while another start is in progress port={Port}", port.Value);
             await console.Error.WriteLineAsync("daemon already running".AsMemory(), cancellationToken);
             return 1;
         }
@@ -73,9 +79,12 @@ public static class DaemonMode
 
         if (lease is null)
         {
+            logger.LogWarning("Failed to start daemon: health check timed out port={Port}", port.Value);
             await console.Error.WriteLineAsync("failed to start daemon: health check timed out".AsMemory(), cancellationToken);
             return 1;
         }
+
+        logger.LogInformation("Daemon started pid={Pid} port={Port}", lease.Pid, lease.Port);
 
         await console.Out.WriteLineAsync($"daemon started (pid {lease.Pid}) on http://127.0.0.1:{lease.Port}".AsMemory(), cancellationToken);
         return 0;
@@ -119,8 +128,9 @@ public static class DaemonMode
         return 0;
     }
 
-    private static async Task<int> StopAsync(IConsoleIO console, DaemonLeaseStore store, CancellationToken cancellationToken)
+    private static async Task<int> StopAsync(IConsoleIO console, DaemonLeaseStore store, ILoggerFactory loggerFactory, CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger(nameof(DaemonMode));
         var lease = await store.TryReadAsync(cancellationToken);
         if (lease is null)
         {
@@ -131,7 +141,7 @@ public static class DaemonMode
         var stopped = false;
         try
         {
-            await using var transport = new ClientWebSocketTransport();
+            await using var transport = new ClientWebSocketTransport(loggerFactory.CreateLogger<ClientWebSocketTransport>());
             await transport.ConnectAsync(new Uri($"ws://127.0.0.1:{lease.Port}"), lease.ApiKey, cancellationToken);
             var response = await transport.SendCommandAsync(new ServerCommandEnvelope(ServerCommandTypes.Shutdown, Id: Guid.NewGuid().ToString("N")), new ShutdownRequest(Confirm: true), cancellationToken);
             stopped = response.Success;
@@ -139,12 +149,15 @@ public static class DaemonMode
         catch (Exception ex) when (ex is WebSocketException or IOException or InvalidOperationException or OperationCanceledException)
         {
             stopped = false; // daemon is not reachable — treat the leftover lease as dead
+            logger.LogWarning(ex, "Daemon shutdown request failed port={Port} pid={Pid}; clearing stale lease", lease.Port, lease.Pid);
         }
 
         await store.ClearAsync(cancellationToken);
+        logger.LogInformation("Daemon lease cleared port={Port} pid={Pid}", lease.Port, lease.Pid);
 
         if (stopped)
         {
+            logger.LogInformation("Daemon stopped port={Port} pid={Pid}", lease.Port, lease.Pid);
             await console.Out.WriteLineAsync("Daemon stopped.".AsMemory(), cancellationToken);
             return 0;
         }
@@ -153,8 +166,9 @@ public static class DaemonMode
         return 1;
     }
 
-    private static async Task<int> StatusAsync(IConsoleIO console, DaemonLeaseStore store, CancellationToken cancellationToken)
+    private static async Task<int> StatusAsync(IConsoleIO console, DaemonLeaseStore store, ILoggerFactory loggerFactory, CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger(nameof(DaemonMode));
         var lease = await store.TryReadAsync(cancellationToken);
         if (lease is null)
         {
@@ -163,6 +177,7 @@ public static class DaemonMode
         }
 
         var alive = DaemonLeaseStore.ProcessAlive(lease.Pid);
+        logger.LogDebug("Daemon status port={Port} pid={Pid} alive={Alive}", lease.Port, lease.Pid, alive);
         await console.Out.WriteLineAsync($"http://127.0.0.1:{lease.Port} pid={lease.Pid} {(alive ? "alive" : "dead")}".AsMemory(), cancellationToken);
         return alive ? 0 : 1;
     }

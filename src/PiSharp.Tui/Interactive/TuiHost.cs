@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Agent.Resources.Theme;
 using PiSharp.Extensions;
+using PiSharp.Logging;
 using PiSharp.Tui.Interactive.Components;
 using PiSharp.Tui.Interactive.Harness;
 using PiSharp.Tui.Interactive.Input;
@@ -18,7 +20,7 @@ namespace PiSharp.Tui.Interactive;
 
 public sealed class TuiHost(TuiHostOptions options)
 {
-    private readonly ILogger<TuiHost> _logger = options.LoggerFactory?.CreateLogger<TuiHost>() ?? NullLogger<TuiHost>.Instance;
+    private ILogger<TuiHost> _logger = options.LoggerFactory?.CreateLogger<TuiHost>() ?? NullLogger<TuiHost>.Instance;
     private TimeSpan TransientSystemMessageLifetime => options.TransientSystemMessageLifetime ?? TimeSpan.FromSeconds(6);
     private static readonly TimeSpan PostStartupMessageLifetime = TimeSpan.FromSeconds(30);
 
@@ -33,14 +35,28 @@ public sealed class TuiHost(TuiHostOptions options)
 
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
-        ConsoleTerminalSessionLifetimeEvents.LoggerFactory = options.LoggerFactory;
-        var terminalScreenSession = options.TerminalScreenSession ?? AnsiTerminalScreenSession.CreateDefault(options.LoggerFactory);
+        // A bare TuiHost (tests, embedding) gets a real file logger instead of a silent
+        // NullLogger: the fallback factory writes to the shared PiSharp log directory.
+        var loggerFactory = options.LoggerFactory;
+        if (loggerFactory is null)
+        {
+            loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder.SetMinimumLevel(LogLevel.Debug);
+                CliFileLogging.AddConfiguredFileLogging(builder, Directory.GetCurrentDirectory());
+            });
+            _logger = loggerFactory.CreateLogger<TuiHost>();
+        }
+
+        ConsoleTerminalSessionLifetimeEvents.LoggerFactory = loggerFactory;
+        var terminalScreenSession = options.TerminalScreenSession ?? AnsiTerminalScreenSession.CreateDefault(loggerFactory);
         terminalScreenSession.Enter();
+        var driver = options.ConsoleDriver;
+        var driverName = driver is null ? TuiConsoleDriverName.DefaultForCurrentPlatform() : "FakeDriver";
+        if (driver is null) TuiConsoleDriverName.PrepareConsoleForDriver(driverName);
         try
         {
-            var driver = options.ConsoleDriver;
-            var driverName = driver is null ? TuiConsoleDriverName.DefaultForCurrentPlatform() : "FakeDriver";
-            if (driver is null) TuiConsoleDriverName.PrepareConsoleForDriver(driverName);
+            _logger.LogDebug("TUI driver initializing driver={DriverName}", driverName);
             Application.Init(driver!, driverName);
             terminalScreenSession.RestoreBracketedPaste();
             // F6/Shift+F6 are Terminal.Gui's built-in NextTabGroup/PrevTabGroup keys.
@@ -51,27 +67,32 @@ public sealed class TuiHost(TuiHostOptions options)
             Application.KeyBindings.Remove(Key.F6);
             Application.KeyBindings.Remove(Key.F6.WithShift);
         }
-        catch
+        catch (Exception exception)
         {
+            _logger.LogError(exception, "TUI driver initialization failed driver={DriverName}", driverName);
             terminalScreenSession.Exit();
             throw;
         }
         TuiTheme.Apply(options.Theme);
-        TuiShortcutRegistrar.LoggerFactory = options.LoggerFactory;
+        TuiShortcutRegistrar.LoggerFactory = loggerFactory;
 
         var keybindingsStore = new TuiKeybindingStore(options.KeybindingsDefaults ?? TuiBuiltInShortcutCatalog.Bindings);
         TuiShortcutRegistrar.DefaultStore = keybindingsStore;
         var initialKeybindingsDiagnostics = new List<string>();
         if (!string.IsNullOrEmpty(options.KeybindingsPath) && File.Exists(options.KeybindingsPath))
         {
+            _logger.LogDebug("TUI keybindings load started path={Path}", options.KeybindingsPath);
             if (KeybindingsLoader.TryReadFile(options.KeybindingsPath, out var keybindingsJson, out var keybindingsError))
             {
                 keybindingsStore.Reload(keybindingsJson);
+                _logger.LogDebug("TUI keybindings loaded path={Path} bindings={BindingCount} diagnostics={DiagnosticCount}",
+                    options.KeybindingsPath, keybindingsStore.CommandDescriptors.Count, keybindingsStore.Diagnostics.Count);
                 initialKeybindingsDiagnostics.AddRange(keybindingsStore.Diagnostics);
             }
             else if (keybindingsError is not null)
             {
                 initialKeybindingsDiagnostics.Add(keybindingsError);
+                _logger.LogWarning("TUI keybindings load failed path={Path} error={Error}", options.KeybindingsPath, keybindingsError);
             }
         }
 
@@ -114,12 +135,14 @@ public sealed class TuiHost(TuiHostOptions options)
         }
         foreach (var diagnostic in initialKeybindingsDiagnostics)
             state = state.AppendSystem(diagnostic, isError: true);
+        _logger.LogInformation("TUI host starting sessionId={SessionId} model={Model} thinking={Thinking} sessionName={SessionName}",
+            state.SessionId, state.ModelDisplay, state.ThinkingLevel, state.SessionName);
 
         var stateStore = new RenderStateStore(state);
 
-        var shell = new TuiShellView(options.LoggerFactory);
+        var shell = new TuiShellView(loggerFactory);
         shell.ProfilingCounters = options.ProfilingCounters;
-        var chatPipeline = new ChatRowRenderPipeline(options.GetExtensionRegistry?.Invoke(), loggerFactory: options.LoggerFactory);
+        var chatPipeline = new ChatRowRenderPipeline(options.GetExtensionRegistry?.Invoke(), loggerFactory: loggerFactory);
         shell.Chat.TranscriptItemRenderer = (item, renderState, width) =>
         {
             options.ProfilingCounters?.Increment(TuiProfilingCounterNames.TranscriptItemRender);
@@ -134,7 +157,7 @@ public sealed class TuiHost(TuiHostOptions options)
             => stateStore.Update(s => TuiSessionSwitch.ApplySnapshot(s, snapshot, preserve));
 
         var headerExpanded = false;
-        var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: options.LoggerFactory);
+        var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: loggerFactory);
         var timingOptions = options.TimingOptions ?? TuiTimingOptions.Default;
 
         TuiShortcutActionHandler? shortcutActionsRef = null;
@@ -158,7 +181,7 @@ public sealed class TuiHost(TuiHostOptions options)
             getActiveTools: () => runtime.ActiveToolNames,
             invokeCommand: InvokeMenuCommand,
             cancellationToken: cancellationToken,
-            loggerFactory: options.LoggerFactory,
+            loggerFactory: loggerFactory,
             updateState: stateStore.Update);
 
         var inlineSelection = new TuiInlineSelectionCoordinator(shell.Prompt, () => renderCoordinator.RequestRender(), appContext.Post);
@@ -169,7 +192,7 @@ public sealed class TuiHost(TuiHostOptions options)
             getEditorText: () => shell.Prompt.PromptText,
             setEditorText: t => shell.Prompt.SetPromptText(t),
             getState: () => stateStore.Snapshot(),
-            loggerFactory: options.LoggerFactory)
+            loggerFactory: loggerFactory)
         {
             DispatchUi = appContext.Post,
             RestoreFocus = () => shell.Prompt.FocusAtEnd(),
@@ -184,7 +207,8 @@ public sealed class TuiHost(TuiHostOptions options)
         var extensionUi = new TuiExtensionUi(bridge, SelectInlineWithLoggingAsync);
 
         var shortcutController = new TuiShortcutController(new TuiShortcutControllerOptions(
-            () => options.GetExtensionShortcuts?.Invoke() ?? [], extensionUi, _ => { }));
+            () => options.GetExtensionShortcuts?.Invoke() ?? [], extensionUi,
+            message => loggerFactory.CreateLogger<TuiShortcutController>().LogWarning("{Message}", message)));
         // Extension shortcuts come from a potentially-remote source, so they are read only on a
         // background thread (see TuiShortcutController) and never on the UI key path. Kick off the
         // first refresh here; invalidations below clear the cache and schedule another refresh.
@@ -227,7 +251,7 @@ public sealed class TuiHost(TuiHostOptions options)
             () => runtime.Phase,
             OnAbortRequested: () => onAbortRequested?.Invoke(),
             UpdateState: update => { var next = stateStore.Update(update); renderCoordinator.RequestRender(); return next; }),
-            options.LoggerFactory);
+            loggerFactory);
         // Wire interactive UI requests (select/input/confirm from daemon slash
         // commands or server extension UI) to the local dialog pipeline. With no
         // handlers the bridge keeps its canned non-interactive defaults.
@@ -243,20 +267,20 @@ public sealed class TuiHost(TuiHostOptions options)
         var stateGateway = new TuiStateGateway(() => stateStore.Snapshot(), s => stateStore.Replace(s), renderCoordinator, appContext, cancellationToken, updateState: stateStore.Update);
         var harnessLifecycle = new TuiHarnessLifecycleCoordinator(
             sessionContext, options, appContext, renderCoordinator,
-            stateStore, LoadSessionSnapshotAsync, ApplySessionSnapshot, options.LoggerFactory);
+            stateStore, LoadSessionSnapshotAsync, ApplySessionSnapshot, loggerFactory);
         var shortcutActions = new TuiShortcutActionHandler(
-            shell, inlineSelection, appContext, stateGateway, sessionContext, options, cancellationToken, options.LoggerFactory);
+            shell, inlineSelection, appContext, stateGateway, sessionContext, options, cancellationToken, loggerFactory);
         var transcriptController = new TuiTranscriptInteractionController(
             shell, options, appContext, renderCoordinator, stateGateway, sessionContext,
-            LoadSessionSnapshotAsync, ApplySessionSnapshot, cancellationToken, options.LoggerFactory);
+            LoadSessionSnapshotAsync, ApplySessionSnapshot, cancellationToken, loggerFactory);
         var submissionCoordinator = new TuiPromptSubmissionCoordinator(
             shell, inlineSelection, stateGateway, sessionContext, options,
             new PromptFileReferenceCompletionProvider(
                 options.WorkingDirectory ?? Environment.CurrentDirectory,
-                gitVisibility: GitVisibilityService.TryCreate(Path.GetFullPath(options.WorkingDirectory ?? Environment.CurrentDirectory), options.LoggerFactory?.CreateLogger(nameof(GitVisibilityService)) ?? NullLogger.Instance),
-                loggerFactory: options.LoggerFactory,
+                gitVisibility: GitVisibilityService.TryCreate(Path.GetFullPath(options.WorkingDirectory ?? Environment.CurrentDirectory), loggerFactory.CreateLogger(nameof(GitVisibilityService))),
+                loggerFactory: loggerFactory,
                 profilingCounters: options.ProfilingCounters),
-            options.LoggerFactory);
+            loggerFactory);
         submissionCoordinator.CommandController = commandController;
         shortcutActions.CommandController = commandController;
         shortcutActionsRef = shortcutActions;
@@ -290,7 +314,7 @@ public sealed class TuiHost(TuiHostOptions options)
             shell.Window, shell.Chat, shell.Prompt,
             () => renderCoordinator.RequestRender(),
             shortcutDispatcher, shortcutContext, shortcutController,
-            shortcutActions.ReportShortcutError, cancellationToken, () => bridge.HasActiveCustomUi, () => shell.HasActiveEditorComponent, options.LoggerFactory);
+            shortcutActions.ReportShortcutError, cancellationToken, () => bridge.HasActiveCustomUi, () => shell.HasActiveEditorComponent, loggerFactory);
         inputCoordinator.Attach();
 
         var customUiCapture = new ExtensionCustomUiInputCapture(bridge);
@@ -309,13 +333,13 @@ public sealed class TuiHost(TuiHostOptions options)
                     shortcutActions.ReportShortcutError,
                     cancellationToken);
             },
-            loggerFactory: options.LoggerFactory);
+            loggerFactory: loggerFactory);
         inputRouter.Attach();
 
         keybindingsStore.Changed += () => appContext.Post(() => renderCoordinator.RequestRender());
         using var keybindingsWatcher = string.IsNullOrEmpty(options.KeybindingsPath)
             ? null
-            : new KeybindingsWatcher(options.KeybindingsPath, keybindingsStore, appContext.Post, shortcutActions.ReportShortcutError);
+            : new KeybindingsWatcher(options.KeybindingsPath, keybindingsStore, appContext.Post, shortcutActions.ReportShortcutError, loggerFactory.CreateLogger<KeybindingsWatcher>());
 
         ConsoleCancelEventHandler consoleCancelKeyPressHandler = (_, args) =>
         {
@@ -446,7 +470,7 @@ public sealed class TuiHost(TuiHostOptions options)
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "TUI startup hydration failed");
+                _logger.LogError(exception, "TUI startup hydration failed; failed to connect to the daemon sessionId={SessionId}", options.SessionId);
                 var errorMessage = $"Failed to connect to the daemon: {exception.Message}. Verify the daemon is running and restart the interactive session.";
                 try
                 {
@@ -489,6 +513,8 @@ public sealed class TuiHost(TuiHostOptions options)
         {
             // Stop any in-flight startup hydration from mutating the UI while the loop is
             // shutting down; a queued-but-unrun mutation observes the cancelled token.
+            var shutdownWatch = Stopwatch.StartNew();
+            _logger.LogInformation("TUI host shutdown started");
             hostLifetime.Cancel();
             try
             {
@@ -503,6 +529,7 @@ public sealed class TuiHost(TuiHostOptions options)
                 Console.CancelKeyPress -= consoleCancelKeyPressHandler;
                 terminalScreenSession.Exit();
             }
+            _logger.LogInformation("TUI host shutdown completed durationMs={DurationMs}", shutdownWatch.ElapsedMilliseconds);
         }
         return 0;
     }
