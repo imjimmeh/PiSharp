@@ -64,7 +64,6 @@ internal sealed class TuiHarnessSubscription(
     {
         _eventPump = new TuiHarnessEventPump(
             ProcessHarnessEventBatch,
-            dispatch,
             _eventBatchInterval,
             EventBatchCapacity,
             EventBatchSize);
@@ -100,14 +99,16 @@ internal sealed class TuiHarnessSubscription(
         }
 
         store.Replace(state);
-        scheduleRender(default);
+        // The reduce stays on the pump worker; the render handoff must be marshaled back to the UI
+        // thread (appContext.Post) so it cannot race the UI thread's own request-render coalescing.
+        dispatch(() => scheduleRender(default));
         foreach (var queued in batch)
         {
             var token = queued.CancellationToken.IsCancellationRequested ? CancellationToken.None : queued.CancellationToken;
             if (ShouldRefreshSessionSnapshot(queued.Event)) _ = RefreshSessionSnapshotAfterEventAsync(token);
             _ = RenderExtensionToolAsync(queued.Event, token).ContinueWith(task =>
             {
-                if (task is { IsCompletedSuccessfully: true, Result: true }) scheduleRender(default);
+                if (task is { IsCompletedSuccessfully: true, Result: true }) dispatch(() => scheduleRender(default));
             }, CancellationToken.None);
         }
     }

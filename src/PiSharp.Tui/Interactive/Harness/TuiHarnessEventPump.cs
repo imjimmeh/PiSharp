@@ -15,7 +15,6 @@ internal sealed record QueuedHarnessEvent(AgentHarnessEvent Event, CancellationT
 internal sealed class TuiHarnessEventPump : IDisposable
 {
     private readonly Action<IReadOnlyList<QueuedHarnessEvent>> _dispatchBatch;
-    private readonly Action<Action> _dispatch;
     private readonly TimeSpan _batchInterval;
     private readonly int _batchSize;
     private readonly CancellationTokenSource _cancellation = new();
@@ -24,7 +23,6 @@ internal sealed class TuiHarnessEventPump : IDisposable
 
     public TuiHarnessEventPump(
         Action<IReadOnlyList<QueuedHarnessEvent>> dispatchBatch,
-        Action<Action> dispatch,
         TimeSpan batchInterval,
         int capacity = 4096,
         int batchSize = 128)
@@ -33,7 +31,6 @@ internal sealed class TuiHarnessEventPump : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
 
         _dispatchBatch = dispatchBatch;
-        _dispatch = dispatch;
         _batchInterval = batchInterval;
         _batchSize = batchSize;
         _queue = Channel.CreateBounded<QueuedHarnessEvent>(new BoundedChannelOptions(capacity)
@@ -42,7 +39,11 @@ internal sealed class TuiHarnessEventPump : IDisposable
             SingleReader = true,
             SingleWriter = false
         });
-        _worker = Task.Run(() => RunAsync(_cancellation.Token), CancellationToken.None);
+        _worker = Task.Factory.StartNew(
+            () => RunAsync(_cancellation.Token),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
     }
 
     public TuiHarnessEventEnqueueResult Enqueue(AgentHarnessEvent evt, CancellationToken token)
@@ -88,12 +89,12 @@ internal sealed class TuiHarnessEventPump : IDisposable
         }
     }
 
-    private async Task RunAsync(CancellationToken token)
+    private void RunAsync(CancellationToken token)
     {
         var batch = new List<QueuedHarnessEvent>(_batchSize);
         try
         {
-            while (await _queue.Reader.WaitToReadAsync(token))
+            while (_queue.Reader.WaitToReadAsync(token).AsTask().GetAwaiter().GetResult())
             {
                 batch.Clear();
                 while (batch.Count < _batchSize && _queue.Reader.TryRead(out var evt)) batch.Add(evt);
@@ -108,14 +109,14 @@ internal sealed class TuiHarnessEventPump : IDisposable
                         if (batch.Count >= _batchSize) break;
 
                         var canRead = _queue.Reader.WaitToReadAsync(token).AsTask();
-                        var completed = await Task.WhenAny(delay, canRead);
+                        var completed = Task.WhenAny(delay, canRead).GetAwaiter().GetResult();
                         if (completed == delay) break;
-                        if (!await canRead) break;
+                        if (!canRead.GetAwaiter().GetResult()) break;
                     }
                 }
 
                 var currentBatch = batch.ToArray();
-                _dispatch(() => _dispatchBatch(currentBatch));
+                _dispatchBatch(currentBatch);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

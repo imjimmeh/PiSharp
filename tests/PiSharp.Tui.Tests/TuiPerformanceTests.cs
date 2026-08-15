@@ -133,7 +133,6 @@ public sealed class TuiPerformanceTests
         var batches = new List<IReadOnlyList<QueuedHarnessEvent>>();
         using var pump = new TuiHarnessEventPump(
             batch => batches.Add(batch.ToArray()),
-            action => action(),
             TimeSpan.FromMilliseconds(10),
             capacity: 16,
             batchSize: 8);
@@ -155,7 +154,6 @@ public sealed class TuiPerformanceTests
         var batches = new List<IReadOnlyList<QueuedHarnessEvent>>();
         using var pump = new TuiHarnessEventPump(
             batch => batches.Add(batch.ToArray()),
-            action => action(),
             TimeSpan.FromSeconds(30),
             capacity: 16,
             batchSize: 2);
@@ -179,8 +177,7 @@ public sealed class TuiPerformanceTests
         using var releaseFirstDispatch = new ManualResetEventSlim(false);
         var dispatchCount = 0;
         using var pump = new TuiHarnessEventPump(
-            batch => batches.Add(batch.ToArray()),
-            action =>
+            batch =>
             {
                 if (Interlocked.Increment(ref dispatchCount) == 1)
                 {
@@ -188,7 +185,7 @@ public sealed class TuiPerformanceTests
                     if (!releaseFirstDispatch.Wait(TimeSpan.FromSeconds(1))) return;
                 }
 
-                action();
+                batches.Add(batch.ToArray());
             },
             TimeSpan.FromSeconds(30),
             capacity: 1,
@@ -213,7 +210,6 @@ public sealed class TuiPerformanceTests
     {
         var pump = new TuiHarnessEventPump(
             _ => { },
-            action => action(),
             TimeSpan.FromMilliseconds(10),
             capacity: 1,
             batchSize: 1);
@@ -230,16 +226,13 @@ public sealed class TuiPerformanceTests
         using var releaseFirstDispatch = new ManualResetEventSlim(false);
         var dispatchCount = 0;
         var pump = new TuiHarnessEventPump(
-            _ => { },
-            action =>
+            _ =>
             {
                 if (Interlocked.Increment(ref dispatchCount) == 1)
                 {
                     firstDispatchStarted.Set();
                     releaseFirstDispatch.Wait(TimeSpan.FromSeconds(1));
                 }
-
-                action();
             },
             TimeSpan.FromSeconds(30),
             capacity: 1,

@@ -12,8 +12,9 @@ internal sealed class TuiRenderCoordinator : IDisposable
     private readonly TuiShellView _shell;
     private readonly Func<TuiRenderState> _getState;
     private readonly Action<TuiRenderState> _setState;
-    private readonly ITuiApplicationContext _appContext;
+    private readonly Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState> _updateState;
     private readonly TuiRenderScheduler _renderScheduler;
+    private readonly ITuiApplicationContext _appContext;
     private readonly Func<TuiFooterSnapshot> _createFooterSnapshot;
     private readonly TuiProfilingCounters? _profilingCounters;
     private readonly Func<bool> _getHeaderExpanded;
@@ -51,11 +52,19 @@ internal sealed class TuiRenderCoordinator : IDisposable
         Func<IReadOnlyList<string>>? getActiveTools = null,
         Action<string>? invokeCommand = null,
         CancellationToken cancellationToken = default,
-        ILoggerFactory? loggerFactory = null)
+        ILoggerFactory? loggerFactory = null,
+        Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState>? updateState = null)
     {
         _shell = shell;
         _getState = getState;
         _setState = setState;
+        _updateState = updateState ?? (update =>
+        {
+            var current = getState();
+            var next = update(current);
+            setState(next);
+            return next;
+        });
         _appContext = appContext;
         _createFooterSnapshot = createFooterSnapshot;
         _profilingCounters = profilingCounters;
@@ -151,9 +160,9 @@ internal sealed class TuiRenderCoordinator : IDisposable
             suggestionsVisible);
         _shell.ApplyLayout(metrics);
 
-        state = TuiPendingEditorText.Apply(state, prompt);
-        state = state.RemoveExpiredSystemRows(DateTimeOffset.UtcNow);
-        _setState(state);
+        // Atomically apply renderer-driven state transforms so a concurrent pump-worker
+        // store.Replace (off-thread ReduceBatch) is never clobbered by this read-modify-write.
+        state = _updateState(s => TuiPendingEditorText.Apply(s, prompt).RemoveExpiredSystemRows(DateTimeOffset.UtcNow));
 
         var now = DateTimeOffset.UtcNow;
         if (now - _lastModifiedFilesRefresh > ModifiedFilesRefreshInterval)
@@ -241,8 +250,7 @@ internal sealed class TuiRenderCoordinator : IDisposable
     private bool CleanupExpiredSystemRows()
     {
         var before = _getState().Transcript.Count;
-        var state = _getState().RemoveExpiredSystemRows(DateTimeOffset.UtcNow);
-        _setState(state);
+        var state = _updateState(s => s.RemoveExpiredSystemRows(DateTimeOffset.UtcNow));
         if (state.Transcript.Count != before) RequestRender();
         return true;
     }
@@ -267,13 +275,11 @@ internal sealed class TuiRenderCoordinator : IDisposable
         var isActive = latest.IsLoading;
         if (!_extensionLoadWasActive && isActive)
         {
-            var state = _getState().AppendSystem(FormatExtensionLoadStartedMessage(latest), pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
-            _setState(state);
+            _updateState(s => s.AppendSystem(FormatExtensionLoadStartedMessage(latest), pinToTop: true, expiresAfter: TransientSystemMessageLifetime));
         }
         else if (_extensionLoadWasActive && !isActive)
         {
-            var state = _getState().AppendSystem(FormatExtensionLoadCompletedMessage(latest), isError: latest.Failed > 0, pinToTop: true, expiresAfter: latest.Failed > 0 ? null : TransientSystemMessageLifetime);
-            _setState(state);
+            _updateState(s => s.AppendSystem(FormatExtensionLoadCompletedMessage(latest), isError: latest.Failed > 0, pinToTop: true, expiresAfter: latest.Failed > 0 ? null : TransientSystemMessageLifetime));
         }
 
         _extensionLoadWasActive = isActive;

@@ -131,7 +131,7 @@ public sealed class TuiHost(TuiHostOptions options)
             => options.GetSessionSnapshotAsync is null ? null : await options.GetSessionSnapshotAsync(token);
 
         void ApplySessionSnapshot(TuiSessionSnapshot snapshot, bool preserve = false)
-            => stateStore.Replace(TuiSessionSwitch.ApplySnapshot(stateStore.Snapshot(), snapshot, preserve));
+            => stateStore.Update(s => TuiSessionSwitch.ApplySnapshot(s, snapshot, preserve));
 
         var headerExpanded = false;
         var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: options.LoggerFactory);
@@ -144,7 +144,8 @@ public sealed class TuiHost(TuiHostOptions options)
                 shortcutActionsRef.DispatchShortcutCommand(command);
         }
         var renderCoordinator = new TuiRenderCoordinator(
-            shell, () => stateStore.Snapshot(), s => stateStore.Replace(s), appContext,
+            shell, () => stateStore.Snapshot(), s => stateStore.Replace(s),
+            appContext,
             () =>
             {
                 var current = stateStore.Snapshot();
@@ -157,7 +158,8 @@ public sealed class TuiHost(TuiHostOptions options)
             getActiveTools: () => runtime.ActiveToolNames,
             invokeCommand: InvokeMenuCommand,
             cancellationToken: cancellationToken,
-            loggerFactory: options.LoggerFactory);
+            loggerFactory: options.LoggerFactory,
+            updateState: stateStore.Update);
 
         var inlineSelection = new TuiInlineSelectionCoordinator(shell.Prompt, () => renderCoordinator.RequestRender(), appContext.Post);
         renderCoordinator.SelectionSessionGetter = () => inlineSelection.CurrentSession;
