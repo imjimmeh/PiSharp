@@ -18,12 +18,14 @@ internal sealed class ToolMiddlewareStage : ILoopEventStage
             context.BeforeToolCall,
             context.AfterToolCall);
 
-        foreach (var middleware in context.Middleware)
-        {
-            await middleware.Value(middlewareContext, (_, _) => Task.CompletedTask, cancellationToken);
-        }
+        // Sticky block flag: once any middleware sets Blocked it sticks, so a later
+        // middleware cannot un-block the decision and nothing downstream runs.
+        var blocked = false;
 
-        if (context.Kind == HarnessEventKind.BeforeToolMiddleware && middlewareContext.Blocked)
+        await context.Middleware[0].Value(middlewareContext, NextFor(0), cancellationToken);
+        blocked = blocked || middlewareContext.Blocked;
+
+        if (context.Kind == HarnessEventKind.BeforeToolMiddleware && blocked)
         {
             context.BeforeToolCallResult = new BeforeToolCallResult(true, middlewareContext.BlockReason);
         }
@@ -34,5 +36,29 @@ internal sealed class ToolMiddlewareStage : ILoopEventStage
                 middlewareContext.ModifiedDetails ?? context.AfterToolCall.Result.Details,
                 middlewareContext.IsError ?? context.AfterToolCall.IsError);
         }
+
+
+        // Composes middlewares so the next of middleware i invokes middleware i+1.
+        // After each middleware returns, Blocked is latched into the sticky flag;
+        // once latched (or observed live), next becomes a no-op so a blocking
+        // middleware can never pull downstream middlewares through the chain.
+        ExtensionNext NextFor(int index)
+            => index == context.Middleware.Count - 1
+                ? (_, _) =>
+                {
+                    blocked = blocked || middlewareContext.Blocked;
+                    return Task.CompletedTask;
+                }
+                : async (nextContext, token) =>
+                {
+                    if (blocked || middlewareContext.Blocked)
+                    {
+                        blocked = true;
+                        return;
+                    }
+
+                    await context.Middleware[index + 1].Value(nextContext, NextFor(index + 1), token);
+                    blocked = blocked || middlewareContext.Blocked;
+                };
     }
 }

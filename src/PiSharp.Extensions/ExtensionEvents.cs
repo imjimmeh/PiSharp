@@ -125,6 +125,16 @@ public sealed record ExtensionEvent(string Name, AgentHarnessEvent OriginalEvent
                 AppendSections: (existing.AppendSections ?? []).Concat(next.AppendSections ?? []).ToArray());
 }
 
+/// <summary>
+/// Mutable per-event context shared by the middlewares of a tool middleware chain.
+/// <para>
+/// <see cref="Blocked"/> is sticky: the harness evaluates it after each middleware
+/// returns, and once it observes <c>true</c> the block is final for the current event —
+/// downstream middlewares do not run, later middlewares cannot lift it by resetting
+/// <see cref="Blocked"/> to <c>false</c>, and the final block decision is written from
+/// the observed value.
+/// </para>
+/// </summary>
 public sealed class ExtensionMiddlewareContext(
     ExtensionEvent Event,
     BeforeToolCallContext? BeforeToolCall = null,
@@ -133,7 +143,11 @@ public sealed class ExtensionMiddlewareContext(
     public ExtensionEvent Event { get; } = Event;
     public BeforeToolCallContext? BeforeToolCall { get; } = BeforeToolCall;
     public AfterToolCallContext? AfterToolCall { get; } = AfterToolCall;
+
+    /// <summary>When <c>true</c>, the tool call is blocked. Sticky: once the harness observes it, the block cannot be undone and downstream middlewares are skipped.</summary>
     public bool Blocked { get; set; }
+
+    /// <summary>Reason for <see cref="Blocked"/>; carried onto the final block decision.</summary>
     public string? BlockReason { get; set; }
     public bool Modified { get; private set; }
     public IReadOnlyList<MessageContent>? ModifiedContent { get; private set; }

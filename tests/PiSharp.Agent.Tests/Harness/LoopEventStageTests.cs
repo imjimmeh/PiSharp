@@ -1,3 +1,7 @@
+using System.Text.Json;
+using PiSharp.Agent.Core;
+using PiSharp.Agent.Core.Loops;
+using PiSharp.Agent.Core.Tools;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Agent.Core.Events;
@@ -292,6 +296,129 @@ public sealed class LoopEventStageTests
     }
 
     [Fact]
+    public async Task ToolMiddlewareStageChainsNextThroughAllMiddlewares()
+    {
+        var calls = new List<string>();
+        var stage = new ToolMiddlewareStage();
+        ExtensionMiddleware first = async (context, next, cancellationToken) =>
+        {
+            calls.Add("first-pre");
+            await next(context, cancellationToken);
+            calls.Add("first-post");
+        };
+        ExtensionMiddleware second = (_, _, _) =>
+        {
+            calls.Add("second");
+            return Task.CompletedTask;
+        };
+
+        await stage.ExecuteAsync(
+            CreateContext(
+                new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.ToolCall("call-1", "read", new Dictionary<string, object?>())),
+                HarnessEventKind.BeforeToolMiddleware,
+                middleware: Middleware(first, second)),
+            CancellationToken.None);
+
+        Assert.Equal(["first-pre", "second", "first-post"], calls);
+    }
+
+    [Fact]
+    public async Task ToolMiddlewareStageSkipsDownstreamMiddlewaresWhenBlocked()
+    {
+        var secondRan = false;
+        var stage = new ToolMiddlewareStage();
+        ExtensionMiddleware first = (context, _, _) =>
+        {
+            context.Blocked = true;
+            context.BlockReason = "blocked by first";
+            return Task.CompletedTask;
+        };
+        ExtensionMiddleware second = (_, _, _) =>
+        {
+            secondRan = true;
+            return Task.CompletedTask;
+        };
+        var context = CreateContext(
+            new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.ToolCall("call-1", "read", new Dictionary<string, object?>())),
+            HarnessEventKind.BeforeToolMiddleware,
+            middleware: Middleware(first, second));
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.False(secondRan);
+        Assert.NotNull(context.BeforeToolCallResult);
+        Assert.True(context.BeforeToolCallResult!.Block);
+        Assert.Equal("blocked by first", context.BeforeToolCallResult.Reason);
+    }
+
+    [Fact]
+    public async Task ToolMiddlewareStageBlocksDownstreamWhenSetAfterNextReturns()
+    {
+        var calls = new List<string>();
+        var stage = new ToolMiddlewareStage();
+        ExtensionMiddleware first = async (context, next, cancellationToken) =>
+        {
+            calls.Add("first-pre");
+            await next(context, cancellationToken);
+            context.Blocked = true;
+            context.BlockReason = "blocked post-next";
+            calls.Add("first-post");
+        };
+        ExtensionMiddleware second = (_, _, _) =>
+        {
+            calls.Add("second");
+            return Task.CompletedTask;
+        };
+        ExtensionMiddleware third = (_, _, _) =>
+        {
+            calls.Add("third");
+            return Task.CompletedTask;
+        };
+        var context = CreateContext(
+            new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.ToolCall("call-1", "read", new Dictionary<string, object?>())),
+            HarnessEventKind.BeforeToolMiddleware,
+            middleware: Middleware(first, second, third));
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Equal(["first-pre", "second", "first-post"], calls);
+        Assert.NotNull(context.BeforeToolCallResult);
+        Assert.True(context.BeforeToolCallResult!.Block);
+        Assert.Equal("blocked post-next", context.BeforeToolCallResult.Reason);
+    }
+
+    [Fact]
+    public async Task ToolMiddlewareStageAppliesAfterToolModificationAcrossChain()
+    {
+        var calls = new List<string>();
+        var stage = new ToolMiddlewareStage();
+        ExtensionMiddleware first = async (context, next, cancellationToken) =>
+        {
+            calls.Add("first-pre");
+            await next(context, cancellationToken);
+            calls.Add("first-post");
+        };
+        ExtensionMiddleware second = (context, _, _) =>
+        {
+            calls.Add("second");
+            context.ModifyToolResult([new TextContent("modified")], new { changed = true }, isError: true);
+            return Task.CompletedTask;
+        };
+        var context = CreateContext(
+            new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.ToolCall("call-1", "read", new Dictionary<string, object?>())),
+            HarnessEventKind.AfterToolMiddleware,
+            afterToolCall: CreateAfterToolCall(),
+            middleware: Middleware(first, second));
+
+        await stage.ExecuteAsync(context, CancellationToken.None);
+
+        Assert.Equal(["first-pre", "second", "first-post"], calls);
+        Assert.NotNull(context.AfterToolCallResult);
+        Assert.True(context.AfterToolCallResult!.IsError);
+        Assert.Equal("modified", Assert.IsType<TextContent>(Assert.Single(context.AfterToolCallResult!.Content!)).Text);
+    }
+
+    [Fact]
     public void HarnessEventContextExposesConstructorValues()
     {
         var message = AgentMessages.Assistant("done");
@@ -315,7 +442,8 @@ public sealed class LoopEventStageTests
         Func<CancellationToken, Task>? flushWritesAsync = null,
         Action<AgentHarnessPhase>? setPhase = null,
         Func<ExtensionEvent, CancellationToken, Task>? dispatchExtensionEventAsync = null,
-        IReadOnlyList<Func<AgentHarnessEvent, CancellationToken, Task>>? listeners = null)
+        IReadOnlyList<Func<AgentHarnessEvent, CancellationToken, Task>>? listeners = null,
+        IReadOnlyList<OwnedExtensionRegistration<ExtensionMiddleware>>? middleware = null)
         => CreateContext(
             new AgentHarnessEvent.Core(@event),
             HarnessEventKind.CoreLoop,
@@ -323,7 +451,8 @@ public sealed class LoopEventStageTests
             flushWritesAsync,
             setPhase,
             dispatchExtensionEventAsync,
-            listeners);
+            listeners,
+            middleware);
 
     private static HarnessEventContext CreateContext(
         AgentHarnessEvent @event,
@@ -332,7 +461,10 @@ public sealed class LoopEventStageTests
         Func<CancellationToken, Task>? flushWritesAsync = null,
         Action<AgentHarnessPhase>? setPhase = null,
         Func<ExtensionEvent, CancellationToken, Task>? dispatchExtensionEventAsync = null,
-        IReadOnlyList<Func<AgentHarnessEvent, CancellationToken, Task>>? listeners = null)
+        IReadOnlyList<Func<AgentHarnessEvent, CancellationToken, Task>>? listeners = null,
+        IReadOnlyList<OwnedExtensionRegistration<ExtensionMiddleware>>? middleware = null,
+        BeforeToolCallContext? beforeToolCall = null,
+        AfterToolCallContext? afterToolCall = null)
         => new(
             @event,
             kind,
@@ -340,11 +472,34 @@ public sealed class LoopEventStageTests
             flushWritesAsync ?? (_ => Task.CompletedTask),
             setPhase ?? (_ => { }),
             dispatchExtensionEventAsync,
-            [],
+            middleware ?? [],
             listeners ?? [],
             NullLogger.Instance,
             0,
-            0);
+            0,
+            beforeToolCall: beforeToolCall,
+            afterToolCall: afterToolCall);
+
+    private static IReadOnlyList<OwnedExtensionRegistration<ExtensionMiddleware>> Middleware(params ExtensionMiddleware[] middlewares)
+        => middlewares
+            .Select((middleware, index) => new OwnedExtensionRegistration<ExtensionMiddleware>($"middleware-{index}", "extension:test", middleware))
+            .ToArray();
+
+    private static AfterToolCallContext CreateAfterToolCall()
+    {
+        var args = JsonDocument.Parse("""{"path":"README.md"}""").RootElement.Clone();
+        var toolCall = new ToolCallContent("call-1", "read", args);
+        var assistantMessage = new AssistantMessage([toolCall]);
+        var agentContext = new AgentContext("test system prompt", [assistantMessage]);
+        return new AfterToolCallContext(
+            assistantMessage,
+            toolCall,
+            args,
+            new AgentToolResult<object?>(Array.Empty<MessageContent>(), null, false),
+            IsError: false,
+            agentContext);
+    }
+
 
     private sealed class DelegateStage(Action onExecute) : ILoopEventStage
     {
