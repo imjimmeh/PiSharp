@@ -31,6 +31,9 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
     private readonly List<AgentMessage> _nextTurnQueue = [];
     private readonly List<PendingWrite> _pendingWrites = [];
     private readonly List<Func<AgentHarnessEvent, CancellationToken, Task>> _listeners = [];
+    private readonly object _queueGate = new();
+    private readonly object _listenerGate = new();
+    private readonly object _writeGate = new();
     private ModelDescriptor _model;
     private ThinkingLevel _thinkingLevel;
     private AgentHarnessPhase _phase = AgentHarnessPhase.Idle;
@@ -81,28 +84,31 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
 
     public IDisposable Subscribe(Func<AgentHarnessEvent, CancellationToken, Task> listener)
     {
-        _listeners.Add(listener);
-        return new HarnessSubscription(() => _listeners.Remove(listener));
+        lock (_listenerGate) _listeners.Add(listener);
+        return new HarnessSubscription(() =>
+        {
+            lock (_listenerGate) _listeners.Remove(listener);
+        });
     }
 
     public void Steer(AgentMessage message)
     {
         EnsureInjectableMessage(message);
-        _steerQueue.Add(message);
+        lock (_queueGate) _steerQueue.Add(message);
         EmitQueueUpdate();
     }
 
     public void FollowUp(AgentMessage message)
     {
         EnsureInjectableMessage(message);
-        _followUpQueue.Add(message);
+        lock (_queueGate) _followUpQueue.Add(message);
         EmitQueueUpdate();
     }
 
     public void QueueNextTurn(AgentMessage message)
     {
         EnsureInjectableMessage(message);
-        _nextTurnQueue.Add(message);
+        lock (_queueGate) _nextTurnQueue.Add(message);
         EmitQueueUpdate();
     }
 
@@ -193,7 +199,10 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
         var previous = _model;
         _model = model;
         if (_phase == AgentHarnessPhase.Idle) await _session.AppendModelChangeAsync(model.Provider, model.Id, cancellationToken);
-        else _pendingWrites.Add(new PendingWrite.ModelChange(model.Provider, model.Id));
+        else
+        {
+            lock (_writeGate) _pendingWrites.Add(new PendingWrite.ModelChange(model.Provider, model.Id));
+        }
         await PublishOwnEventAsync(new AgentHarnessOwnEvent.ModelSelect(model, previous, source), cancellationToken);
     }
 
@@ -225,7 +234,10 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
         await PublishOwnEventAsync(new AgentHarnessOwnEvent.ThinkingLevelSelect(level, previous), cancellationToken);
         await PublishOwnEventAsync(new AgentHarnessOwnEvent.ThinkingLevelChanged(level), cancellationToken);
         if (_phase == AgentHarnessPhase.Idle) await _session.AppendThinkingLevelChangeAsync(serialized, cancellationToken);
-        else _pendingWrites.Add(new PendingWrite.ThinkingChange(serialized));
+        else
+        {
+            lock (_writeGate) _pendingWrites.Add(new PendingWrite.ThinkingChange(serialized));
+        }
     }
 
     public async Task SetSessionNameAsync(string name, CancellationToken cancellationToken = default)
@@ -388,12 +400,17 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
             }
         }
         messages.Add(AgentMessages.User(content));
-        if (_nextTurnQueue.Count > 0)
+        var nextTurnQueued = false;
+        lock (_queueGate)
         {
-            messages.InsertRange(0, _nextTurnQueue);
-            _nextTurnQueue.Clear();
-            EmitQueueUpdate();
+            if (_nextTurnQueue.Count > 0)
+            {
+                messages.InsertRange(0, _nextTurnQueue);
+                _nextTurnQueue.Clear();
+                nextTurnQueued = true;
+            }
         }
+        if (nextTurnQueued) EmitQueueUpdate();
         var interceptors = _extensions?.StreamDeltaInterceptors ?? [];
         var config = new AgentLoopConfig(_model, _options.StreamAsync)
         {
@@ -562,7 +579,10 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
     private async Task QueueWriteOrAppendAsync(AgentMessage message)
     {
         if (_phase == AgentHarnessPhase.Idle) await _session.AppendMessageAsync(message);
-        else _pendingWrites.Add(new PendingWrite.MessageWrite(message));
+        else
+        {
+            lock (_writeGate) _pendingWrites.Add(new PendingWrite.MessageWrite(message));
+        }
     }
 
     private HarnessEventContext CreateEventContext(
@@ -574,6 +594,8 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
     {
         var mappedExtensionEvent = extensionEvent ?? ExtensionEventMapper.Map(@event);
         var extensionHandlerCount = _extensions?.Handlers.Count(handler => StringComparer.Ordinal.Equals(handler.Value.EventName, mappedExtensionEvent.Name)) ?? 0;
+        Func<AgentHarnessEvent, CancellationToken, Task>[] listeners;
+        lock (_listenerGate) listeners = _listeners.ToArray();
         return new(
             @event,
             kind,
@@ -582,7 +604,7 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
             phase => _phase = phase,
             _extensions is null ? null : DispatchExtensionEventAsync,
             _extensions?.Middleware ?? [],
-            _listeners.ToArray(),
+            listeners,
             _logger,
             RuntimeHelpers.GetHashCode(this),
             extensionHandlerCount,
@@ -621,11 +643,16 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
 
     private async Task FlushWritesAsync(CancellationToken cancellationToken)
     {
-        if (_pendingWrites.Count == 0) return;
+        PendingWrite[] writes;
+        lock (_writeGate)
+        {
+            if (_pendingWrites.Count == 0) return;
+            writes = _pendingWrites.ToArray();
+        }
 
-        var writes = _pendingWrites.ToArray();
         await _session.AppendEntriesAsync(writes.Select(ToSessionEntry).ToArray(), cancellationToken);
-        _pendingWrites.RemoveRange(0, writes.Length);
+
+        lock (_writeGate) _pendingWrites.RemoveRange(0, writes.Length);
     }
 
     private static SessionTreeEntry ToSessionEntry(PendingWrite write)
@@ -687,8 +714,18 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
 
     private void EmitQueueUpdate()
     {
+        AgentMessage[] steer;
+        AgentMessage[] followUp;
+        AgentMessage[] nextTurn;
+        lock (_queueGate)
+        {
+            steer = _steerQueue.ToArray();
+            followUp = _followUpQueue.ToArray();
+            nextTurn = _nextTurnQueue.ToArray();
+        }
+
         _ = PublishOwnEventAsync(
-            new AgentHarnessOwnEvent.QueueUpdate(_steerQueue.ToArray(), _followUpQueue.ToArray(), _nextTurnQueue.ToArray()),
+            new AgentHarnessOwnEvent.QueueUpdate(steer, followUp, nextTurn),
             CancellationToken.None);
     }
 
@@ -706,9 +743,14 @@ public sealed class AgentHarness<TMetadata> where TMetadata : ISessionMetadata
 
     private Task<IReadOnlyList<AgentMessage>> DrainQueueAsync(List<AgentMessage> queue)
     {
-        if (queue.Count == 0) return Task.FromResult<IReadOnlyList<AgentMessage>>([]);
-        var drained = queue.ToArray();
-        queue.Clear();
+        AgentMessage[] drained;
+        lock (_queueGate)
+        {
+            if (queue.Count == 0) return Task.FromResult<IReadOnlyList<AgentMessage>>([]);
+            drained = queue.ToArray();
+            queue.Clear();
+        }
+
         EmitQueueUpdate();
         return Task.FromResult<IReadOnlyList<AgentMessage>>(drained);
     }

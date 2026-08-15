@@ -38,8 +38,11 @@ public sealed class Agent
 
     public IDisposable Subscribe(Func<AgentEvent, CancellationToken, Task> listener)
     {
-        _listeners.Add(listener);
-        return new Subscription(() => _listeners.Remove(listener));
+        lock (_notificationGate) _listeners.Add(listener);
+        return new Subscription(() =>
+        {
+            lock (_notificationGate) _listeners.Remove(listener);
+        });
     }
 
     public void Steer(AgentMessage message) => _steeringQueue.Enqueue(message);
@@ -188,7 +191,9 @@ public sealed class Agent
 
     private async Task NotifyListenersAsync(AgentEvent @event, CancellationToken cancellationToken)
     {
-        foreach (var listener in _listeners.ToArray())
+        Func<AgentEvent, CancellationToken, Task>[] listeners;
+        lock (_notificationGate) listeners = _listeners.ToArray();
+        foreach (var listener in listeners)
         {
             await listener(@event, cancellationToken);
         }

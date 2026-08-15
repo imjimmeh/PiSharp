@@ -53,20 +53,24 @@ internal sealed class MutableAgentState : IAgentState
 internal sealed class PendingMessageQueue(QueueMode mode)
 {
     private readonly Queue<AgentMessage> _messages = new();
+    private readonly object _gate = new();
     public QueueMode Mode { get; set; } = mode;
-    public void Enqueue(AgentMessage message) => _messages.Enqueue(message);
-    public bool HasItems => _messages.Count > 0;
+    public void Enqueue(AgentMessage message) { lock (_gate) _messages.Enqueue(message); }
+    public bool HasItems { get { lock (_gate) return _messages.Count > 0; } }
 
     public IReadOnlyList<AgentMessage> Drain()
     {
-        if (_messages.Count == 0) return [];
-        if (Mode == QueueMode.OneAtATime) return [_messages.Dequeue()];
-        var drained = _messages.ToArray();
-        _messages.Clear();
-        return drained;
+        lock (_gate)
+        {
+            if (_messages.Count == 0) return [];
+            if (Mode == QueueMode.OneAtATime) return [_messages.Dequeue()];
+            var drained = _messages.ToArray();
+            _messages.Clear();
+            return drained;
+        }
     }
 
-    public void Clear() => _messages.Clear();
+    public void Clear() { lock (_gate) _messages.Clear(); }
 }
 
 internal sealed record ActiveRun(CancellationTokenSource AbortController, Task Completion);
