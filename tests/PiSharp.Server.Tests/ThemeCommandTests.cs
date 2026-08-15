@@ -194,6 +194,37 @@ public sealed class ThemeCommandTests
         Assert.Empty(themes.Documents);
     }
 
+    [Fact]
+    public async Task CreateSession_DoesNotWaitForThemeRegistryMerge()
+    {
+        var themes = new BlockingThemeRegistry();
+        await using var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = new PiServerWebSocketHandler(
+            registry,
+            new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }),
+            NullLogger<PiServerWebSocketHandler>.Instance,
+            themeRegistry: themes);
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-theme-create-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+            {
+                id = "create", type = ServerCommandTypes.CreateSession, cwd = root,
+                noTools = true, noBuiltinTools = true, noExtensions = true, noSkills = true,
+                noPromptTemplates = true, noThemes = true, noContextFiles = true,
+            }, ServerJsonSerializer.Options)).WaitAsync(TimeSpan.FromMilliseconds(250));
+
+            Assert.True(response.Success, response.Error?.Message);
+            await themes.MergeStarted.WaitAsync(TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            themes.CompleteMerge();
+        }
+    }
+
     // --- shared helpers ---
 
     private static (PiServerWebSocketHandler Handler, ThemeRegistry Themes) CreateHandler(out ThemeRegistry themes, ServerSessionRegistry? registry = null)
@@ -207,6 +238,22 @@ public sealed class ThemeCommandTests
             delegates: null,
             themeRegistry: themes);
         return (handler, themes);
+    }
+
+    private sealed class BlockingThemeRegistry : ThemeRegistry
+    {
+        private readonly TaskCompletionSource _mergeStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _mergeCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task MergeStarted => _mergeStarted.Task;
+
+        public override Task<int> MergeAsync(IEnumerable<string>? themePaths, CancellationToken cancellationToken = default)
+        {
+            _mergeStarted.TrySetResult();
+            return _mergeCompletion.Task;
+        }
+
+        public void CompleteMerge() => _mergeCompletion.TrySetResult(0);
     }
 
     private static async Task<ServerSessionCreated> CreateSessionAsync(PiServerWebSocketHandler handler, ServerSessionRegistry? registry = null)

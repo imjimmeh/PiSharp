@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
@@ -33,11 +34,13 @@ public sealed class ClientWebSocketTransport : IClientTransport
     private readonly Channel<ServerEventEnvelope> _events = Channel.CreateUnbounded<ServerEventEnvelope>();
     private readonly CancellationTokenSource _readerCts = new();
     private readonly TimeSpan _commandTimeout;
+    private readonly ILogger? _logger;
     private int _disposed;
 
-    public ClientWebSocketTransport(TimeSpan? commandTimeout = null)
+    public ClientWebSocketTransport(TimeSpan? commandTimeout = null, ILogger? logger = null)
     {
         _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
+        _logger = logger;
     }
 
     public ChannelReader<ServerEventEnvelope> Events => _events.Reader;
@@ -72,6 +75,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
 
         try
         {
+            _logger?.LogDebug("WebSocket command sent: {Command}", envelope.Type);
             await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct);
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -169,6 +173,10 @@ public sealed class ClientWebSocketTransport : IClientTransport
         {
             // transport disposed — nothing left to read
         }
+        catch (Exception exception)
+        {
+            _logger?.LogError(exception, "WebSocket receive loop terminated unexpectedly");
+        }
         finally
         {
             _events.Writer.TryComplete();
@@ -218,6 +226,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
     private void ResolveResponse(ServerResponse response)
     {
         if (response.Id is null || !_pending.TryRemove(response.Id, out var tcs)) return; // unknown or duplicate id
+        _logger?.LogDebug("WebSocket response received: {Command}", response.Command);
         tcs.TrySetResult(response);
     }
 

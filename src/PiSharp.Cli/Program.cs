@@ -100,7 +100,7 @@ public static class Program
             var lease = await InteractiveMode.SelectLeaseAsync(store, ct: cancellationToken);
             if (lease is not null)
             {
-                return await InteractiveMode.RunRemoteAsync(lease, runtimeArgs, console, cancellationToken);
+                return await InteractiveMode.RunRemoteAsync(lease, runtimeArgs, console, loggerFactory, cancellationToken);
             }
 
             await console.Error.WriteLineAsync("daemon unavailable; falling back to in-process mode".AsMemory(), cancellationToken);

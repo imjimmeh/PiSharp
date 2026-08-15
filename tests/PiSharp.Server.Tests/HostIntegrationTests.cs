@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Hosting;
@@ -151,15 +152,56 @@ public sealed class HostIntegrationTests
         Assert.Equal(watermark, second.Sequence);
     }
 
+    [Fact]
+    public async Task Shutdown_ReturnsSuccessOverWebSocket()
+    {
+        await using var host = await StartHostAsync((session, text) => new ServerCommandResult(true, text));
+
+        await using var client = new RawClient();
+        await client.ConnectAsync(HostUri(host), ApiKey, CancellationToken.None);
+
+        // Shutdown is session-independent: the CLI daemon-stop sends a bare envelope
+        // (ShutdownRequest.ConfirmationToken is optional), so no payload is required.
+        var response = await client.SendCommandAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.Shutdown, Id: "shutdown"));
+
+        AssertSuccess(response);
+        Assert.Equal(ServerCommandTypes.Shutdown, response.RootElement.GetProperty("command").GetString());
+    }
+
+    [Fact]
+    public async Task CreateSession_ForwardsBootstrapDiagnosticsToHostLoggerFactory()
+    {
+        var root = NewTempDir();
+        var messages = new ConcurrentQueue<string>();
+        using var loggerFactory = LoggerFactory.Create(builder =>
+            builder.SetMinimumLevel(LogLevel.Debug).AddProvider(new CapturingLoggerProvider(messages)));
+        await using var host = await StartHostAsync(
+            (session, text) => new ServerCommandResult(true, text),
+            loggerFactory);
+
+        await using var client = new RawClient();
+        await client.ConnectAsync(HostUri(host), ApiKey, CancellationToken.None);
+
+        using var create = await client.SendCommandAsync(CreateFrame(root));
+        AssertSuccess(create);
+
+        Assert.Contains(messages, message => message.Contains("bootstrap: create-session start", StringComparison.Ordinal));
+        Assert.Contains(messages, message => message.Contains("bootstrap: create-session complete", StringComparison.Ordinal));
+    }
+
     // --- shared helpers ---
 
-    private static async Task<PiServerHost> StartHostAsync(Func<LiveServerSession, string, ServerCommandResult> emitOnRunCommand)
+    private static async Task<PiServerHost> StartHostAsync(
+        Func<LiveServerSession, string, ServerCommandResult> emitOnRunCommand,
+        ILoggerFactory? loggerFactory = null)
     {
         var host = new PiServerHost(new PiServerHostOptions
         {
             ApiKey = ApiKey,
             // Keep the idle sweep far away so sessions survive disconnects between reconnects.
             IdleTimeout = TimeSpan.FromHours(1),
+            LoggerFactory = loggerFactory,
             RunCommandAsync = (context, text, options, ct) =>
             {
                 var result = emitOnRunCommand(context.Session, text);
@@ -212,6 +254,26 @@ public sealed class HostIntegrationTests
     /// collecting event frames in arrival order. Mirrors the read loop of ClientWebSocketTransport
     /// without depending on PiSharp.Client.
     /// </summary>
+    private sealed class CapturingLoggerProvider(ConcurrentQueue<string> messages) : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName) => new CapturingLogger(categoryName, messages);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class CapturingLogger(string categoryName, ConcurrentQueue<string> messages) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (IsEnabled(logLevel)) messages.Enqueue($"{categoryName}: {formatter(state, exception)}");
+        }
+    }
     private sealed class RawClient : IAsyncDisposable
     {
         private readonly ClientWebSocket _socket = new();

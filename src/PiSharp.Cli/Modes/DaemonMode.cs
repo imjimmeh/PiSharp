@@ -2,7 +2,9 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
+using Microsoft.Extensions.Logging;
 using PiSharp.Cli.IO;
+using PiSharp.Cli.Logging;
 using PiSharp.Cli.Parsing;
 using PiSharp.Client;
 using PiSharp.Compatibility.Settings;
@@ -81,7 +83,14 @@ public static class DaemonMode
 
     private static async Task<int> RunForegroundAsync(IConsoleIO console, DaemonLeaseStore store, int port, string apiKey, string version, CancellationToken cancellationToken)
     {
-        var host = new PiServerHost(new PiServerHostOptions { ApiKey = apiKey });
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .SetMinimumLevel(LogLevel.Debug)
+                .AddDebug();
+            _ = CliFileLogging.AddConfiguredFileLogging(builder, Directory.GetCurrentDirectory());
+        });
+        var host = new PiServerHost(new PiServerHostOptions { ApiKey = apiKey, LoggerFactory = loggerFactory });
         await host.StartAsync(port);
         await store.WriteAsync(new DaemonLease(Environment.ProcessId, host.Port, apiKey, DateTimeOffset.UtcNow, version), cancellationToken);
         await console.Out.WriteLineAsync($"daemon listening on http://127.0.0.1:{host.Port}".AsMemory(), cancellationToken);

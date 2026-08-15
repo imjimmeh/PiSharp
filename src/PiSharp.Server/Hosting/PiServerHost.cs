@@ -28,6 +28,7 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions());
         builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
         builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+        if (options.LoggerFactory is not null) builder.Services.AddSingleton(options.LoggerFactory);
         builder.Services.AddSingleton(new ApiKeyValidator(new ApiKeyOptions { ApiKey = options.ApiKey }));
         var metricsAggregator = Metrics;
         builder.Services.AddSingleton(metricsAggregator);
@@ -76,12 +77,21 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
     private static Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> CreateRuntimeFactory(PiServerHostOptions options, TelemetryMetricsAggregator metrics)
         => async (request, cancellationToken) =>
         {
-            if (!options.TelemetryEnabled) return await ServerSessionRegistry.CreateRuntimeAsync(request, cancellationToken);
+            if (!options.TelemetryEnabled)
+                return await ServerSessionRegistry.CreateRuntimeAsync(
+                    request,
+                    telemetry: null,
+                    cancellationToken: cancellationToken,
+                    loggerFactory: options.LoggerFactory);
 
             var sinks = new List<ITelemetrySink> { metrics };
             if (options.TelemetrySinks is not null) sinks.AddRange(options.TelemetrySinks);
             var telemetry = new PiSharp.Runtime.Telemetry.TelemetryService(enabled: true, sinks: sinks);
-            return await ServerSessionRegistry.CreateRuntimeAsync(request, telemetry, cancellationToken);
+            return await ServerSessionRegistry.CreateRuntimeAsync(
+                request,
+                telemetry,
+                cancellationToken,
+                loggerFactory: options.LoggerFactory);
         };
 
     /// <summary>Stops the Kestrel host when the shutdown token fires, so cancellation alone triggers graceful teardown.</summary>

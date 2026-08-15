@@ -11,7 +11,7 @@ namespace PiSharp.Server.Runtime;
 /// event read and mutate it. Multi-terminal attach stays consistent because there is exactly one
 /// active theme daemon-wide.
 /// </summary>
-public sealed class ThemeRegistry
+public class ThemeRegistry
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, TuiThemeDocument> _documents = new(StringComparer.OrdinalIgnoreCase);
@@ -62,7 +62,7 @@ public sealed class ThemeRegistry
     /// with the same name. Returns the number of documents merged (0 when no paths or no loadable
     /// documents). The active name is preserved across merges.
     /// </summary>
-    public async Task<int> MergeAsync(IEnumerable<string>? themePaths, CancellationToken cancellationToken = default)
+    public virtual async Task<int> MergeAsync(IEnumerable<string>? themePaths, CancellationToken cancellationToken = default)
     {
         var paths = themePaths?.Where(path => !string.IsNullOrWhiteSpace(path)).ToArray() ?? [];
         if (paths.Length == 0) return 0;

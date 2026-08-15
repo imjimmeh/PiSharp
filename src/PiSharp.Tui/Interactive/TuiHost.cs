@@ -372,21 +372,27 @@ public sealed class TuiHost(TuiHostOptions options)
         {
             try
             {
+                _logger.LogDebug("TUI startup hydration started");
                 // Only deferred-startup callers reach this function; the guard also keeps
                 // the nullable flow analysis sound.
                 if (startupAsync is null)
                     return;
                 var startupResult = await startupAsync(token).ConfigureAwait(false);
+                _logger.LogDebug("TUI startup phase completed");
                 if (startupResult.Theme is not null)
                     await appContext.InvokeAsync(() => TuiTheme.Apply(startupResult.Theme), token).ConfigureAwait(false);
 
                 var sessionName = await options.GetSessionNameAsync(token).ConfigureAwait(false);
+                _logger.LogDebug("TUI session name resolved");
                 TuiSessionSnapshot? snapshot = null;
                 if (options.GetSessionSnapshotAsync is not null)
                     snapshot = await options.GetSessionSnapshotAsync(token).ConfigureAwait(false);
+                _logger.LogDebug("TUI session snapshot resolved");
 
+                _logger.LogDebug("TUI startup state apply requested");
                 await appContext.InvokeAsync(() =>
                 {
+                    _logger.LogDebug("TUI startup state apply started");
                     if (snapshot is not null)
                     {
                         ApplySessionSnapshot(snapshot);
@@ -395,12 +401,16 @@ public sealed class TuiHost(TuiHostOptions options)
                     {
                         state = state with { SessionName = sessionName };
                     }
+                    _logger.LogDebug(
+                        "TUI startup state applied; placeholder session={PlaceholderSession}",
+                        string.Equals(state.SessionId, "connecting", StringComparison.Ordinal));
                     foreach (var message in options.StartupMessages ?? [])
                         state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
                     foreach (var message in startupResult.StartupMessages ?? [])
                         state = state.AppendSystem(message, pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
                     shell.Prompt.Enabled = true;
                     renderCoordinator.RequestRender();
+                    _logger.LogDebug("TUI startup hydration completed");
                 }, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)

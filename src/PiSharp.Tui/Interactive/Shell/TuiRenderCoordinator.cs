@@ -30,6 +30,7 @@ internal sealed class TuiRenderCoordinator : IDisposable
     private int _workingFrameIndex;
     private object? _workingAnimationToken;
     private object? _extensionLoadPollingToken;
+    private int _extensionLoadStatusPollPending;
     private object? _transientSystemMessageCleanupToken;
     private IReadOnlyList<TuiMenuEntry>? _lastRenderedMenus;
     private DateTimeOffset _lastModifiedFilesRefresh = DateTimeOffset.MinValue;
@@ -68,10 +69,6 @@ internal sealed class TuiRenderCoordinator : IDisposable
         _logger = loggerFactory?.CreateLogger<TuiRenderCoordinator>() ?? NullLogger<TuiRenderCoordinator>.Instance;
         _renderScheduler = new TuiRenderScheduler(appContext, renderFrameInterval);
 
-        var initialLoadStatus = _getExtensionLoadStatus();
-        _extensionLoadStatus = initialLoadStatus;
-        _extensionLoadWasActive = initialLoadStatus?.IsLoading ?? false;
-
         appContext.SizeChanging += HandleApplicationResize;
     }
 
@@ -79,20 +76,14 @@ internal sealed class TuiRenderCoordinator : IDisposable
     {
         if (_hasExtensionLoadStatus)
         {
-            var extensionLoadStatus = _getExtensionLoadStatus();
-            if (extensionLoadStatus is { IsLoading: true })
-            {
-                var state = _getState().AppendSystem(FormatExtensionLoadStartedMessage(extensionLoadStatus), pinToTop: true, expiresAfter: TransientSystemMessageLifetime);
-                _setState(state);
-            }
-
             _extensionLoadPollingToken = _appContext.AddTimeout(TimeSpan.FromMilliseconds(200), PollExtensionLoadStatus);
         }
 
         _transientSystemMessageCleanupToken = _appContext.AddTimeout(TimeSpan.FromSeconds(1), CleanupExpiredSystemRows);
     }
 
-    public void RequestRender(CancellationToken token = default) => _renderScheduler.RequestRender(Render, token);
+    public void RequestRender(CancellationToken token = default) =>
+        _renderScheduler.RequestRender(Render, token);
 
     public Func<InlineSelectionSession?>? SelectionSessionGetter { set => _getSelectionSession = value ?? (() => null); }
     public Func<bool>? IsInputCaptured { get; set; }
@@ -218,7 +209,28 @@ internal sealed class TuiRenderCoordinator : IDisposable
 
     private bool PollExtensionLoadStatus()
     {
-        UpdateExtensionLoadStatusFromRuntime();
+        if (Interlocked.Exchange(ref _extensionLoadStatusPollPending, 1) != 0)
+            return true;
+
+        _ = Task.Run(() =>
+        {
+            TuiExtensionLoadStatus? latest = null;
+            try
+            {
+                latest = _getExtensionLoadStatus();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Failed to read extension load status.");
+            }
+
+            _appContext.Post(() =>
+            {
+                Interlocked.Exchange(ref _extensionLoadStatusPollPending, 0);
+                if (!_disposed) UpdateExtensionLoadStatus(latest);
+            });
+        });
+
         return true;
     }
 
@@ -231,9 +243,8 @@ internal sealed class TuiRenderCoordinator : IDisposable
         return true;
     }
 
-    private void UpdateExtensionLoadStatusFromRuntime()
+    private void UpdateExtensionLoadStatus(TuiExtensionLoadStatus? latest)
     {
-        var latest = _getExtensionLoadStatus();
         var previous = _extensionLoadStatus;
         if (Equals(previous, latest)) return;
 

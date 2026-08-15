@@ -33,6 +33,11 @@ public static class PiRuntimeBootstrap
         var benchmark = options.BenchmarkStartup ? new StartupBenchmarkCollector() : null;
         var startupContext = new RuntimeStartupContext(options, benchmark);
         var logger = loggerFactory?.CreateLogger("PiSharp.Runtime.Bootstrap") ?? NullLogger.Instance;
+        var bootstrapStopwatch = Stopwatch.StartNew();
+        bool requestedSessionIdOrPath = options.Session is not null
+            && (!string.IsNullOrWhiteSpace(options.Session.SessionIdOrPath)
+                || !string.IsNullOrWhiteSpace(options.Session.NewSessionId));
+        logger.LogInformation($"bootstrap: create-session start — NoExtensions={options.Resources?.DisableExtensions == true}, NoTsExtensions={options.Resources?.DisableTypeScriptExtensions == true}, RequestedSessionIdOrPath={requestedSessionIdOrPath}");
 
         var settingsStore = new PiSettingsStore();
         var settings = await startupContext.MeasureAsync("settings.load", () => settingsStore.LoadAsync(options.Env.Cwd, options.HomeDirectory, cancellationToken: cancellationToken));
@@ -338,6 +343,8 @@ public static class PiRuntimeBootstrap
             _ = runtime.StartCachedExtensionBackgroundActivationAsync(cancellationToken);
         }
         logger.LogInformation($"phase: startup complete — ext states: {extensionLoadCoordinator.Statuses.Count(s => s.State == ExtensionLoadState.Ready)} ready, {extensionLoadCoordinator.Statuses.Count(s => s.State == ExtensionLoadState.Failed)} failed, {extensionLoadCoordinator.Statuses.Count(s => s.State is not ExtensionLoadState.Ready and not ExtensionLoadState.Failed)} pending");
+        bootstrapStopwatch.Stop();
+        logger.LogInformation($"bootstrap: create-session complete — elapsedMs={bootstrapStopwatch.ElapsedMilliseconds}, ready={extensionLoadCoordinator.Statuses.Count(s => s.State == ExtensionLoadState.Ready)}, failed={extensionLoadCoordinator.Statuses.Count(s => s.State == ExtensionLoadState.Failed)}, pending={extensionLoadCoordinator.Statuses.Count(s => s.State is not ExtensionLoadState.Ready and not ExtensionLoadState.Failed)}");
         return runtime;
     }
 

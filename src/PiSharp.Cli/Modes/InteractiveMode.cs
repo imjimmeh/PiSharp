@@ -255,11 +255,18 @@ public static class InteractiveMode
     /// Runs the TUI against a daemon-hosted session over the wire. The daemon session stays live
     /// after this client exits so a later client can re-attach (Task4.3).
     /// </summary>
-    internal static async Task<int> RunRemoteAsync(DaemonLease lease, CliArgs runtimeArgs, IConsoleIO console, CancellationToken cancellationToken)
+    internal static async Task<int> RunRemoteAsync(
+        DaemonLease lease,
+        CliArgs runtimeArgs,
+        IConsoleIO console,
+        ILoggerFactory? loggerFactory,
+        CancellationToken cancellationToken)
     {
-        await using var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
+        await using var transport = new ClientWebSocketTransport(
+            TimeSpan.FromSeconds(30),
+            loggerFactory?.CreateLogger<ClientWebSocketTransport>());
         await using var connection = new ClientSessionConnection(transport);
-        await using var backend = new RemoteTuiBackend(connection);
+        await using var backend = new RemoteTuiBackend(connection, loggerFactory?.CreateLogger<RemoteTuiBackend>());
 
         var cwd = Directory.GetCurrentDirectory();
         var attachId = runtimeArgs.Attach;
@@ -380,7 +387,7 @@ public static class InteractiveMode
                 ? new TuiExtensionLoadStatus(0, 0, 0, 0, 0)
                 : backend.GetExtensionLoadStatusAsync(CancellationToken.None).GetAwaiter().GetResult(),
             ExtensionLoadCommandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" },
-            LoggerFactory: null)
+            LoggerFactory: loggerFactory)
         {
             StartupAsync = StartRemoteAsync
         };

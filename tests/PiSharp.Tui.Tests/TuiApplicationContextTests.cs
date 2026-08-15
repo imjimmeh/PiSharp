@@ -131,6 +131,19 @@ public sealed class TuiApplicationContextTests
     }
 
     [Fact]
+    public void TerminalGuiDispatcherPostWakesLoopAfterSchedulingAction()
+    {
+        var calls = new List<string>();
+        var dispatcher = new TerminalGuiDispatcher(
+            action => calls.Add("invoke"),
+            () => calls.Add("wakeup"));
+
+        dispatcher.Post(() => { });
+
+        Assert.Equal(["invoke", "wakeup"], calls);
+    }
+
+    [Fact]
     public void FakeDispatcherAddTimeoutReturnsTrackedToken()
     {
         var dispatcher = new FakeTuiDispatcher();

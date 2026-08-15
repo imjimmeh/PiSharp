@@ -139,6 +139,66 @@ public sealed class TuiHostIntegrationTests
             await runTask.WaitAsync(TimeSpan.FromSeconds(5));
         }
     }
+
+    [Fact]
+    public async Task DeferredStartupCompletesWhenExtensionLoadStatusPollBlocks()
+    {
+        var statusPollEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseStatusPoll = new TaskCompletionSource<TuiExtensionLoadStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runContextReached = new TaskCompletionSource<TuiHostRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var statusReadCount = 0;
+        var driver = new FakeDriver();
+        driver.SetWindowSize(100, 30);
+        var terminal = new RecordingTerminalScreenSession();
+        using var runCancellation = new CancellationTokenSource();
+
+        var options = TuiIntegrationTestHost.CreateOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), terminal) with
+        {
+            ConsoleDriver = driver,
+            StartupAsync = async cancellationToken =>
+            {
+                await statusPollEntered.Task.WaitAsync(cancellationToken);
+                return new TuiHostStartupResult(Theme: null, StartupMessages: []);
+            },
+            GetExtensionLoadStatus = () =>
+            {
+                if (Interlocked.Increment(ref statusReadCount) <= 2)
+                    return new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
+
+                statusPollEntered.TrySetResult();
+                return releaseStatusPoll.Task.GetAwaiter().GetResult();
+            },
+            BeforeRunAsync = (context, _) =>
+            {
+                runContextReached.TrySetResult(context);
+                return Task.CompletedTask;
+            }
+        };
+        var host = new TuiHost(options);
+        var runTask = Task.Run(() => host.RunAsync(runCancellation.Token), CancellationToken.None);
+
+        try
+        {
+            var runContext = await runContextReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await statusPollEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var deadline = DateTime.UtcNow.AddSeconds(1);
+            while (!runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("Deferred startup was blocked by extension load-status polling.");
+                await Task.Delay(25);
+            }
+        }
+        finally
+        {
+            releaseStatusPoll.TrySetResult(new TuiExtensionLoadStatus(0, 0, 0, 0, 0));
+            var runContext = await runContextReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Application.Invoke(() => Application.RequestStop(runContext.Window));
+            runCancellation.Cancel();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
     [Fact]
     public async Task DeferredStartupBeginsWhenOnlyConnectingPostIsDelivered()
     {
@@ -269,6 +329,80 @@ public sealed class TuiHostIntegrationTests
         finally
         {
             var runContext = await runContextReached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Application.Invoke(() => Application.RequestStop(runContext.Window));
+            runCancellation.Cancel();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+    [Fact]
+    public async Task TypingLandsInPromptAfterDeferredStartupCompletes()
+    {
+        var startupCanComplete = new TaskCompletionSource<TuiHostStartupResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readyTcs = new TaskCompletionSource<TuiHostRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var driver = new FakeDriver();
+        driver.SetWindowSize(100, 30);
+        var terminal = new RecordingTerminalScreenSession();
+        using var runCancellation = new CancellationTokenSource();
+
+        var options = TuiIntegrationTestHost.CreateOptions(TuiIntegrationTestHost.CreateRuntimeFacade(), terminal) with
+        {
+            ConsoleDriver = driver,
+            StartupAsync = cancellationToken => startupCanComplete.Task.WaitAsync(cancellationToken),
+            BeforeRunAsync = (context, _) =>
+            {
+                readyTcs.TrySetResult(context);
+                return Task.CompletedTask;
+            }
+        };
+        var host = new TuiHost(options);
+        var runTask = Task.Run(() => host.RunAsync(runCancellation.Token), CancellationToken.None);
+
+        try
+        {
+            var runContext = await readyTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // The prompt is disabled while the deferred startup (daemon connect) is pending.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not disable the prompt while the startup hook was pending.");
+                await Task.Delay(25);
+            }
+
+            startupCanComplete.TrySetResult(new TuiHostStartupResult(Theme: null, StartupMessages: ["daemon ready"]));
+
+            // Startup succeeds: the prompt is re-enabled (the host reports ready).
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!runContext.Prompt.Enabled)
+            {
+                if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+                    throw new TimeoutException("TUI host did not enable the prompt after startup succeeded.");
+                await Task.Delay(25);
+            }
+
+            // Typing must reach the prompt once the host is ready.
+            var keySent = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Application.Invoke(() =>
+            {
+                try
+                {
+                    var handled = Application.RaiseKeyDownEvent(new Key((KeyCode)'h'));
+                    keySent.TrySetResult(handled);
+                }
+                catch (Exception ex)
+                {
+                    keySent.TrySetException(ex);
+                }
+            });
+            var handled = await keySent.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.True(handled, "Typed key was not handled by the TUI after startup completed.");
+            Assert.Contains("h", runContext.Prompt.PromptText);
+        }
+        finally
+        {
+            var runContext = await readyTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Application.Invoke(() => Application.RequestStop(runContext.Window));
             runCancellation.Cancel();
             await runTask.WaitAsync(TimeSpan.FromSeconds(5));

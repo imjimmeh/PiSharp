@@ -102,6 +102,7 @@ public sealed class PiServerWebSocketHandler(
                         try
                         {
                             await SendAsync(response, linked.Token);
+                            logger.LogDebug("Command response sent for {CommandType}", response.Command);
                         }
                         finally
                         {
@@ -130,6 +131,7 @@ public sealed class PiServerWebSocketHandler(
             envelope = JsonSerializer.Deserialize<ServerCommandEnvelope>(json, ServerJsonSerializer.Options)
                 ?? throw new InvalidOperationException("Invalid command envelope.");
             if (string.IsNullOrWhiteSpace(envelope.Type)) return ServerResponse.Fail(envelope.Id, "unknown", "invalid_command", "Command type is required.");
+            logger.LogDebug("Dispatching command {CommandType}", envelope.Type);
             return envelope.Type switch
             {
                 ServerCommandTypes.CreateSession => await CreateSessionAsync(json, envelope, ensureEventPump, cancellationToken),
@@ -188,6 +190,7 @@ public sealed class PiServerWebSocketHandler(
                 ServerCommandTypes.CancelJob => await CancelJobAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.Autonomous => await AutonomousAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.GetContinuityState => await GetContinuityStateAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.Shutdown => await ShutdownAsync(json, envelope, responseSent ?? Task.CompletedTask),
                 _ => ServerResponse.Fail(envelope.Id, envelope.Type, "unknown_command", $"Unknown command '{envelope.Type}'.")
             };
         }
@@ -206,16 +209,38 @@ public sealed class PiServerWebSocketHandler(
     private async Task<ServerResponse> CreateSessionAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)
     {
         var request = JsonSerializer.Deserialize<CreateServerSessionRequest>(json, ServerJsonSerializer.Options)!;
+        var startTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+        logger.LogDebug("Creating server session");
         var created = await registry.CreateAsync(request, cancellationToken);
+        var elapsedMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+        logger.LogDebug("Created server session in {ElapsedMilliseconds:0.0} ms", elapsedMilliseconds);
         if (registry.TryGet(created.ServerSessionId, out var live))
         {
             // Feed the daemon theme registry from this session's theme resources so list_themes/
-            // get_theme can answer before any explicit set_theme.
-            await Themes.MergeAsync(live.Runtime.Resources?.ThemePaths, cancellationToken);
+            // get_theme can answer before any explicit set_theme. Discovery is not a precondition
+            // for the client session response.
+            logger.LogDebug("Queueing server session theme merge");
+            _ = MergeSessionThemesAsync(Themes, live.Runtime.Resources?.ThemePaths?.ToArray());
+            logger.LogDebug("Starting server session event pump");
             if (ensureEventPump is not null) await ensureEventPump(live, 0);
+            logger.LogDebug("Started server session event pump");
         }
 
         return ServerResponse.Ok(envelope.Id, envelope.Type, created);
+    }
+
+    private async Task MergeSessionThemesAsync(ThemeRegistry themes, IReadOnlyList<string>? themePaths)
+    {
+        try
+        {
+            logger.LogDebug("Merging server session themes");
+            await themes.MergeAsync(themePaths, CancellationToken.None);
+            logger.LogDebug("Merged server session themes");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Server session theme merge failed");
+        }
     }
 
     private async Task<ServerResponse> AttachAsync(string json, ServerCommandEnvelope envelope, Func<LiveServerSession, long, Task>? ensureEventPump, CancellationToken cancellationToken)

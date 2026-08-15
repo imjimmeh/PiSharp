@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using PiSharp.Extensions;
 using PiSharp.Server.Contracts;
 
@@ -7,6 +8,9 @@ public sealed record PiServerHostOptions
 {
     public required string ApiKey { get; init; }
     public TimeSpan IdleTimeout { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Logger factory used for host and runtime lifecycle diagnostics.</summary>
+    public ILoggerFactory? LoggerFactory { get; init; }
 
     /// <summary>
     /// When true, every runtime the host creates is wired to a daemon-shared
