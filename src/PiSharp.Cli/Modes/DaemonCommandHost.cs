@@ -42,6 +42,7 @@ public static class DaemonCommandHost
             LoggerFactory = loggerFactory,
             RunCommandAsync = async (context, text, options, ct) =>
             {
+                if (string.IsNullOrWhiteSpace(text)) return new ServerCommandResult(false);
                 var runtime = context.Session.Runtime;
                 var logger = loggerFactory?.CreateLogger(nameof(DaemonCommandHost));
                 var name = text.Trim()[1..].Split([' '], 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
@@ -62,7 +63,9 @@ public static class DaemonCommandHost
                 return new ServerCommandResult(result.Handled, result.Message, result.IsError, result.ShouldExit);
             },
             CompleteCommandAsync = (session, text, ct) =>
-                Task.FromResult(SlashCommandRegistryFactory.Create(session.Runtime).Complete(text)),
+                Task.FromResult(string.IsNullOrWhiteSpace(text)
+                    ? []
+                    : SlashCommandRegistryFactory.Create(session.Runtime).Complete(text)),
             ProcessInputAsync = async (request, ct) =>
             {
                 var runtime = resolveSession?.Invoke()?.Runtime ?? throw new InvalidOperationException("No daemon session available for process_input.");
@@ -138,7 +141,8 @@ public static class DaemonCommandHost
         if (selected is null) return null;
         return sessions.FirstOrDefault(session =>
             string.Equals(session.Id, selected, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(session.Path, selected, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(session.Path, selected, StringComparison.OrdinalIgnoreCase)
+            || string.Equals($"{session.Id} {session.Path}", selected, StringComparison.OrdinalIgnoreCase))
             ?? current;
     }
 
