@@ -61,12 +61,14 @@ public sealed class ClientSessionConnectionTests
 public sealed class FakeTransport : IClientTransport
 {
     public Channel<ServerEventEnvelope> Events { get; } = Channel.CreateUnbounded<ServerEventEnvelope>();
+    public Channel<ServerResponse> Late { get; } = Channel.CreateUnbounded<ServerResponse>();
     public ServerCommandEnvelope? LastCommand { get; private set; }
     public object? LastPayload { get; private set; }
     public Uri? LastUri { get; private set; }
     public string? LastApiKey { get; private set; }
 
     ChannelReader<ServerEventEnvelope> IClientTransport.Events => Events.Reader;
+    ChannelReader<ServerResponse> IClientTransport.LateResponses => Late.Reader;
 
     public Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct)
     {

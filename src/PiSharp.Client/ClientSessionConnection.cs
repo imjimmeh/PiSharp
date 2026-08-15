@@ -27,6 +27,9 @@ public sealed class ClientSessionConnection : IAsyncDisposable
     /// <summary>Sequence watermark of the most recent envelope raised via <see cref="EventReceived"/>.</summary>
     public long LastAppliedSequence { get; private set; }
 
+    /// <summary>Responses that arrived after their command timed out (see <see cref="IClientTransport.LateResponses"/>).</summary>
+    public ChannelReader<ServerResponse> LateResponses => _transport.LateResponses;
+
     public Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct = default)
         => _transport.ConnectAsync(uri, apiKey, ct);
 

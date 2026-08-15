@@ -42,6 +42,13 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     /// <summary>Raised after a completed gap-recovery resync.</summary>
     public event Action? Resynced;
 
+    /// <summary>
+    /// Raised when a <c>run_command</c> response carrying <c>shouldExit: true</c> arrives after
+    /// the command already timed out client-side — the daemon handled it, so the exit signal must
+    /// not be lost (e.g. <c>/quit</c> after a long-running slash command).
+    /// </summary>
+    public event Action? LateCommandShouldExit;
+
     private readonly ClientSessionConnection _connection;
     private readonly ILogger? _logger;
     private readonly Channel<ServerEventEnvelope> _inbox = Channel.CreateUnbounded<ServerEventEnvelope>(
@@ -63,6 +70,24 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         _logger = logger;
         connection.EventReceived += OnEnvelope;
         _ = Task.Run(() => ProcessInboxAsync(_cts.Token), CancellationToken.None);
+        _ = Task.Run(() => DrainLateResponsesAsync(_cts.Token), CancellationToken.None);
+    }
+
+    private async Task DrainLateResponsesAsync(CancellationToken token)
+    {
+        try
+        {
+            await foreach (var response in _connection.LateResponses.ReadAllAsync(token))
+            {
+                if (response.Command != ServerCommandTypes.RunCommand) continue;
+                if (FromServerPayload<ServerCommandResult>(response.Data)?.ShouldExit == true)
+                    LateCommandShouldExit?.Invoke();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // disposed
+        }
     }
 
     // --- ITuiRuntimeFacade ---

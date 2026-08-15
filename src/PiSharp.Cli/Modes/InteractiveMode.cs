@@ -274,6 +274,11 @@ public static class InteractiveMode
         await using var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection, loggerFactory?.CreateLogger<RemoteTuiBackend>());
 
+        var logger = loggerFactory?.CreateLogger(nameof(InteractiveMode));
+        void OnLateCommandShouldExit() => logger?.LogWarning(
+            "A run_command completed after the client-side timeout; the daemon already handled it (ShouldExit lost).");
+        backend.LateCommandShouldExit += OnLateCommandShouldExit;
+
         var cwd = Directory.GetCurrentDirectory();
         var attachId = runtimeArgs.Attach;
         string? runtimeSessionId = null;
@@ -405,6 +410,7 @@ public static class InteractiveMode
         }
         finally
         {
+            backend.LateCommandShouldExit -= OnLateCommandShouldExit;
             var lastAppliedSequence = connection.LastAppliedSequence;
             await backend.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(runtimeSessionId))

@@ -76,6 +76,60 @@ public sealed class ClientWebSocketTransportTimeoutTests
             $"default timeout should fire near 300ms, not wait for the server; elapsed {stopwatch.Elapsed.TotalSeconds:0.###}s");
     }
 
+    [Fact]
+    public async Task RunCommand_UsesLongDefault()
+    {
+        // Slow slash commands (e.g. /install-extension, /resume, /compact) can run for minutes;
+        // run_command must not trip the blanket default. Waiting out a real 10-minute window is
+        // not CI-feasible, so the policy itself is asserted directly; the failure-message path
+        // below then proves the resolved effective timeout reaches the caller.
+        Assert.True(
+            ClientWebSocketTransport.CommandTimeouts.TryGetValue(ServerCommandTypes.RunCommand, out var timeout)
+            && timeout >= TimeSpan.FromMinutes(10),
+            $"run_command should default to at least 10 minutes; got {timeout}");
+
+        await using var server = await DelayedResponseServer.StartAsync(delay: TimeSpan.FromSeconds(1));
+        await using var transport = new ClientWebSocketTransport(TimeSpan.FromMilliseconds(300));
+        await transport.ConnectAsync(server.WsUri, "test-key", CancellationToken.None);
+
+        var stopwatch = Stopwatch.StartNew();
+        var response = await transport.SendCommandAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.RunCommand, Id: Guid.NewGuid().ToString("N")),
+            CancellationToken.None,
+            timeoutOverride: TimeSpan.FromMilliseconds(500));
+        stopwatch.Stop();
+
+        Assert.False(response.Success);
+        Assert.Equal("timeout", response.Error?.Code);
+        Assert.Contains("0.5s", response.Error?.Message, StringComparison.Ordinal);
+        Assert.True(
+            stopwatch.Elapsed >= TimeSpan.FromMilliseconds(400),
+            $"override should have outlasted the 300ms transport default; elapsed {stopwatch.Elapsed.TotalSeconds:0.###}s");
+    }
+
+    [Fact]
+    public async Task TimedOutResponse_IsNotDiscarded()
+    {
+        await using var server = await DelayedResponseServer.StartAsync(delay: TimeSpan.FromMilliseconds(150));
+        await using var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(5));
+        await transport.ConnectAsync(server.WsUri, "test-key", CancellationToken.None);
+
+        var envelope = new ServerCommandEnvelope(ServerCommandTypes.GetTheme, Id: Guid.NewGuid().ToString("N"));
+        var response = await transport.SendCommandAsync(
+            envelope, CancellationToken.None, timeoutOverride: TimeSpan.FromMilliseconds(50));
+
+        Assert.False(response.Success);
+        Assert.Equal("timeout", response.Error?.Code);
+
+        // The server answers after the client gave up; the late response must surface on the
+        // late-response lane instead of being dropped as an unknown id.
+        var late = await transport.LateResponses.ReadAsync(CancellationToken.None).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(envelope.Id, late.Id);
+        Assert.Equal(ServerCommandTypes.GetTheme, late.Command);
+        Assert.True(late.Success);
+    }
+
     /// <summary>
     /// Minimal Kestrel WebSocket endpoint at /ws that echoes an Ok response for every command,
     /// after a fixed delay — simulating a slow daemon.

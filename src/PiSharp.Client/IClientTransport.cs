@@ -17,6 +17,14 @@ public interface IClientTransport : IAsyncDisposable
     /// commands keep the default.
     /// </summary>
     Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null);
+
+    /// <summary>
+    /// Responses that arrived after their command already timed out client-side. Timed-out
+    /// responses must be observed, not dropped: a late <c>run_command</c> <c>ShouldExit</c> or a
+    /// session-creation result would otherwise be lost. Bounded — when the lane is full, further
+    /// late responses are discarded.
+    /// </summary>
+    ChannelReader<ServerResponse> LateResponses { get; }
     ChannelReader<ServerEventEnvelope> Events { get; }
 
     /// <summary>

@@ -186,6 +186,42 @@ public sealed class RemoteTuiBackendTests
         Assert.Equal(true, (bool?)PayloadValue(payload, "cancelled"));
     }
 
+    [Fact]
+    public async Task LateRunCommandWithShouldExit_RaisesLateCommandShouldExit()
+    {
+        var transport = new BackendFakeTransport();
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.LateCommandShouldExit += () => fired.TrySetResult();
+
+        transport.Late.Writer.TryWrite(ServerResponse.Ok(
+            "late-1", ServerCommandTypes.RunCommand, new ServerCommandResult(Handled: true, ShouldExit: true)));
+
+        await fired.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task LateResponseWithoutShouldExit_DoesNotRaiseEvent()
+    {
+        var transport = new BackendFakeTransport();
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.LateCommandShouldExit += () => fired.TrySetResult();
+
+        // A run_command that did not exit, and a ShouldExit response for a different command
+        // type, must both stay silent on the event.
+        transport.Late.Writer.TryWrite(ServerResponse.Ok(
+            "late-1", ServerCommandTypes.RunCommand, new ServerCommandResult(Handled: true, ShouldExit: false)));
+        transport.Late.Writer.TryWrite(ServerResponse.Ok(
+            "late-2", ServerCommandTypes.CreateSession, new ServerCommandResult(Handled: true, ShouldExit: true)));
+
+        await Task.Delay(300);
+        Assert.False(fired.Task.IsCompleted);
+    }
     // --- helpers ---
 
     private static ServerEventEnvelope MessageEnvelope(long sequence, string text)
@@ -214,10 +250,12 @@ public sealed class RemoteTuiBackendTests
     private sealed class BackendFakeTransport : IClientTransport
     {
         public Channel<ServerEventEnvelope> Events { get; } = Channel.CreateUnbounded<ServerEventEnvelope>();
+        public Channel<ServerResponse> Late { get; } = Channel.CreateUnbounded<ServerResponse>();
         public List<(ServerCommandEnvelope Envelope, object? Payload)> Commands { get; } = [];
         public Func<string, ServerResponse>? Responder { get; set; }
 
         ChannelReader<ServerEventEnvelope> IClientTransport.Events => Events.Reader;
+        ChannelReader<ServerResponse> IClientTransport.LateResponses => Late.Reader;
 
         public Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct) => Task.CompletedTask;
 
