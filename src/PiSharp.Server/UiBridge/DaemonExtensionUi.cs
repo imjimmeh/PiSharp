@@ -13,7 +13,7 @@ namespace PiSharp.Server.UiBridge;
 /// immediately — no round-trip latency, no orphan <c>ui_request</c> events — keeping headless and
 /// SDK-session behavior identical to the previous hard deny. Every typed <see cref="IExtensionUi"/>
 /// member is a thin wrapper over the same lane, so daemon behavior is consistent with local
-/// (<see cref="PiSharp.Tui.Interactive.TuiExtensionUi"/>): a typed call behaves exactly like the
+/// (<c>TuiExtensionUi</c>): a typed call behaves exactly like the
 /// underlying <c>RequestAsync</c> kind round-trip.
 /// </summary>
 public sealed class DaemonExtensionUi(LiveServerSession live, IServerUiBridge bridge) : IExtensionUi
