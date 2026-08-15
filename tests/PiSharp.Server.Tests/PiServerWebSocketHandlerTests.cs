@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core;
+using PiSharp.Agent.Core.Tools;
+using PiSharp.Extensions;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Core.Streaming;
 using PiSharp.Agent.Harness;
@@ -287,6 +289,36 @@ public sealed class PiServerWebSocketHandlerTests
         Assert.Equal("not_available", response.Error?.Code);
     }
 
+    [Fact]
+    public async Task GetExtensionRegistry_SerializesWireMappingOfRegisteredExtensions()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeWithExtensionsAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(new
+        {
+            id = "r", type = ServerCommandTypes.GetExtensionRegistry, serverSessionId = created.ServerSessionId
+        }, ServerJsonSerializer.Options));
+
+        Assert.True(response.Success);
+        var wire = Assert.IsType<ExtensionRegistryWire>(response.Data);
+        var tool = Assert.Single(wire.Tools);
+        Assert.Equal("fmt", tool.Name);
+        Assert.Equal("Format", tool.Label);
+        Assert.Equal("Pretty-prints code", tool.Description);
+        Assert.Equal(ToolExecutionMode.Parallel, tool.ExecutionMode);
+        Assert.Equal("Use fmt", tool.PromptSnippet);
+        Assert.Contains("guideline", tool.PromptGuidelines!);
+        Assert.Equal(ExtensionChatRowType.Custom.ToString(), Assert.Single(wire.Renderers).RowType);
+        Assert.Equal("my-type", Assert.Single(wire.Renderers).CustomType);
+        Assert.Equal(ExtensionOverridePolicy.OverrideBuiltIn, Assert.Single(wire.Renderers).Override);
+        Assert.Equal(ExtensionChatRowType.System.ToString(), Assert.Single(wire.Decorators).RowType);
+        Assert.Equal("ctrl+r", Assert.Single(wire.Shortcuts).Keys);
+    }
+
     private static PiServerWebSocketHandler CreateHandler(ServerSessionRegistry registry, IServerUiBridge? uiBridge = null, PiServerCommandDelegates? delegates = null)
         => new(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance, uiBridge, delegates);
 
@@ -296,6 +328,34 @@ public sealed class PiServerWebSocketHandlerTests
         var createOptions = new JsonlSessionCreateOptions(root);
         var initial = await repo.CreateAsync(createOptions);
         return new PiSharp.Runtime.SessionRuntime(repo, createOptions, session => new AgentHarness<JsonlSessionMetadata>(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), FakeStream, FakeCompletion, [])), initial);
+    }
+
+    private static async Task<PiSharp.Runtime.SessionRuntime> CreateRuntimeWithExtensionsAsync(string root)
+    {
+        var repo = new JsonlSessionRepo(new SystemExecutionEnv(root), "sessions");
+        var createOptions = new JsonlSessionCreateOptions(root);
+        var initial = await repo.CreateAsync(createOptions);
+        var extensions = new ExtensionRegistry();
+        extensions.RegisterTool(
+            "ext:test",
+            new ExtensionToolRegistration(
+                "fmt", "Format", "Pretty-prints code",
+                JsonDocument.Parse("{\"type\":\"object\"}").RootElement.Clone(),
+                (_, _, _, _) => Task.FromResult(new AgentToolResult<object?>([], null)),
+                ExecutionMode: ToolExecutionMode.Parallel,
+                PromptSnippet: "Use fmt",
+                PromptGuidelines: ["guideline"]).ToAgentTool());
+        extensions.RegisterShortcut("ext:test", new ExtensionShortcutRegistration("ctrl+r", "Runs something", (_, _) => Task.CompletedTask));
+        extensions.RegisterMessageRenderer("ext:test", new ExtensionMessageRendererRegistration(
+            "custom-ren", RowType: ExtensionChatRowType.Custom, CustomType: "my-type", Override: ExtensionOverridePolicy.OverrideBuiltIn));
+        extensions.RegisterMessageDecorator("ext:test", new ExtensionMessageDecoratorRegistration(
+            "custom-dec", RowType: ExtensionChatRowType.System, CustomType: "dec-type"));
+        return new PiSharp.Runtime.SessionRuntime(
+            repo,
+            createOptions,
+            session => new AgentHarness<JsonlSessionMetadata>(new AgentHarnessOptions<JsonlSessionMetadata>(session, new ModelDescriptor("test", "test", "test"), FakeStream, FakeCompletion, [])),
+            initial,
+            new ExtensionManager(extensions));
     }
 
     private static AgentCompletionAsync FakeCompletion => (_, _, _, _) => Task.FromResult(AgentMessages.Assistant("ok"));

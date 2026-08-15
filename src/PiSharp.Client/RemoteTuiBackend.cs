@@ -3,7 +3,9 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
+using PiSharp.Agent.Core;
 using PiSharp.Agent.Core.Events;
+using PiSharp.Agent.Core.Tools;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Harness;
 using PiSharp.Agent.Resources.Theme;
@@ -390,14 +392,31 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
     public async Task<ExtensionRegistry?> GetExtensionRegistryAsync(CancellationToken token = default)
     {
-        // The registry graph is not constructible client-side (delegate registrations); on any
-        // trouble the TUI falls back to no registry.
-        await SendAsync(
+        var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetExtensionRegistry, ServerSessionId: RequireSessionId()),
             token);
-        return null;
-    }
+        if (!response.Success) return null;
 
+        var wire = FromServerPayload<ExtensionRegistryWire>(response.Data);
+        if (wire is null) return null;
+
+        var registry = new ExtensionRegistry();
+        foreach (var tool in wire.Tools)
+        {
+            if (string.IsNullOrWhiteSpace(tool.Name)) continue;
+            registry.RegisterTool(tool.Name, new RemoteToolSummary(tool));
+        }
+
+        foreach (var shortcut in wire.Shortcuts)
+        {
+            if (string.IsNullOrWhiteSpace(shortcut.Keys)) continue;
+            // Remote shortcut invocation is a no-op for now (handler delegate is not wireable).
+            var sourceId = shortcut.SourceId ?? shortcut.Id;
+            registry.RegisterShortcut(sourceId, new ExtensionShortcutRegistration(shortcut.Keys, shortcut.Description, static (_, _) => Task.CompletedTask));
+        }
+
+        return registry;
+    }
     public async Task<TuiExtensionLoadStatus> GetExtensionLoadStatusAsync(CancellationToken token = default)
     {
         var response = await SendAsync(
@@ -694,6 +713,29 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         private Action? _dispose = dispose;
 
         public void Dispose() => Interlocked.Exchange(ref _dispose, null)?.Invoke();
+    }
+
+    /// <summary>
+    /// Metadata-only client-side stand-in for a remotely-hosted registry tool (the daemon executes
+    /// the real tool over the wire, so this proxy intentionally has no executable body).
+    /// </summary>
+    private sealed class RemoteToolSummary(ExtensionToolWire wire) : IAgentTool
+    {
+        public string Name => wire.Name;
+        public string Label => wire.Label;
+        public string Description => wire.Description;
+        public string? PromptSnippet => wire.PromptSnippet;
+        public IReadOnlyList<string> PromptGuidelines => wire.PromptGuidelines ?? [];
+        public JsonElement ParametersSchema => wire.ParametersSchema;
+        public ToolExecutionMode? ExecutionMode => wire.ExecutionMode;
+        public JsonElement PrepareArguments(JsonElement args) => args;
+
+        public Task<AgentToolResult<object?>> ExecuteAsync(
+            string toolCallId,
+            JsonElement parameters,
+            CancellationToken cancellationToken = default,
+            AgentToolUpdateCallback<object?>? onUpdate = null)
+            => Task.FromResult(new AgentToolResult<object?>([], null));
     }
 
     // --- wire payload shapes for response Data ---

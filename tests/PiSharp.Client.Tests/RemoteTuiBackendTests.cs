@@ -6,6 +6,7 @@ using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
+using PiSharp.Extensions;
 using PiSharp.Agent.Harness;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
@@ -222,6 +223,39 @@ public sealed class RemoteTuiBackendTests
         await Task.Delay(300);
         Assert.False(fired.Task.IsCompleted);
     }
+    [Fact]
+    public async Task GetExtensionRegistry_ReconstructsRegistryFromWire()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionRegistryWire(
+            Tools: [new ExtensionToolWire(
+                "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+                HasRenderCall: false, HasRenderResult: false,
+                RendererName: "my-renderer", RenderShell: "bash",
+                ExecutionMode: null, PromptSnippet: "Use fmt", PromptGuidelines: ["guideline"])],
+            Shortcuts: [new ExtensionShortcutWire("shortcut:ctrl+r:ext:test", "ext:test", "ctrl+r", "Runs something")],
+            Renderers: [],
+            Decorators: []);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.GetExtensionRegistry
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var registry = await backend.GetExtensionRegistryAsync(CancellationToken.None);
+
+        Assert.NotNull(registry);
+        var tool = Assert.Single(registry.Tools);
+        Assert.Equal("fmt", tool.Value.Name);
+        Assert.Equal("Pretty-prints code", tool.Value.Description);
+        Assert.Equal("Use fmt", tool.Value.PromptSnippet);
+        var shortcut = Assert.Single(registry.Shortcuts);
+        Assert.Equal("ctrl+r", shortcut.Value.Keys);
+    }
+
     // --- helpers ---
 
     private static ServerEventEnvelope MessageEnvelope(long sequence, string text)

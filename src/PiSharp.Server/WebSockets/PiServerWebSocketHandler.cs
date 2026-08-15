@@ -7,6 +7,7 @@ using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
 using PiSharp.Ai;
 using PiSharp.Agent.Core.Events;
+using PiSharp.Agent.Core.Tools;
 using PiSharp.Runtime;
 using PiSharp.Server.Authentication;
 using PiSharp.Continuity.Contracts;
@@ -656,9 +657,62 @@ public sealed class PiServerWebSocketHandler(
         var manager = live.Runtime.ExtensionManager;
         return Task.FromResult(manager is null
             ? ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "No extension manager is configured for this session.")
-            : ServerResponse.Ok(envelope.Id, envelope.Type, manager.Registry));
+            : ServerResponse.Ok(envelope.Id, envelope.Type, ComposeExtensionRegistryWire(manager.Registry)));
     }
 
+    /// <summary>
+    /// Projects the live extension registry onto the wire. Tool rows carry serializable metadata;
+    /// <c>RendererName</c>/<c>RenderShell</c> are not exposed by the registry's
+    /// <see cref="IAgentToolRenderer"/> surface, so they ride as null until a producer type
+    /// publishes them. Renderer/decorator handler delegates are not wireable — only the
+    /// row-type/custom-type/override metadata is transferred.
+    /// </summary>
+    private static ExtensionRegistryWire ComposeExtensionRegistryWire(ExtensionRegistry registry)
+    {
+        var tools = registry.Tools
+            .Select(registration =>
+            {
+                var tool = registration.Value;
+                var renderer = tool as IAgentToolRenderer;
+                return new ExtensionToolWire(
+                    tool.Name,
+                    tool.Label,
+                    tool.Description,
+                    tool.ParametersSchema,
+                    renderer?.HasRenderCall ?? false,
+                    renderer?.HasRenderResult ?? false,
+                    RendererName: null,
+                    RenderShell: null,
+                    tool.ExecutionMode,
+                    tool.PromptSnippet,
+                    tool.PromptGuidelines.Count == 0 ? null : tool.PromptGuidelines.ToArray());
+            })
+            .ToArray();
+
+        var shortcuts = registry.Shortcuts
+            .Select(registration => new ExtensionShortcutWire(
+                registration.Id,
+                registration.SourceId,
+                registration.Value.Keys,
+                registration.Value.Description))
+            .ToArray();
+
+        var renderers = registry.Renderers
+            .Select(registration => new ExtensionRendererWire(
+                registration.Value.RowType.ToString(),
+                registration.Value.CustomType,
+                registration.Value.Override))
+            .ToArray();
+
+        var decorators = registry.Decorators
+            .Select(registration => new ExtensionDecoratorWire(
+                registration.Value.RowType.ToString(),
+                registration.Value.CustomType,
+                registration.Override))
+            .ToArray();
+
+        return new ExtensionRegistryWire(tools, shortcuts, renderers, decorators);
+    }
     private Task<ServerResponse> ResolveToolAsync(string json, ServerCommandEnvelope envelope)
     {
         var command = JsonSerializer.Deserialize<ResolveToolRequest>(json, ServerJsonSerializer.Options)!;

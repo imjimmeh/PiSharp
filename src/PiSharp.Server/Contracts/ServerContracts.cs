@@ -1,8 +1,11 @@
+using System.Text.Json;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
+using PiSharp.Agent.Core;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Continuity.Contracts;
+using PiSharp.Extensions;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.UiBridge;
 
@@ -214,6 +217,37 @@ public sealed record RemoveExtensionCommand(
     string? ServerSessionId = null,
     string? Reference = null,
     bool Local = false);
+// --- P24: extension registry wire surface (scout gap 8) ---
+
+/// <summary>
+/// Serializable projection of <see cref="PiSharp.Extensions.ExtensionRegistry"/> answered by
+/// <see cref="ServerCommandTypes.GetExtensionRegistry"/>. The live registry holds delegate-bearing
+/// registrations that serialize to empty objects; this DTO carries only wireable metadata. The
+/// renderer/decorator rows are metadata-only — their invocation handlers are not wireable — so
+/// clients reconstruct tools/shortcuts but never renderer/decorator handlers.
+/// </summary>
+public sealed record ExtensionRegistryWire(
+    IReadOnlyList<ExtensionToolWire> Tools,
+    IReadOnlyList<ExtensionShortcutWire> Shortcuts,
+    IReadOnlyList<ExtensionRendererWire> Renderers,
+    IReadOnlyList<ExtensionDecoratorWire> Decorators);
+
+/// <summary>Serializable tool projection for <see cref="ExtensionRegistryWire"/>.</summary>
+public sealed record ExtensionToolWire(
+    string Name, string Label, string Description,
+    JsonElement ParametersSchema, bool HasRenderCall, bool HasRenderResult,
+    string? RendererName, string? RenderShell,
+    ToolExecutionMode? ExecutionMode, string? PromptSnippet, IReadOnlyList<string>? PromptGuidelines);
+
+/// <summary>Serializable shortcut projection for <see cref="ExtensionRegistryWire"/>.</summary>
+public sealed record ExtensionShortcutWire(string Id, string? SourceId, string Keys, string Description);
+
+/// <summary>Serializable message-renderer projection for <see cref="ExtensionRegistryWire"/> (metadata only).</summary>
+public sealed record ExtensionRendererWire(string RowType, string? CustomType, ExtensionOverridePolicy Override);
+
+/// <summary>Serializable message-decorator projection for <see cref="ExtensionRegistryWire"/> (metadata only).</summary>
+public sealed record ExtensionDecoratorWire(string RowType, string? CustomType, ExtensionOverridePolicy Override);
+
 
 /// <summary>
 /// Request for <see cref="ServerCommandTypes.ManageSkill"/>. <see cref="Op"/> is one of
