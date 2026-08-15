@@ -60,6 +60,10 @@ public static class ClientToTuiAdapter
             "compaction_start" => MapCompactionStart(envelope.Event.Data),
             "compaction_end" => MapCompactionEnd(envelope.Event.Data),
             "system_message" => MapSystemMessage(envelope.Event.Data),
+            "theme_changed" => MapThemeChanged(envelope.Event.Data),
+            // The server emits package changes under ExtensionEventNames.PackagesChanged.
+            "extensions_changed" => MapPackagesChanged(envelope.Event.Data),
+            "skills_changed" => MapSkillsChanged(envelope.Event.Data),
             _ => null,
         };
 
@@ -192,6 +196,30 @@ public static class ClientToTuiAdapter
             ? new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.SystemMessage(text, wire.IsError ?? false))
             : null;
 
+    /// <summary>
+    /// Maps <c>theme_changed</c> to an informational system row. Live re-theming is out of scope:
+    /// no live re-theme path exists even locally (<c>TuiTheme.Apply</c> runs at startup only).
+    /// </summary>
+    private static AgentHarnessEvent? MapThemeChanged(object? data)
+        => FromPayload<ThemeChangedWire>(data) is { Name: { Length: > 0 } name }
+            ? new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.SystemMessage($"Theme changed to '{name}'."))
+            : null;
+
+    private static AgentHarnessEvent? MapPackagesChanged(object? data) => MapListChanged(data, "Extensions");
+
+    private static AgentHarnessEvent? MapSkillsChanged(object? data) => MapListChanged(data, "Skills");
+
+    private static AgentHarnessEvent? MapListChanged(object? data, string noun)
+    {
+        var wire = FromPayload<ListChangedWire>(data);
+        var parts = new List<string>();
+        if (wire?.Added is { Count: > 0 } added) parts.Add($"added {string.Join(", ", added)}");
+        if (wire?.Removed is { Count: > 0 } removed) parts.Add($"removed {string.Join(", ", removed)}");
+        if (wire?.Updated is { Count: > 0 } updated) parts.Add($"updated {string.Join(", ", updated)}");
+        return parts.Count == 0
+            ? null
+            : new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.SystemMessage($"{noun} changed: {string.Join("; ", parts)}."));
+    }
 
     // --- assistant event reconstruction ---
 
@@ -258,4 +286,6 @@ public static class ClientToTuiAdapter
     private sealed record CompactionStartPayload(string? Reason);
     private sealed record CompactionEndPayload(string? Reason, object? Result, bool? Aborted, bool? WillRetry, string? ErrorMessage);
     private sealed record SystemMessageWire(string? Text, bool? IsError);
+    private sealed record ThemeChangedWire(string? Name, object? Document);
+    private sealed record ListChangedWire(IReadOnlyList<string>? Added, IReadOnlyList<string>? Removed, IReadOnlyList<string>? Updated);
 }

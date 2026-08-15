@@ -122,6 +122,21 @@ public sealed class InteractiveModeTests
         Assert.Equal(0, InteractiveMode.ReadCursorSequence("sess-garbage", tempDir.Path, tempDir.Path));
     }
 
+    [Fact]
+    public void ResolveRemoteKeybindingsPath_ReturnsKeybindingsJsonUnderPiAgentPath()
+    {
+        using var tempDir = TempDirectory.Create();
+
+        var resolved = InteractiveMode.ResolveRemoteKeybindingsPath(tempDir.Path);
+
+        Assert.NotNull(resolved);
+        Assert.EndsWith("keybindings.json", resolved, StringComparison.Ordinal);
+        Assert.Equal(
+            PiAgentPaths.FromCwd(tempDir.Path).GlobalAgentDirectory,
+            Path.GetDirectoryName(resolved),
+            ignoreCase: true);
+    }
+
     private static string CursorFilePath(string sessionId, string home)
         => Path.Combine(PiAgentPaths.FromCwd(home, home).GlobalPiSharpDirectory, "sessions", $"{sessionId}.cursor");
 

@@ -258,6 +258,15 @@ public static class InteractiveMode
     }
 
     /// <summary>
+    /// Resolves the user's keybindings.json for the remote TUI, mirroring the local path's
+    /// <c>KeybindingsPath</c> option. <c>TuiHost</c> loads it at startup and watches it via
+    /// <c>KeybindingsWatcher</c>.
+    /// </summary>
+    internal static string? ResolveRemoteKeybindingsPath(string cwd)
+        => PiAgentPaths.FromCwd(cwd).KeybindingsPath;
+
+
+    /// <summary>
     /// Runs the TUI against a daemon-hosted session over the wire. The daemon session stays live
     /// after this client exits so a later client can re-attach (Task4.3).
     /// </summary>
@@ -280,6 +289,8 @@ public static class InteractiveMode
         backend.LateCommandShouldExit += OnLateCommandShouldExit;
 
         var cwd = Directory.GetCurrentDirectory();
+        var footerSnapshotProvider = new TuiFooterSnapshotProvider(loggerFactory: loggerFactory);
+
         var attachId = runtimeArgs.Attach;
         string? runtimeSessionId = null;
         var remoteReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -354,6 +365,19 @@ public static class InteractiveMode
             }
         }
 
+        TuiFooterSnapshot CreateRemoteFooterSnapshot(TuiRenderState state)
+        {
+            try
+            {
+                return footerSnapshotProvider.CreateSnapshotFromSessionEntries(state, cwd, state.SessionBranchEntries);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogDebug(ex, "Branch metadata snapshot failed, using static footer");
+                return footerSnapshotProvider.CreateSnapshot(state, cwd);
+            }
+        }
+
         var options = new TuiHostOptions(
             backend,
             SessionId: "connecting",
@@ -362,7 +386,7 @@ public static class InteractiveMode
             DispatchCommandAsync: backend.DispatchCommandAsync,
             CompleteCommand: text => backend.CompleteCommandAsync(text, CancellationToken.None).GetAwaiter().GetResult(),
             WorkingDirectory: cwd,
-            FooterSnapshot: null,
+            FooterSnapshot: CreateRemoteFooterSnapshot,
             ConfigureUiBridge: bridge =>
             {
                 backend.UiRequestHandler = async (intent, ct) =>
@@ -380,6 +404,7 @@ public static class InteractiveMode
                 await backend.PostStartupChecksAsync(inject, ct);
             },
             Theme: null,
+            KeybindingsPath: ResolveRemoteKeybindingsPath(cwd),
             GetExtensionShortcuts: () => backend.ServerSessionId is null
                 ? []
                 : backend.GetExtensionShortcutsAsync(CancellationToken.None).GetAwaiter().GetResult(),

@@ -52,4 +52,62 @@ public sealed class ClientToTuiAdapterTests
         Assert.Equal("Update failed", system.Text);
         Assert.True(system.IsError);
     }
+
+    [Fact]
+    public void ToHarnessEvent_MapsPackagesChangedToSystemRow()
+    {
+        // The server emits package changes under ExtensionEventNames.PackagesChanged ("extensions_changed").
+        var envelope = ServerEventEnvelope.FromFlat(
+            "srv-1",
+            1,
+            AgentSessionEvent.FromServer("extensions_changed", new { added = new[] { "my-ext" }, removed = Array.Empty<string>(), updated = Array.Empty<string>() }));
+
+        var harnessEvent = ClientToTuiAdapter.ToHarnessEvent(envelope);
+
+        var system = Assert.IsType<AgentHarnessOwnEvent.SystemMessage>(
+            Assert.IsType<AgentHarnessEvent.Own>(harnessEvent).Event);
+        Assert.Contains("my-ext", system.Text);
+    }
+
+    [Fact]
+    public void ToHarnessEvent_MapsSkillsChangedToSystemRow()
+    {
+        var envelope = ServerEventEnvelope.FromFlat(
+            "srv-1",
+            1,
+            AgentSessionEvent.FromServer("skills_changed", new { added = new[] { "code-reviewer" }, removed = new[] { "old-skill" }, updated = Array.Empty<string>() }));
+
+        var harnessEvent = ClientToTuiAdapter.ToHarnessEvent(envelope);
+
+        var system = Assert.IsType<AgentHarnessOwnEvent.SystemMessage>(
+            Assert.IsType<AgentHarnessEvent.Own>(harnessEvent).Event);
+        Assert.Contains("code-reviewer", system.Text);
+        Assert.Contains("old-skill", system.Text);
+    }
+
+    [Fact]
+    public void ToHarnessEvent_MapsThemeChangedToSystemRow()
+    {
+        var envelope = ServerEventEnvelope.FromFlat(
+            "srv-1",
+            1,
+            AgentSessionEvent.FromServer("theme_changed", new { name = "ocean", document = new { } }));
+
+        var harnessEvent = ClientToTuiAdapter.ToHarnessEvent(envelope);
+
+        var system = Assert.IsType<AgentHarnessOwnEvent.SystemMessage>(
+            Assert.IsType<AgentHarnessEvent.Own>(harnessEvent).Event);
+        Assert.Contains("ocean", system.Text);
+    }
+
+    [Fact]
+    public void ToHarnessEvent_DropsListChangedWithNoEntries()
+    {
+        var envelope = ServerEventEnvelope.FromFlat(
+            "srv-1",
+            1,
+            AgentSessionEvent.FromServer("skills_changed", new { added = Array.Empty<string>(), removed = Array.Empty<string>(), updated = Array.Empty<string>() }));
+
+        Assert.Null(ClientToTuiAdapter.ToHarnessEvent(envelope));
+    }
 }
