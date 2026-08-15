@@ -91,6 +91,48 @@ public sealed class PiServerUiBridgeTests
             envelope => envelope.Event.Type == "ui_request");
     }
 
+    /// <summary>Per-kind default timeouts (Task 9): interactive kinds must get a generous default
+    /// (~5 min) instead of the bridge's fixed 5s, so a human answering a <c>select</c> dialog over
+    /// the wire is not auto-cancelled server-side; fire-and-forget kinds keep the short default.
+    /// Here a <c>select</c> issued with <c>responseTimeout: null</c> is answered ~6s after emission —
+    /// beyond today's fixed 5s auto-cancel — and the caller must still receive the value.
+    /// Sole slow test for the per-kind timeout feature (~6s).</summary>
+    [Fact]
+    public async Task Select_NullResponseTimeout_InteractiveKindDefault_ClientAnswersAfterSixSeconds()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var bridge = new ServerUiBridge(registry);
+        var target = await CreateSessionAsync(registry);
+
+        var intent = new ServerUiIntent("ui-select-6s", "select", "Pick", "Choose one", ["alpha"], null);
+        var responseTask = bridge.RequestUiAsync(intent, target, responseTimeout: null, CancellationToken.None);
+
+        using var readerCts = new CancellationTokenSource(ReaderTimeout);
+        var targetRequestId = await ReadFirstUiRequestIdAsync(target, readerCts.Token);
+        Assert.Equal(intent.RequestId, targetRequestId);
+
+        // Answer ~6s after emission: the bridge's fixed 5s default would already have auto-cancelled,
+        // so only a generous per-kind default keeps the request pending until the client responds.
+        await Task.Delay(TimeSpan.FromSeconds(6));
+        bridge.ResolveUiAsync(intent.RequestId, "alpha", cancelled: false);
+
+        var response = await responseTask;
+        Assert.False(response.Cancelled);
+        Assert.Equal("alpha", response.Value);
+    }
+
+    /// <summary>Per-kind default timeout resolution (Task 9): interactive kinds get a generous
+    /// default, fire-and-forget kinds keep the short bridge default.</summary>
+    [Fact]
+    public void TimeoutFor_InteractiveKinds_AreGenerous()
+    {
+        foreach (var kind in new[] { "select", "input", "editor", "confirm", "custom", "custom_update" })
+            Assert.True(ServerUiBridge.TimeoutFor(kind) > TimeSpan.FromMinutes(1), $"{kind} should get a generous default timeout");
+
+        Assert.Equal(ServerUiBridge.TimeoutFor("notify"), ServerUiBridge.TimeoutFor("status"));
+        Assert.True(ServerUiBridge.TimeoutFor("notify") < TimeSpan.FromSeconds(30));
+    }
+
     /// <summary>Reads the session's event lane and returns the request id of the first
     /// <c>ui_request</c> it sees (null if the lane ends first). Cancellation is provided by the
     /// caller so a missing emission fails fast instead of hanging.</summary>

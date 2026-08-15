@@ -8,6 +8,10 @@
     <RootNamespace>PiSharp.Server</RootNamespace>
   </PropertyGroup>
 
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Server.Tests" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PiSharp.Runtime\PiSharp.Runtime.csproj" />
     <ProjectReference Include="..\PiSharp.Continuity.Contracts\PiSharp.Continuity.Contracts.csproj" />

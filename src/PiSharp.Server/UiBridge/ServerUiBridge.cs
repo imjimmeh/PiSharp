@@ -17,6 +17,18 @@ namespace PiSharp.Server.UiBridge;
 public sealed class ServerUiBridge : IServerUiBridge
 {
     private static readonly TimeSpan ResponseTimeout = TimeSpan.FromSeconds(5);
+    /// <summary>Default window for interactive kinds answered by a human over the wire: generous so
+    /// a dialog that takes a while to answer is not auto-cancelled server-side.</summary>
+    internal static readonly TimeSpan InteractiveKindTimeout = TimeSpan.FromMinutes(5);
+    private static readonly HashSet<string> InteractiveKinds = new(StringComparer.Ordinal)
+    {
+        "select", "input", "editor", "confirm", "custom", "custom_update"
+    };
+
+    /// <summary>Per-kind default response timeout: interactive kinds get <see cref="InteractiveKindTimeout"/>,
+    /// everything else keeps the bridge's short <see cref="ResponseTimeout"/>.</summary>
+    internal static TimeSpan TimeoutFor(string kind)
+        => InteractiveKinds.Contains(kind) ? InteractiveKindTimeout : ResponseTimeout;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerUiResponse>> _pending = new(StringComparer.Ordinal);
     private readonly ServerSessionRegistry _registry;
     private readonly ILogger<ServerUiBridge> _logger;
@@ -54,7 +66,7 @@ public sealed class ServerUiBridge : IServerUiBridge
         {
             EmitUiRequest(intent, target);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(responseTimeout ?? ResponseTimeout);
+            timeout.CancelAfter(responseTimeout ?? TimeoutFor(intent.Kind));
             using var registration = timeout.Token.Register(() => tcs.TrySetResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true)));
             try
             {
