@@ -12185,7 +12185,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 384000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.06566m, Output: 0.13132m, CacheRead: 0.013132m))),
+            Cost: new ModelCost(Input: 0.06426m, Output: 0.12852m, CacheRead: 0.012852m))),
 
         new("openrouter", "deepseek/deepseek-v4-flash-0731", new ModelDescriptor(
             Provider: "openrouter",
@@ -14573,7 +14573,7 @@ public static class BuiltInModels
             ContextWindow: 1000000,
             MaxTokens: 32768,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.4m, Output: 1.2m, CacheWrite: 0.5m))),
+            Cost: new ModelCost(Input: 0.26m, Output: 0.78m))),
 
         new("openrouter", "qwen/qwen3-14b", new ModelDescriptor(
             Provider: "openrouter",
@@ -15579,9 +15579,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 384000,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.06846m, Output: 0.13692m, CacheRead: 0.013692m))),
+            Cost: new ModelCost(Input: 0.0675m, Output: 0.135m, CacheRead: 0.0135m))),
 
         new("openrouter", "~google/gemini-flash-latest", new ModelDescriptor(
             Provider: "openrouter",
