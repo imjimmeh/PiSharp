@@ -23,6 +23,9 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
     internal Action<Action>? DispatchUi { get; set; }
     internal Action<string>? ShowNotification { get; set; }
     public Func<string, string?, int?, int?, string?, CancellationToken, Task<ExtensionCustomUiSnapshot>>? SendCustomUiInputAsync { get; set; }
+    public Func<string, IReadOnlyList<string>?, CancellationToken, Task<string?>>? SelectAction { get; set; }
+    public Func<string, string?, CancellationToken, Task<string?>>? InputAction { get; set; }
+    public Func<string, string?, CancellationToken, Task<bool>>? ConfirmAction { get; set; }
 
     private Action<Action> UiPost => DispatchUi ?? TerminalGuiDispatcher.Instance.Post;
 
@@ -34,6 +37,20 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
         try
         {
             await TuiDispatcherExtensions.InvokeAsync(UiPost, action, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Extension UI dispatch failed");
+            throw;
+        }
+    }
+
+    private async Task<T> InvokeOnUiThreadAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var innerTask = await TuiDispatcherExtensions.InvokeAsync(UiPost, action, cancellationToken).ConfigureAwait(false);
+            return await innerTask.ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -276,14 +293,32 @@ public sealed class ExtensionUiBridgeHost(Window window, Action<Func<TuiRenderSt
         return new ExtensionUiIntentResult(intent.RequestId, true);
     }
 
-    private static Task<ExtensionUiIntentResult> Select(ExtensionUiIntent intent, CancellationToken cancellationToken)
-        => Task.FromResult(new ExtensionUiIntentResult(intent.RequestId, intent.Options?.FirstOrDefault(), intent.Options is null || intent.Options.Count == 0));
+    private async Task<ExtensionUiIntentResult> Select(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var selectAction = SelectAction;
+        if (selectAction is null)
+            return new ExtensionUiIntentResult(intent.RequestId, intent.Options?.FirstOrDefault(), intent.Options is null || intent.Options.Count == 0);
+        var value = await InvokeOnUiThreadAsync(() => selectAction(intent.Title, intent.Options, cancellationToken), cancellationToken).ConfigureAwait(false);
+        return new ExtensionUiIntentResult(intent.RequestId, value, value is null);
+    }
 
-    private static Task<ExtensionUiIntentResult> Confirm(ExtensionUiIntent intent, CancellationToken cancellationToken)
-        => Task.FromResult(new ExtensionUiIntentResult(intent.RequestId, true));
+    private async Task<ExtensionUiIntentResult> Confirm(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var confirmAction = ConfirmAction;
+        if (confirmAction is null)
+            return new ExtensionUiIntentResult(intent.RequestId, true);
+        var confirmed = await InvokeOnUiThreadAsync(() => confirmAction(intent.Title, intent.Message, cancellationToken), cancellationToken).ConfigureAwait(false);
+        return new ExtensionUiIntentResult(intent.RequestId, confirmed, !confirmed);
+    }
 
-    private static Task<ExtensionUiIntentResult> Input(ExtensionUiIntent intent, CancellationToken cancellationToken)
-        => Task.FromResult(new ExtensionUiIntentResult(intent.RequestId, intent.Message ?? string.Empty));
+    private async Task<ExtensionUiIntentResult> Input(ExtensionUiIntent intent, CancellationToken cancellationToken)
+    {
+        var inputAction = InputAction;
+        if (inputAction is null)
+            return new ExtensionUiIntentResult(intent.RequestId, intent.Message ?? string.Empty);
+        var value = await InvokeOnUiThreadAsync(() => inputAction(intent.Message ?? intent.Title, intent.Message, cancellationToken), cancellationToken).ConfigureAwait(false);
+        return new ExtensionUiIntentResult(intent.RequestId, value, value is null);
+    }
 
     private async Task<ExtensionUiIntentResult> Status(ExtensionUiIntent intent, CancellationToken cancellationToken)
     {
