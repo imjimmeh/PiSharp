@@ -4,8 +4,10 @@ using System.Threading.Channels;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
+using PiSharp.Agent.Core;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
+using PiSharp.Agent.Core.Tools;
 using PiSharp.Extensions;
 using PiSharp.Agent.Harness;
 using PiSharp.Server.Contracts;
@@ -254,6 +256,163 @@ public sealed class RemoteTuiBackendTests
         Assert.Equal("Use fmt", tool.Value.PromptSnippet);
         var shortcut = Assert.Single(registry.Shortcuts);
         Assert.Equal("ctrl+r", shortcut.Value.Keys);
+    }
+    [Fact]
+    public async Task ResolveTool_ReturnsRemoteRegisteredTool_WithWireCapabilities()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: ToolExecutionMode.Parallel, PromptSnippet: "Use fmt", PromptGuidelines: ["guideline"]);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.ResolveTool
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+
+        Assert.NotNull(tool);
+        Assert.Equal("fmt", tool.Name);
+        Assert.Equal("Format", tool.Label);
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        Assert.True(renderer.HasRenderCall);
+        Assert.False(renderer.HasRenderResult);
+        var (envelope, payload) = Assert.Single(transport.Commands);
+        Assert.Equal(ServerCommandTypes.ResolveTool, envelope.Type);
+        Assert.Equal(SessionId, envelope.ServerSessionId);
+        Assert.Equal("fmt", (string?)PayloadValue(payload, "name"));
+    }
+
+    [Fact]
+    public async Task ResolveTool_NonRenderableWire_YieldsRendererWithNoCapabilities()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: false, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type == ServerCommandTypes.ResolveTool
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        Assert.False(renderer.HasRenderCall);
+        Assert.False(renderer.HasRenderResult);
+    }
+
+    [Fact]
+    public async Task ResolveTool_RenderCallAsync_SendsRenderToolCall_AndMapsLines()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type switch
+            {
+                ServerCommandTypes.ResolveTool => ServerResponse.Ok("st", type, wire),
+                ServerCommandTypes.RenderToolCall => ServerResponse.Ok("st", type, new { lines = new[] { "call line" } }),
+                _ => ServerResponse.Ok("st", type),
+            },
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        var rendered = await renderer.RenderCallAsync(
+            new ToolRenderRequest("tc-1", "fmt", schema.RootElement.Clone(), null, IsPartial: true, IsError: false, Expanded: false, Width: 120),
+            CancellationToken.None);
+
+        Assert.NotNull(rendered);
+        Assert.Equal(["call line"], rendered.Lines);
+        var renderCommand = Assert.Single(transport.Commands, command => command.Envelope.Type == ServerCommandTypes.RenderToolCall);
+        Assert.Equal("tc-1", (string?)PayloadValue(renderCommand.Payload, "ToolCallId"));
+        Assert.Equal("fmt", (string?)PayloadValue(renderCommand.Payload, "Name"));
+        Assert.Equal(true, (bool?)PayloadValue(renderCommand.Payload, "IsCall"));
+        Assert.Equal(120, (int?)PayloadValue(renderCommand.Payload, "Width"));
+    }
+
+    [Fact]
+    public async Task ResolveTool_RenderResultAsync_SendsRenderToolResult_AndMapsLines()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: true,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type switch
+            {
+                ServerCommandTypes.ResolveTool => ServerResponse.Ok("st", type, wire),
+                ServerCommandTypes.RenderToolResult => ServerResponse.Ok("st", type, new { lines = new[] { "result line" } }),
+                _ => ServerResponse.Ok("st", type),
+            },
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        var rendered = await renderer.RenderResultAsync(
+            new ToolRenderRequest("tc-1", "fmt", Arguments: null, null, IsPartial: false, IsError: true, Expanded: true, Width: 120),
+            CancellationToken.None);
+
+        Assert.NotNull(rendered);
+        Assert.Equal(["result line"], rendered.Lines);
+        var renderCommand = Assert.Single(transport.Commands, command => command.Envelope.Type == ServerCommandTypes.RenderToolResult);
+        Assert.Equal("tc-1", (string?)PayloadValue(renderCommand.Payload, "ToolCallId"));
+        Assert.Equal(true, (bool?)PayloadValue(renderCommand.Payload, "IsError"));
+        Assert.Equal(false, (bool?)PayloadValue(renderCommand.Payload, "IsCall"));
+    }
+
+    [Fact]
+    public async Task ResolveTool_RenderCallAsync_ServerFailure_ReturnsNull()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: null, PromptSnippet: null, PromptGuidelines: null);
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => type switch
+            {
+                ServerCommandTypes.ResolveTool => ServerResponse.Ok("st", type, wire),
+                ServerCommandTypes.RenderToolCall => ServerResponse.Fail("st", type, "not_available", "Tool 'fmt' is not registered."),
+                _ => ServerResponse.Ok("st", type),
+            },
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        var tool = backend.ResolveTool("fmt");
+        var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
+        var rendered = await renderer.RenderCallAsync(
+            new ToolRenderRequest("tc-1", "fmt", schema.RootElement.Clone(), null, IsPartial: true, IsError: false, Expanded: false, Width: 120),
+            CancellationToken.None);
+
+        Assert.Null(rendered);
     }
 
     // --- helpers ---

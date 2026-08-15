@@ -166,6 +166,8 @@ public sealed class PiServerWebSocketHandler(
                 ServerCommandTypes.GetExtensionShortcuts => await GetExtensionShortcutsAsync(envelope),
                 ServerCommandTypes.GetExtensionRegistry => await GetExtensionRegistryAsync(envelope),
                 ServerCommandTypes.ResolveTool => await ResolveToolAsync(json, envelope),
+                ServerCommandTypes.RenderToolCall => await RenderToolCallAsync(json, envelope, cancellationToken),
+                ServerCommandTypes.RenderToolResult => await RenderToolResultAsync(json, envelope, cancellationToken),
                 ServerCommandTypes.CycleThinkingLevel => await CycleThinkingLevelAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetAvailableModels => GetAvailableModels(envelope),
                 ServerCommandTypes.GetCommands => await GetCommandsAsync(envelope, cancellationToken),
@@ -670,23 +672,7 @@ public sealed class PiServerWebSocketHandler(
     private static ExtensionRegistryWire ComposeExtensionRegistryWire(ExtensionRegistry registry)
     {
         var tools = registry.Tools
-            .Select(registration =>
-            {
-                var tool = registration.Value;
-                var renderer = tool as IAgentToolRenderer;
-                return new ExtensionToolWire(
-                    tool.Name,
-                    tool.Label,
-                    tool.Description,
-                    tool.ParametersSchema,
-                    renderer?.HasRenderCall ?? false,
-                    renderer?.HasRenderResult ?? false,
-                    RendererName: null,
-                    RenderShell: null,
-                    tool.ExecutionMode,
-                    tool.PromptSnippet,
-                    tool.PromptGuidelines.Count == 0 ? null : tool.PromptGuidelines.ToArray());
-            })
+            .Select(registration => ComposeToolWire(registration.Value))
             .ToArray();
 
         var shortcuts = registry.Shortcuts
@@ -713,6 +699,29 @@ public sealed class PiServerWebSocketHandler(
 
         return new ExtensionRegistryWire(tools, shortcuts, renderers, decorators);
     }
+
+    /// <summary>
+    /// Projects a registered tool onto the wire. The capability flags come from the tool's
+    /// <see cref="IAgentToolRenderer"/> surface; <c>RendererName</c>/<c>RenderShell</c> are not
+    /// exposed by that surface, so they ride as null until a producer type publishes them.
+    /// </summary>
+    private static ExtensionToolWire ComposeToolWire(IAgentTool tool)
+    {
+        var renderer = tool as IAgentToolRenderer;
+        return new ExtensionToolWire(
+            tool.Name,
+            tool.Label,
+            tool.Description,
+            tool.ParametersSchema,
+            renderer?.HasRenderCall ?? false,
+            renderer?.HasRenderResult ?? false,
+            RendererName: null,
+            RenderShell: null,
+            tool.ExecutionMode,
+            tool.PromptSnippet,
+            tool.PromptGuidelines.Count == 0 ? null : tool.PromptGuidelines.ToArray());
+    }
+
     private Task<ServerResponse> ResolveToolAsync(string json, ServerCommandEnvelope envelope)
     {
         var command = JsonSerializer.Deserialize<ResolveToolRequest>(json, ServerJsonSerializer.Options)!;
@@ -722,7 +731,37 @@ public sealed class PiServerWebSocketHandler(
         var tool = manager.Registry.Tools.FirstOrDefault(t => string.Equals(t.Value.Name, command.Name, StringComparison.Ordinal))?.Value;
         return Task.FromResult(tool is null
             ? ServerResponse.Fail(command.Id, command.Type, "not_available", $"Tool '{command.Name}' is not registered.")
-            : ServerResponse.Ok(command.Id, command.Type, tool));
+            : ServerResponse.Ok(command.Id, command.Type, ComposeToolWire(tool)));
+    }
+
+    private async Task<ServerResponse> RenderToolCallAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<RenderToolRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var manager = live.Runtime.ExtensionManager;
+        if (manager is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session.");
+        var tool = manager.Registry.Tools.FirstOrDefault(t => string.Equals(t.Value.Name, command.Name, StringComparison.Ordinal))?.Value;
+        if (tool is not IAgentToolRenderer { HasRenderCall: true } renderer)
+            return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Tool '{command.Name}' does not support call rendering.");
+        var rendered = await renderer.RenderCallAsync(
+            new ToolRenderRequest(command.ToolCallId, command.Name, command.Arguments, Result: null, IsPartial: true, IsError: false, command.IsExpanded, command.Width),
+            cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, new { lines = rendered?.Lines ?? [] });
+    }
+
+    private async Task<ServerResponse> RenderToolResultAsync(string json, ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var command = JsonSerializer.Deserialize<RenderToolRequest>(json, ServerJsonSerializer.Options)!;
+        var live = RequireSession(command.ServerSessionId);
+        var manager = live.Runtime.ExtensionManager;
+        if (manager is null) return ServerResponse.Fail(command.Id, command.Type, "not_available", "No extension manager is configured for this session.");
+        var tool = manager.Registry.Tools.FirstOrDefault(t => string.Equals(t.Value.Name, command.Name, StringComparison.Ordinal))?.Value;
+        if (tool is not IAgentToolRenderer { HasRenderResult: true } renderer)
+            return ServerResponse.Fail(command.Id, command.Type, "not_available", $"Tool '{command.Name}' does not support result rendering.");
+        var rendered = await renderer.RenderResultAsync(
+            new ToolRenderRequest(command.ToolCallId, command.Name, command.Arguments, Result: null, IsPartial: false, IsError: command.IsError, command.IsExpanded, command.Width),
+            cancellationToken);
+        return ServerResponse.Ok(command.Id, command.Type, new { lines = rendered?.Lines ?? [] });
     }
 
     private async Task<ServerResponse> CycleThinkingLevelAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
@@ -58,6 +59,9 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly object _sync = new();
     private readonly List<Func<AgentHarnessEvent, CancellationToken, Task>> _listeners = [];
+    private readonly ConcurrentDictionary<string, IAgentTool?> _resolvedTools = new(StringComparer.Ordinal);
+    /// <summary>Arguments placeholder sent when a render request carries no arguments (result renders without a transcript row).</summary>
+    private static readonly JsonElement EmptyArguments = JsonDocument.Parse("{}").RootElement.Clone();
 
     private ClientSessionState _state = ClientSessionState.Empty;
     private ModelDescriptor? _model;
@@ -298,6 +302,68 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         return response.Success
             ? FromServerPayload<IReadOnlyList<string>>(response.Data) ?? []
             : [];
+    }
+
+    // --- remote tool resolution + rendering (resolve_tool / render_tool_call / render_tool_result) ---
+
+    /// <summary>
+    /// Resolves a daemon-hosted extension tool over <c>resolve_tool</c>, caching per name so the
+    /// TUI's per-event render path does not re-round-trip. Sync-over-async matches the
+    /// <c>CompleteCommand</c> wiring pattern in InteractiveMode; a failed resolution caches null so
+    /// the TUI keeps its text-row fallback instead of re-querying the daemon every event.
+    /// </summary>
+    public IAgentTool? ResolveTool(string name)
+    {
+        if (_resolvedTools.TryGetValue(name, out var cached)) return cached;
+        var tool = ResolveToolCoreAsync(name, CancellationToken.None).GetAwaiter().GetResult();
+        _resolvedTools.TryAdd(name, tool);
+        return tool;
+    }
+
+    private async Task<IAgentTool?> ResolveToolCoreAsync(string name, CancellationToken token)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.ResolveTool, ServerSessionId: RequireSessionId()),
+            new { name },
+            token);
+        if (!response.Success) return null;
+        var wire = FromServerPayload<ExtensionToolWire>(response.Data);
+        return wire is null ? null : new RemoteRegisteredTool(wire, this);
+    }
+
+    /// <summary>
+    /// Asks the daemon to render a tool-call line for the named tool. Returns null when the daemon
+    /// cannot render (unknown tool, missing renderer, or a failed command) so the TUI falls back to
+    /// its plain text row.
+    /// </summary>
+    public async Task<ToolRenderResult?> RenderToolCallAsync(string name, ToolRenderRequest request, CancellationToken token = default)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.RenderToolCall, ServerSessionId: RequireSessionId()),
+            new RenderToolRequest(ServerCommandTypes.RenderToolCall, null, RequireSessionId(), name, request.ToolCallId, request.Arguments ?? EmptyArguments, IsCall: true, IsError: false, IsExpanded: request.Expanded, Width: request.Width),
+            token);
+        return ReadRenderLines(response);
+    }
+
+    /// <summary>
+    /// Asks the daemon to render a tool-result line for the named tool. Returns null when the daemon
+    /// cannot render (unknown tool, missing renderer, or a failed command) so the TUI falls back to
+    /// its plain text row.
+    /// </summary>
+    public async Task<ToolRenderResult?> RenderToolResultAsync(string name, ToolRenderRequest request, CancellationToken token = default)
+    {
+        var response = await SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.RenderToolResult, ServerSessionId: RequireSessionId()),
+            new RenderToolRequest(ServerCommandTypes.RenderToolResult, null, RequireSessionId(), name, request.ToolCallId, request.Arguments ?? EmptyArguments, IsCall: false, IsError: request.IsError, IsExpanded: request.Expanded, Width: request.Width),
+            token);
+        return ReadRenderLines(response);
+    }
+
+    private static ToolRenderResult? ReadRenderLines(ServerResponse response)
+    {
+        if (!response.Success) return null;
+        var wire = FromServerPayload<RenderLinesWire>(response.Data);
+        return wire is null ? null : new ToolRenderResult(wire.Lines ?? []);
     }
 
     public async Task<TuiInputHookResult> ProcessInputAsync(string text, IReadOnlyList<ImageContent>? images, string source, CancellationToken token = default)
@@ -744,4 +810,5 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     private sealed record ShortcutValueWire(string Keys, string Description);
     private sealed record ThinkingLevelWire(string? Level);
     private sealed record TextWire(string? Text);
+    private sealed record RenderLinesWire(IReadOnlyList<string>? Lines);
 }

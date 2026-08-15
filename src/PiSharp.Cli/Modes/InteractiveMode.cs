@@ -409,7 +409,7 @@ public static class InteractiveMode
                 ? []
                 : backend.GetExtensionShortcutsAsync(CancellationToken.None).GetAwaiter().GetResult(),
             GetExtensionRegistry: () => null,
-            ResolveTool: _ => null,
+            ResolveTool: backend.ResolveTool,
             CycleThinkingLevelAsync: backend.CycleThinkingLevelAsync,
             ProcessFileReferencesAsync: async (text, workingDirectory, token) =>
             {

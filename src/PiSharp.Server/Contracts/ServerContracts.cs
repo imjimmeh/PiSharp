@@ -42,6 +42,8 @@ public static class ServerCommandTypes
     public const string GetExtensionShortcuts = "get_extension_shortcuts";
     public const string GetExtensionRegistry = "get_extension_registry";
     public const string ResolveTool = "resolve_tool";
+    public const string RenderToolCall = "render_tool_call";
+    public const string RenderToolResult = "render_tool_result";
     public const string CycleThinkingLevel = "cycle_thinking_level";
     public const string GetAvailableModels = "get_available_models";
     public const string GetCommands = "get_commands";
@@ -169,6 +171,25 @@ public sealed record CompleteCommandRequest(string Type, string? Id, string Serv
 public sealed record ProcessInputRequest(string Text, IReadOnlyList<ImageContent>? Images = null, string Source = "interactive");
 public sealed record ProcessInputResult(bool Handled, string Text, IReadOnlyList<ImageContent>? Images = null);
 public sealed record ResolveToolRequest(string Type, string? Id, string ServerSessionId, string Name);
+
+/// <summary>
+/// Request for <see cref="ServerCommandTypes.RenderToolCall"/> / <see cref="ServerCommandTypes.RenderToolResult"/>:
+/// the client asks the daemon to render a tool call/result line for a registered extension tool that
+/// implements <see cref="PiSharp.Agent.Core.Tools.IAgentToolRenderer"/>. The daemon answers
+/// <c>{ lines: [...] }</c>; non-renderable or unknown tools answer <c>not_available</c> so the
+/// client TUI falls back to its plain text rows.
+/// </summary>
+public sealed record RenderToolRequest(
+    string Type,
+    string? Id,
+    string ServerSessionId,
+    string Name,
+    string ToolCallId,
+    JsonElement Arguments,
+    bool IsCall,
+    bool IsError,
+    bool IsExpanded,
+    int Width);
 public sealed record UiResponseCommand(string Type, string? Id, string ServerSessionId, string RequestId, object? Value = null, bool Cancelled = false);
 
 /// <summary>Request for the <see cref="ServerCommandTypes.McpStatus"/> command (read-only, session-independent).</summary>
