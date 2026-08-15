@@ -66,6 +66,8 @@ public static class DaemonCommandHost
                 Task.FromResult(string.IsNullOrWhiteSpace(text)
                     ? []
                     : SlashCommandRegistryFactory.Create(session.Runtime).Complete(text)),
+            GetCommandsAsync = (session, ct) =>
+                Task.FromResult<IReadOnlyList<string>>(SlashCommandRegistryFactory.Create(session.Runtime).Commands.Select(c => "/" + c.Name).ToArray()),
             ProcessInputAsync = async (request, ct) =>
             {
                 var runtime = resolveSession?.Invoke()?.Runtime ?? throw new InvalidOperationException("No daemon session available for process_input.");

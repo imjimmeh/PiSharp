@@ -30,6 +30,20 @@ public sealed class DaemonCommandHostTests
     }
 
     [Fact]
+    public async Task GetCommands_ReturnsSlashCommandNames()
+    {
+        var runtime = await ModeTestRuntime.CreateAsync();
+        await using var live = new LiveServerSession("test-session", runtime);
+        var options = DaemonCommandHost.CreateHostOptions("key");
+
+        var commands = await options.GetCommandsAsync!(live, CancellationToken.None);
+
+        Assert.Contains("/settings", commands);
+        Assert.Contains("/quit", commands);
+        Assert.All(commands, command => Assert.StartsWith("/", command));
+    }
+
+    [Fact]
     public void CreateHostOptionsWiresEveryCommandDelegate()
     {
         var options = DaemonCommandHost.CreateHostOptions("key");
@@ -40,6 +54,7 @@ public sealed class DaemonCommandHostTests
         Assert.NotNull(options.GetStartupMessagesAsync);
         Assert.NotNull(options.PostStartupChecksAsync);
         Assert.NotNull(options.GetMcpStatusAsync);
+        Assert.NotNull(options.GetCommandsAsync);
     }
 
     private sealed class FakeUiBridge : IServerUiBridge

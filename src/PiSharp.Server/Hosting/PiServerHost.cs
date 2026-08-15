@@ -48,6 +48,7 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
             options.ProcessInputAsync,
             options.GetStartupMessagesAsync,
             options.PostStartupChecksAsync,
+            GetCommandsAsync: options.GetCommandsAsync,
             GetMcpStatusAsync: options.GetMcpStatusAsync,
             OnShutdown: _ => StopAsync()));
         builder.Services.AddSingleton(new ThemeRegistry());

@@ -29,4 +29,5 @@ public sealed record PiServerHostOptions
     public Func<LiveServerSession, CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync { get; init; }
     public Func<LiveServerSession, Action<string>, CancellationToken, Task>? PostStartupChecksAsync { get; init; }
     public Func<CancellationToken, Task<McpStatusResult>>? GetMcpStatusAsync { get; init; }
+    public Func<LiveServerSession, CancellationToken, Task<IReadOnlyList<string>>>? GetCommandsAsync { get; init; }
 }

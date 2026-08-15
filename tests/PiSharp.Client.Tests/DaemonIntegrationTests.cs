@@ -282,6 +282,72 @@ public sealed class DaemonIntegrationTests
     }
 
     [Fact]
+    public async Task GetCommands_ReturnsDaemonCommandNames_OverRealTransport()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+            GetCommandsAsync = (session, ct) =>
+                Task.FromResult<IReadOnlyList<string>>(new[] { "/settings", "/quit" }),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        await using var backend = new RemoteTuiBackend(conn)
+        {
+            ServerSessionId = sessionId,
+        };
+
+        // The daemon answers with the command names; the client surfaces them, not not_available.
+        var commands = await backend.GetCommandsAsync();
+        Assert.Equal(new[] { "/settings", "/quit" }, commands);
+    }
+
+    [Fact]
+    public async Task GetCommands_WithoutDelegate_ReturnsEmpty_DoesNotThrow()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        await using var backend = new RemoteTuiBackend(conn)
+        {
+            ServerSessionId = sessionId,
+        };
+
+        // A delegate-less daemon answers not_available; the client tolerates it and returns [].
+        var commands = await backend.GetCommandsAsync();
+        Assert.Empty(commands);
+    }
+
+    [Fact]
     public async Task DaemonSession_WithAttachedClient_ApprovalClient_ReturnsAllow()
     {
         var root = NewTempDir();

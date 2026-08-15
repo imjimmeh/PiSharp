@@ -313,6 +313,7 @@ public sealed record PiServerCommandDelegates(
     Func<LiveServerSession, CancellationToken, Task<ServerStartupMessages>>? GetStartupMessagesAsync = null,
     Func<LiveServerSession, Action<string>, CancellationToken, Task>? PostStartupChecksAsync = null,
     Func<CancellationToken, Task<McpStatusResult>>? GetMcpStatusAsync = null,
+    Func<LiveServerSession, CancellationToken, Task<IReadOnlyList<string>>>? GetCommandsAsync = null,
     Func<CancellationToken, Task>? OnShutdown = null);
 
 // --- P05: daemon theme authority surface (plan C8) ---

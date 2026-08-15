@@ -168,7 +168,7 @@ public sealed class PiServerWebSocketHandler(
                 ServerCommandTypes.ResolveTool => await ResolveToolAsync(json, envelope),
                 ServerCommandTypes.CycleThinkingLevel => await CycleThinkingLevelAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetAvailableModels => GetAvailableModels(envelope),
-                ServerCommandTypes.GetCommands => GetCommandsNotAvailable(envelope),
+                ServerCommandTypes.GetCommands => await GetCommandsAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetLastAssistantText => await GetLastAssistantTextAsync(envelope, cancellationToken),
                 ServerCommandTypes.GetStartupMessages => await GetStartupMessagesAsync(envelope, cancellationToken),
                 ServerCommandTypes.PostStartupChecks => await PostStartupChecksAsync(envelope, cancellationToken),
@@ -740,8 +740,13 @@ public sealed class PiServerWebSocketHandler(
     private static ServerResponse GetAvailableModels(ServerCommandEnvelope envelope)
         => ServerResponse.Ok(envelope.Id, envelope.Type, PublicApi.Models.Select(m => m.Descriptor).ToArray());
 
-    private static ServerResponse GetCommandsNotAvailable(ServerCommandEnvelope envelope)
-        => ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", "Command discovery is not available on this daemon.");
+    private async Task<ServerResponse> GetCommandsAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
+    {
+        var live = RequireSession(RequiredSessionId(envelope));
+        if (delegates?.GetCommandsAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
+        var commands = await delegates.GetCommandsAsync(live, cancellationToken);
+        return ServerResponse.Ok(envelope.Id, envelope.Type, commands);
+    }
 
     private async Task<ServerResponse> GetLastAssistantTextAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
