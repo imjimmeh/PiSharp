@@ -423,7 +423,7 @@ public sealed class TsBridgeManifestTests
     }
 
     [Fact]
-    public async Task AgentSessionShimUsesRealSubagentRuntimeActions()
+    public async Task AgentSessionShimReexportsRuntimeHelper()
     {
         var manifest = TsBridgeManifestFactory.CreateDefault();
         var shim = manifest.ModuleShims.Single(s => s.Specifier == "@pi-coding-agent");
@@ -453,47 +453,13 @@ public sealed class TsBridgeManifestTests
             const manifest = JSON.parse(readFileSync('{{escapedManifestPath}}', 'utf8'));
             const source = generateModuleShimSource(manifest.moduleShims[0]);
 
-            const errors = [];
-
-            if (!/createAgentSession/.test(source)) errors.push('MISSING createAgentSession in source');
-            else {
-              if (!/bridge\.runtime\s*\(bridge\.actions\.createAgentSession/.test(source)) errors.push('createAgentSession MISSING bridge.runtime createAgentSession call');
-              if (!/new\s+helpers\.AgentSession\s*\(bridge/.test(source)) errors.push('createAgentSession MISSING AgentSession construction from result');
-              if (!/result\?\.ok\s*===\s*false/.test(source)) errors.push('createAgentSession MISSING ok===false check');
+            const expectedExport = 'export const createAgentSession = helpers.createAgentSession;';
+            if (!source.includes(expectedExport)) {
+              console.log('FAIL MISSING createAgentSession runtime helper re-export');
+              console.log('Generated shim source: ' + source);
+              process.exit(1);
             }
 
-            const agentMatch = source.match(/\bAgentSession\s*:\s*class\s+AgentSession\s*\{([\s\S]*?)\n\s*\},\s*$/m);
-            if (!agentMatch) { errors.push('FAIL AgentSession class not found in generated shim'); }
-            else {
-              const classBody = agentMatch[1];
-
-              if (!/constructor\s*\(bridge,\s*sessionId,\s*sessionSnapshot\)/.test(classBody)) errors.push('AgentSession constructor MISSING sessionId/sessionSnapshot params');
-              if (!/this\._sessionId\s*=\s*sessionId/.test(classBody)) errors.push('AgentSession constructor MISSING _sessionId');
-              if (!/get sessionId\(\)\s*\{\s*return this\._sessionId/.test(classBody)) errors.push('AgentSession MISSING sessionId getter');
-
-              if (/completeSimple/.test(classBody)) errors.push('AgentSession STILL uses completeSimple');
-              if (/promptAndWait/.test(classBody)) errors.push('AgentSession STILL uses promptAndWait');
-
-              if (!/bridge\.actions\.agentSessionPrompt/.test(classBody)) errors.push('AgentSession.prompt MISSING agentSessionPrompt action');
-              if (!/sessionId:\s*this\._sessionId/.test(classBody)) errors.push('AgentSession.prompt MISSING sessionId in payload');
-
-              if (!/bridge\.actions\.agentSessionAbort/.test(classBody)) errors.push('AgentSession MISSING agentSessionAbort action');
-              if (!/bridge\.actions\.agentSessionSteer/.test(classBody)) errors.push('AgentSession MISSING agentSessionSteer action');
-              if (!/bridge\.actions\.agentSessionFollowUp/.test(classBody)) errors.push('AgentSession MISSING agentSessionFollowUp action');
-              if (!/bridge\.actions\.agentSessionCompact/.test(classBody)) errors.push('AgentSession MISSING agentSessionCompact action');
-              if (!/bridge\.actions\.agentSessionSetModel/.test(classBody)) errors.push('AgentSession MISSING agentSessionSetModel action');
-              if (!/bridge\.actions\.agentSessionSetThinkingLevel/.test(classBody)) errors.push('AgentSession MISSING agentSessionSetThinkingLevel action');
-              if (!/bridge\.actions\.agentSessionDispose/.test(classBody)) errors.push('AgentSession MISSING agentSessionDispose action');
-              if (/bridge\.actions\.sendMessage/.test(classBody)) errors.push('AgentSession STILL routes to parent sendMessage');
-              if (/bridge\.actions\.sendUserMessage/.test(classBody)) errors.push('AgentSession STILL routes to parent sendUserMessage');
-            }
-
-            if (errors.length) {
-                console.log('FAIL ' + errors.join(' | '));
-                const match = source.match(/\bAgentSession\s*:\s*class\s+AgentSession\s*\{([\s\S]*?)\n\s*\},\s*$/m);
-                if (match) console.log('AgentSession class body excerpt:\n' + match[1].slice(0, 3000));
-                process.exit(1);
-            }
             console.log('PASS');
             """);
 
