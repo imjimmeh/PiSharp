@@ -308,14 +308,13 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
     /// <summary>
     /// Resolves a daemon-hosted extension tool over <c>resolve_tool</c>, caching per name so the
-    /// TUI's per-event render path does not re-round-trip. Sync-over-async matches the
-    /// <c>CompleteCommand</c> wiring pattern in InteractiveMode; a failed resolution caches null so
+    /// TUI's per-event render path does not re-round-trip. A failed resolution caches null so
     /// the TUI keeps its text-row fallback instead of re-querying the daemon every event.
     /// </summary>
-    public IAgentTool? ResolveTool(string name)
+    public async Task<IAgentTool?> ResolveToolAsync(string name, CancellationToken token = default)
     {
         if (_resolvedTools.TryGetValue(name, out var cached)) return cached;
-        var tool = ResolveToolCoreAsync(name, CancellationToken.None).GetAwaiter().GetResult();
+        var tool = await ResolveToolCoreAsync(name, token).ConfigureAwait(false);
         _resolvedTools.TryAdd(name, tool);
         return tool;
     }

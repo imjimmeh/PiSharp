@@ -14,7 +14,7 @@ internal sealed class TuiHarnessSubscription(
     RenderStateStore store,
     Action<CancellationToken> scheduleRender,
     Action<Action> dispatch,
-    Func<string, IAgentTool?>? resolveTool,
+    Func<string, CancellationToken, Task<IAgentTool?>>? resolveTool,
     Func<CancellationToken, Task<TuiSessionSnapshot?>> loadSessionSnapshot,
     Action<TuiSessionSnapshot, bool> applySessionSnapshot,
     TimeSpan? eventBatchInterval = null,
@@ -145,7 +145,7 @@ internal sealed class TuiHarnessSubscription(
         switch (evt)
         {
             case AgentHarnessEvent.Core { Event: AgentEvent.ToolExecutionStart tool }:
-                if (resolveTool?.Invoke(tool.ToolName) is not IAgentToolRenderer { HasRenderCall: true } callRenderer) return false;
+                if (resolveTool is null || await resolveTool(tool.ToolName, token) is not IAgentToolRenderer { HasRenderCall: true } callRenderer) return false;
                 var renderedCall = await callRenderer.RenderCallAsync(new ToolRenderRequest(tool.ToolCallId, tool.ToolName, tool.Arguments.Clone(), null, true, false, false, 120), token);
                 if (renderedCall is { Lines.Count: > 0 })
                 {
@@ -154,7 +154,7 @@ internal sealed class TuiHarnessSubscription(
                 }
                 return false;
             case AgentHarnessEvent.Core { Event: AgentEvent.ToolExecutionEnd tool }:
-                if (resolveTool?.Invoke(tool.ToolName) is not IAgentToolRenderer { HasRenderResult: true } resultRenderer) return false;
+                if (resolveTool is null || await resolveTool(tool.ToolName, token) is not IAgentToolRenderer { HasRenderResult: true } resultRenderer) return false;
                 var existing = store.Snapshot().Transcript.LastOrDefault(item => string.Equals(item.ToolCallId, tool.ToolCallId, StringComparison.Ordinal));
                 var result = tool.Result as AgentToolResult<object?>;
                 var renderedResult = await resultRenderer.RenderResultAsync(new ToolRenderRequest(tool.ToolCallId, tool.ToolName, existing?.ToolArguments?.Clone(), result, false, tool.IsError, existing?.IsExpanded ?? false, 120), token);

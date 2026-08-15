@@ -1,3 +1,6 @@
+using System.Text.Json;
+using PiSharp.Agent.Core.Tools;
+using PiSharp.Agent.Core;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
@@ -86,5 +89,88 @@ public sealed class TuiHarnessLifecycleCoordinatorTests
         Assert.True(renderCalled.Wait(TimeSpan.FromSeconds(2))); // render requested after the batch
         Assert.True(store.Snapshot().IsBusy);                     // TurnStart -> IsBusy=true
         subscription.Dispose();
+    }
+
+    [Fact]
+    public async Task Tool_render_resolution_is_awaited_not_blocked()
+    {
+        var facade = new CapturingFacade();
+        var store = new RenderStateStore(
+            TuiRenderState.Empty("s1", null, new ModelDescriptor("p", "m", "n"), ThinkingLevel.Off, null));
+        var renderCalled = new ManualResetEventSlim(false);
+        var resolverStarted = new ManualResetEventSlim(false);
+        var releaseResolver = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var renderer = new StubToolRenderer();
+        var subscription = new TuiHarnessSubscription(
+            getCurrentRuntime: () => facade,
+            store,
+            scheduleRender: _ => renderCalled.Set(),
+            dispatch: action => action(),
+            resolveTool: async (name, token) =>
+            {
+                resolverStarted.Set();
+                await releaseResolver.Task.WaitAsync(token);
+                return renderer;
+            },
+            loadSessionSnapshot: _ => Task.FromResult<TuiSessionSnapshot?>(null),
+            applySessionSnapshot: (_, _) => { });
+        subscription.Bind();
+
+        var listener = facade.Listener
+            ?? throw new InvalidOperationException("subscription did not subscribe to the facade");
+
+        using var args = JsonDocument.Parse("{}");
+        await Task.Run(() => listener(new AgentHarnessEvent.Core(new AgentEvent.ToolExecutionStart("tc-1", "fmt", args.RootElement.Clone())), CancellationToken.None));
+
+        // The pump worker must await the async resolver instead of blocking on a wire call:
+        // the resolver is invoked, and the store is untouched until it completes.
+        Assert.True(resolverStarted.Wait(TimeSpan.FromSeconds(2)), "async resolver was never invoked");
+        Assert.Null(store.Snapshot().Transcript.SingleOrDefault()?.RenderedToolCall);
+
+        releaseResolver.SetResult();
+        await WaitForConditionAsync(
+            () => store.Snapshot().Transcript.SingleOrDefault()?.RenderedToolCall is { Count: > 0 },
+            TimeSpan.FromSeconds(2));
+        Assert.True(renderCalled.IsSet, "render was not requested after the resolved tool render landed");
+        subscription.Dispose();
+    }
+
+    private sealed class StubToolRenderer : IAgentTool, IAgentToolRenderer
+    {
+        private static readonly JsonDocument Schema = JsonDocument.Parse("{\"type\":\"object\"}");
+
+        public string Name => "fmt";
+        public string Label => "Format";
+        public string Description => "Pretty-prints code";
+        public JsonElement ParametersSchema => Schema.RootElement.Clone();
+        public ToolExecutionMode? ExecutionMode => ToolExecutionMode.Parallel;
+        public bool HasRenderCall => true;
+        public bool HasRenderResult => true;
+
+        public JsonElement PrepareArguments(JsonElement args) => args;
+
+        public Task<AgentToolResult<object?>> ExecuteAsync(
+            string toolCallId,
+            JsonElement parameters,
+            CancellationToken cancellationToken = default,
+            AgentToolUpdateCallback<object?>? onUpdate = null)
+            => Task.FromResult(new AgentToolResult<object?>([], null));
+
+        public Task<ToolRenderResult?> RenderCallAsync(ToolRenderRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult<ToolRenderResult?>(new ToolRenderResult(["formatted call"]));
+
+        public Task<ToolRenderResult?> RenderResultAsync(ToolRenderRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult<ToolRenderResult?>(new ToolRenderResult(["formatted result"]));
+    }
+    private static async Task WaitForConditionAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var stopAt = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < stopAt)
+        {
+            if (condition()) return;
+            await Task.Delay(10);
+        }
+
+        Assert.True(condition(), "Expected condition to become true before timeout.");
     }
 }

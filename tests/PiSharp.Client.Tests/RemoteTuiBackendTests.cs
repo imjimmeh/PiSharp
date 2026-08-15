@@ -331,7 +331,7 @@ public sealed class RemoteTuiBackendTests
         var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
 
-        var tool = backend.ResolveTool("fmt");
+        var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
 
         Assert.NotNull(tool);
         Assert.Equal("fmt", tool.Name);
@@ -343,6 +343,32 @@ public sealed class RemoteTuiBackendTests
         Assert.Equal(ServerCommandTypes.ResolveTool, envelope.Type);
         Assert.Equal(SessionId, envelope.ServerSessionId);
         Assert.Equal("fmt", (string?)PayloadValue(payload, "name"));
+    }
+
+    [Fact]
+    public async Task ResolveToolAsync_does_not_block_on_a_stalled_transport()
+    {
+        using var schema = JsonDocument.Parse("{\"type\":\"object\"}");
+        var wire = new ExtensionToolWire(
+            "fmt", "Format", "Pretty-prints code", schema.RootElement.Clone(),
+            HasRenderCall: true, HasRenderResult: false,
+            RendererName: null, RenderShell: null,
+            ExecutionMode: ToolExecutionMode.Parallel, PromptSnippet: "Use fmt", PromptGuidelines: ["guideline"]);
+        var transport = new BackendFakeTransport
+        {
+            ResponseDelay = TimeSpan.FromMilliseconds(200),
+            Responder = type => type == ServerCommandTypes.ResolveTool
+                ? ServerResponse.Ok("st", type, wire)
+                : ServerResponse.Ok("st", type),
+        };
+        var connection = new ClientSessionConnection(transport);
+        await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
+
+        // Must complete asynchronously: the caller's thread is never blocked on the wire reply.
+        var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
+
+        Assert.NotNull(tool);
+        Assert.Equal("fmt", tool!.Name);
     }
 
     [Fact]
@@ -363,7 +389,7 @@ public sealed class RemoteTuiBackendTests
         var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
 
-        var tool = backend.ResolveTool("fmt");
+        var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
 
         var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
         Assert.False(renderer.HasRenderCall);
@@ -391,7 +417,7 @@ public sealed class RemoteTuiBackendTests
         var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
 
-        var tool = backend.ResolveTool("fmt");
+        var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
         var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
         var rendered = await renderer.RenderCallAsync(
             new ToolRenderRequest("tc-1", "fmt", schema.RootElement.Clone(), null, IsPartial: true, IsError: false, Expanded: false, Width: 120),
@@ -427,7 +453,7 @@ public sealed class RemoteTuiBackendTests
         var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
 
-        var tool = backend.ResolveTool("fmt");
+        var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
         var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
         var rendered = await renderer.RenderResultAsync(
             new ToolRenderRequest("tc-1", "fmt", Arguments: null, null, IsPartial: false, IsError: true, Expanded: true, Width: 120),
@@ -462,7 +488,7 @@ public sealed class RemoteTuiBackendTests
         var connection = new ClientSessionConnection(transport);
         await using var backend = new RemoteTuiBackend(connection) { ServerSessionId = SessionId };
 
-        var tool = backend.ResolveTool("fmt");
+        var tool = await backend.ResolveToolAsync("fmt", CancellationToken.None);
         var renderer = Assert.IsAssignableFrom<IAgentToolRenderer>(tool);
         var rendered = await renderer.RenderCallAsync(
             new ToolRenderRequest("tc-1", "fmt", schema.RootElement.Clone(), null, IsPartial: true, IsError: false, Expanded: false, Width: 120),
@@ -502,6 +528,7 @@ public sealed class RemoteTuiBackendTests
         public Channel<ServerResponse> Late { get; } = Channel.CreateUnbounded<ServerResponse>();
         public List<(ServerCommandEnvelope Envelope, object? Payload)> Commands { get; } = [];
         public Func<string, ServerResponse>? Responder { get; set; }
+        public TimeSpan? ResponseDelay { get; set; }
 
         ChannelReader<ServerEventEnvelope> IClientTransport.Events => Events.Reader;
         ChannelReader<ServerResponse> IClientTransport.LateResponses => Late.Reader;
@@ -511,10 +538,11 @@ public sealed class RemoteTuiBackendTests
         public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
             => SendCommandAsync(envelope, payload: null, ct, timeoutOverride);
 
-        public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
+        public async Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, object? payload, CancellationToken ct, TimeSpan? timeoutOverride = null)
         {
+            if (ResponseDelay is { } delay) await Task.Delay(delay, ct);
             Commands.Add((envelope, payload));
-            return Task.FromResult(Responder?.Invoke(envelope.Type) ?? ServerResponse.Ok(envelope.Id, envelope.Type));
+            return Responder?.Invoke(envelope.Type) ?? ServerResponse.Ok(envelope.Id, envelope.Type);
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

@@ -59,7 +59,7 @@ public sealed record TuiHostOptions(
     IReadOnlyList<TuiKeybinding>? KeybindingsDefaults = null,
     Func<IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>>>? GetExtensionShortcuts = null,
     Func<ExtensionRegistry?>? GetExtensionRegistry = null,
-    Func<string, IAgentTool?>? ResolveTool = null,
+    Func<string, CancellationToken, Task<IAgentTool?>>? ResolveTool = null,
     Func<CancellationToken, Task>? CycleThinkingLevelAsync = null,
     Func<string, string, CancellationToken, Task<(string Text, IReadOnlyList<ImageContent> Images)>>? ProcessFileReferencesAsync = null,
     Func<string, IReadOnlyList<ImageContent>?, string, CancellationToken, Task<TuiInputHookResult>>? ProcessInputAsync = null,

@@ -2,6 +2,7 @@ using System.Text.Json;
 using PiSharp.Cli.IO;
 using PiSharp.Cli.Parsing;
 using PiSharp.Client;
+using PiSharp.Extensions;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
 using Microsoft.Extensions.Logging;
@@ -64,12 +65,12 @@ public static class InteractiveMode
             return new TuiCommandDispatchResult(result.Handled, result.ShouldExit);
         }
 
-        PiSharp.Agent.Core.Tools.IAgentTool? ResolveExtensionTool(string name)
+        Task<PiSharp.Agent.Core.Tools.IAgentTool?> ResolveExtensionTool(string name, CancellationToken token)
         {
             var manager = runtime.ExtensionManager;
-            if (manager is null) return null;
+            if (manager is null) return Task.FromResult<PiSharp.Agent.Core.Tools.IAgentTool?>(null);
             var registration = manager.Registry.Tools.FirstOrDefault(tool => string.Equals(tool.Value.Name, name, StringComparison.Ordinal));
-            return registration?.Value;
+            return Task.FromResult(registration?.Value);
         }
 
         async Task CycleThinkingLevelAsync(CancellationToken token)
@@ -378,13 +379,103 @@ public static class InteractiveMode
             }
         }
 
+        // --- non-blocking remote daemon caches (Task 4) ---
+        // The UI thread and the pump/render workers must never block on a daemon RPC. Each option
+        // body below returns the last fetched value synchronously and refreshes it on a background
+        // worker; a latch keeps at most one fetch in flight per source. Fetch workers publish into
+        // these caches under plain locks — none of the caches is owned by the main loop, so routing
+        // the write through the app context would add latency without a correctness benefit.
+        var shortcutCacheGate = new object();
+        var loadStatusCacheGate = new object();
+        var completionCacheGate = new object();
+        IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>> shortcutCache = [];
+        var loadStatusCache = new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
+        var completionCache = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        int shortcutRefreshInFlight = 0;
+        int loadStatusRefreshInFlight = 0;
+
+        async Task RefreshShortcutCacheAsync()
+        {
+            try
+            {
+                var fetched = await backend.GetExtensionShortcutsAsync(CancellationToken.None).ConfigureAwait(false);
+                lock (shortcutCacheGate) shortcutCache = fetched;
+            }
+            catch (Exception exception)
+            {
+                logger?.LogDebug(exception, "Remote extension shortcut refresh failed; keeping previous cache");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref shortcutRefreshInFlight, 0);
+            }
+        }
+
+        async Task RefreshLoadStatusCacheAsync()
+        {
+            try
+            {
+                var fetched = await backend.GetExtensionLoadStatusAsync(CancellationToken.None).ConfigureAwait(false);
+                lock (loadStatusCacheGate) loadStatusCache = fetched;
+            }
+            catch (Exception exception)
+            {
+                logger?.LogDebug(exception, "Remote extension load status refresh failed; keeping previous cache");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref loadStatusRefreshInFlight, 0);
+            }
+        }
+
+        async Task RefreshCompletionCacheAsync(string text)
+        {
+            try
+            {
+                var completions = await backend.CompleteCommandAsync(text, CancellationToken.None).ConfigureAwait(false);
+                lock (completionCacheGate) completionCache[text] = completions;
+            }
+            catch (Exception exception)
+            {
+                logger?.LogDebug(exception, "Remote command completion refresh failed; keeping previous cache");
+            }
+        }
+
+        IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>> GetCachedRemoteShortcuts()
+        {
+            if (backend.ServerSessionId is null) return [];
+            if (Interlocked.CompareExchange(ref shortcutRefreshInFlight, 1, 0) == 0)
+                _ = Task.Run(() => RefreshShortcutCacheAsync());
+            lock (shortcutCacheGate) return shortcutCache;
+        }
+
+        TuiExtensionLoadStatus GetCachedRemoteLoadStatus()
+        {
+            if (backend.ServerSessionId is null) return new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
+            if (Interlocked.CompareExchange(ref loadStatusRefreshInFlight, 1, 0) == 0)
+                _ = Task.Run(() => RefreshLoadStatusCacheAsync());
+            lock (loadStatusCacheGate) return loadStatusCache;
+        }
+
+        IReadOnlyList<string> GetCachedRemoteCompletions(string text)
+        {
+            lock (completionCacheGate)
+            {
+                if (completionCache.TryGetValue(text, out var cached)) return cached;
+                completionCache[text] = [];
+            }
+
+            _ = Task.Run(() => RefreshCompletionCacheAsync(text));
+            return [];
+        }
+
         var options = new TuiHostOptions(
             backend,
             SessionId: "connecting",
             SessionFile: null,
             backend.GetSessionNameAsync,
             DispatchCommandAsync: backend.DispatchCommandAsync,
-            CompleteCommand: text => backend.CompleteCommandAsync(text, CancellationToken.None).GetAwaiter().GetResult(),
+            CompleteCommand: GetCachedRemoteCompletions,
             WorkingDirectory: cwd,
             FooterSnapshot: CreateRemoteFooterSnapshot,
             ConfigureUiBridge: bridge =>
@@ -405,11 +496,9 @@ public static class InteractiveMode
             },
             Theme: null,
             KeybindingsPath: ResolveRemoteKeybindingsPath(cwd),
-            GetExtensionShortcuts: () => backend.ServerSessionId is null
-                ? []
-                : backend.GetExtensionShortcutsAsync(CancellationToken.None).GetAwaiter().GetResult(),
+            GetExtensionShortcuts: GetCachedRemoteShortcuts,
             GetExtensionRegistry: () => null,
-            ResolveTool: backend.ResolveTool,
+            ResolveTool: backend.ResolveToolAsync,
             CycleThinkingLevelAsync: backend.CycleThinkingLevelAsync,
             ProcessFileReferencesAsync: async (text, workingDirectory, token) =>
             {
@@ -419,9 +508,7 @@ public static class InteractiveMode
             ProcessInputAsync: backend.ProcessInputAsync,
             GetSessionSnapshotAsync: backend.GetSessionSnapshotAsync,
             ForkFromEntryAsync: backend.ForkFromEntryAsync,
-            GetExtensionLoadStatus: () => backend.ServerSessionId is null
-                ? new TuiExtensionLoadStatus(0, 0, 0, 0, 0)
-                : backend.GetExtensionLoadStatusAsync(CancellationToken.None).GetAwaiter().GetResult(),
+            GetExtensionLoadStatus: GetCachedRemoteLoadStatus,
             ExtensionLoadCommandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" },
             LoggerFactory: loggerFactory)
         {
