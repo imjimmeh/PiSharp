@@ -362,6 +362,19 @@ public sealed class TuiShortcutTests
     }
 
     [Fact]
+    public void HotkeyTextRenderFromBindingsIncludesExtensionShortcuts()
+    {
+        var text = TuiHotkeyText.RenderFromBindings(TuiKeybindings.CommandDescriptors,
+            [new TuiExtensionShortcutBinding("extension:test", "ctrl+k", "Run test", [Key.K.WithCtrl], _ => Task.CompletedTask)]);
+
+        Assert.Contains("Built-in shortcuts:", text);
+        Assert.Contains("Extension shortcuts:", text);
+        Assert.Contains("ctrl+k", text);
+        Assert.Contains("Run test", text);
+        Assert.Contains("extension:test", text);
+    }
+
+    [Fact]
     public void PromptEditorDoesNotExposeAppShortcutEvents()
     {
         var eventNames = typeof(PromptEditor).GetEvents().Select(e => e.Name).ToArray();

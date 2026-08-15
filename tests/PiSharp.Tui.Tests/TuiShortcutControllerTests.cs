@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PiSharp.Extensions;
 using PiSharp.Tui.Interactive;
 using Terminal.Gui;
@@ -8,7 +9,7 @@ namespace PiSharp.Tui.Tests;
 public sealed class TuiShortcutControllerTests
 {
     [Fact]
-    public void BuildExtensionShortcutBindingsRejectsInvalidAndBuiltInConflictingShortcuts()
+    public async Task RefreshExtensionShortcutsRejectsInvalidAndBuiltInConflictingShortcuts()
     {
         var errors = new List<string>();
         var controller = new TuiShortcutController(new TuiShortcutControllerOptions(
@@ -21,8 +22,9 @@ public sealed class TuiShortcutControllerTests
             NoExtensionUi.Instance,
             errors.Add));
 
-        var bindings = controller.BuildExtensionShortcutBindings();
+        await controller.RefreshExtensionShortcutsAsync();
 
+        var bindings = controller.BuildExtensionShortcutBindings();
         var binding = Assert.Single(bindings);
         Assert.Equal("extension:ok", binding.SourceId);
         Assert.Equal("ctrl+k", binding.Keys);
@@ -32,7 +34,7 @@ public sealed class TuiShortcutControllerTests
     }
 
     [Fact]
-    public async Task BuildExtensionShortcutBindingsInvokesRegisteredShortcutHandler()
+    public async Task RefreshExtensionShortcutsProducesInvokableBindings()
     {
         string? capturedArgs = null;
         var controller = new TuiShortcutController(new TuiShortcutControllerOptions(
@@ -47,6 +49,8 @@ public sealed class TuiShortcutControllerTests
             NoExtensionUi.Instance,
             _ => { }));
 
+        await controller.RefreshExtensionShortcutsAsync();
+
         var binding = Assert.Single(controller.BuildExtensionShortcutBindings());
         await binding.InvokeAsync(CancellationToken.None);
 
@@ -54,7 +58,7 @@ public sealed class TuiShortcutControllerTests
     }
 
     [Fact]
-    public void BuildExtensionShortcutBindingsCachesUntilInvalidated()
+    public async Task BuildExtensionShortcutBindingsNeverConsultsSourceSynchronously()
     {
         var calls = 0;
         var controller = new TuiShortcutController(new TuiShortcutControllerOptions(
@@ -66,16 +70,42 @@ public sealed class TuiShortcutControllerTests
             NoExtensionUi.Instance,
             _ => { }));
 
-        var first = controller.BuildExtensionShortcutBindings();
-        var second = controller.BuildExtensionShortcutBindings();
+        // The key path must read only the cache and never trigger a (potentially remote) fetch.
+        Assert.Empty(controller.BuildExtensionShortcutBindings());
+        Assert.Empty(controller.BuildExtensionShortcutBindings());
+        Assert.Equal(0, calls);
 
-        Assert.Same(first, second);
+        // A refresh populates the cache and the key path returns it.
+        await controller.RefreshExtensionShortcutsAsync();
+        Assert.Single(controller.BuildExtensionShortcutBindings());
         Assert.Equal(1, calls);
 
+        // Invalidation clears the cache but must not re-read the source from the key path.
         controller.InvalidateExtensionShortcuts();
+        Assert.Empty(controller.BuildExtensionShortcutBindings());
+        Assert.Equal(1, calls);
+    }
 
-        _ = controller.BuildExtensionShortcutBindings();
-        Assert.Equal(2, calls);
+    [Fact]
+    public void BuildExtensionShortcutBindingsDoesNotBlockWhenSourceIsSlow()
+    {
+        var controller = new TuiShortcutController(new TuiShortcutControllerOptions(
+            () =>
+            {
+                // Simulate a remote source that is slow to respond — the key path must never wait on it.
+                Thread.Sleep(2000);
+                return [];
+            },
+            NoExtensionUi.Instance,
+            _ => { }));
+
+        var stopwatch = Stopwatch.StartNew();
+        var bindings = controller.BuildExtensionShortcutBindings();
+        stopwatch.Stop();
+
+        Assert.Empty(bindings);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1),
+            $"Key path blocked on the shortcut source for {stopwatch.Elapsed.TotalMilliseconds:0} ms.");
     }
 
     private static OwnedExtensionRegistration<ExtensionShortcutRegistration> Registration(string sourceId, string keys)

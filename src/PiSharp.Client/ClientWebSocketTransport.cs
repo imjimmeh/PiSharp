@@ -73,7 +73,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
             : uri;
 
         _socket.Options.SetRequestHeader("Authorization", $"Bearer {apiKey}");
-        await _socket.ConnectAsync(endpoint, ct);
+        await _socket.ConnectAsync(endpoint, ct).ConfigureAwait(false);
         _ = Task.Run(() => ReadLoopAsync(_readerCts.Token), CancellationToken.None);
     }
 
@@ -96,7 +96,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         try
         {
             _logger?.LogDebug("WebSocket command sent: {Command}", envelope.Type);
-            await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct);
+            await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct).ConfigureAwait(false);
 
             var effectiveTimeout = timeoutOverride
                 ?? (CommandTimeouts.TryGetValue(envelope.Type, out var tableTimeout) ? tableTimeout : _commandTimeout);
@@ -104,7 +104,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
             linked.CancelAfter(effectiveTimeout);
             try
             {
-                return await tcs.Task.WaitAsync(linked.Token);
+                return await tcs.Task.WaitAsync(linked.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
@@ -147,7 +147,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
             {
                 try
                 {
-                    await _socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "client disposed", CancellationToken.None);
+                    await _socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "client disposed", CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is WebSocketException or ObjectDisposedException or InvalidOperationException)
                 {
@@ -169,7 +169,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         {
             while (!ct.IsCancellationRequested)
             {
-                var json = await ReceiveTextAsync(buffer, ct);
+                var json = await ReceiveTextAsync(buffer, ct).ConfigureAwait(false);
                 if (json is null) return; // server sent a Close frame
 
                 try
@@ -211,7 +211,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         ValueWebSocketReceiveResult result;
         do
         {
-            result = await _socket.ReceiveAsync((Memory<byte>)buffer, ct);
+            result = await _socket.ReceiveAsync((Memory<byte>)buffer, ct).ConfigureAwait(false);
             if (result.MessageType == WebSocketMessageType.Close) return null;
             stream.Write(buffer, 0, result.Count);
         }

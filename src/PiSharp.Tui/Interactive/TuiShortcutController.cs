@@ -10,17 +10,55 @@ public sealed record TuiShortcutControllerOptions(
 
 public sealed class TuiShortcutController(TuiShortcutControllerOptions options)
 {
+    private readonly object _gate = new();
     private IReadOnlyList<TuiExtensionShortcutBinding>? _cachedBindings;
 
     /// <summary>
-    /// Builds the extension shortcut bindings, caching the result so the shortcut source
-    /// (which may be a remote round trip) is not consulted on every keystroke. Call
-    /// <see cref="InvalidateExtensionShortcuts"/> when the source changes (e.g. extensions load).
+    /// Key-path accessor: returns the last asynchronously rebuilt bindings, or an empty list until
+    /// the first <see cref="RefreshExtensionShortcutsAsync"/> lands. It never consults the
+    /// (potentially remote) shortcut source synchronously, so the UI thread can never block on a
+    /// WebSocket round trip while dispatching a keystroke.
     /// </summary>
     public IReadOnlyList<TuiExtensionShortcutBinding> BuildExtensionShortcutBindings()
-        => _cachedBindings ??= BuildCore();
+    {
+        lock (_gate) return _cachedBindings ?? [];
+    }
 
-    public void InvalidateExtensionShortcuts() => _cachedBindings = null;
+    /// <summary>Clears the cached bindings so the key path returns empty until the next refresh.</summary>
+    public void InvalidateExtensionShortcuts()
+    {
+        lock (_gate) _cachedBindings = null;
+    }
+
+    /// <summary>
+    /// Rebuilds the bindings by reading the shortcut source off the caller's thread (the caller is
+    /// typically the UI thread) and atomically swapping them into the cache. A slow or unavailable
+    /// source delays only the background refresh — the key path keeps returning the last good cache
+    /// (or empty) and never blocks. Reportable build errors are surfaced; other failures leave the
+    /// previous cache intact.
+    /// </summary>
+    public async Task RefreshExtensionShortcutsAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<TuiExtensionShortcutBinding> bindings;
+        try
+        {
+            // Task.Run moves the blocking source read off the caller's thread; ConfigureAwait(false)
+            // keeps the continuation (and the cache swap) on a pool thread so nothing here ever
+            // depends on a UI main loop that might be wedged.
+            bindings = await Task.Run(() => BuildCore(), cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            options.ReportError($"Failed to refresh extension shortcuts: {exception.Message}");
+            return;
+        }
+
+        lock (_gate) _cachedBindings = bindings;
+    }
 
     private IReadOnlyList<TuiExtensionShortcutBinding> BuildCore()
     {

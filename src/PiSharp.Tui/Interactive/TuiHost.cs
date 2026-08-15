@@ -177,10 +177,15 @@ public sealed class TuiHost(TuiHostOptions options)
 
         var shortcutController = new TuiShortcutController(new TuiShortcutControllerOptions(
             () => options.GetExtensionShortcuts?.Invoke() ?? [], extensionUi, _ => { }));
-        _ = shortcutController.BuildExtensionShortcutBindings();
-        // Extension shortcuts are cached so the (potentially remote) source isn't consulted on
-        // every keystroke; refresh the cache whenever the extension load state changes.
-        renderCoordinator.OnExtensionShortcutsChanged = () => shortcutController.InvalidateExtensionShortcuts();
+        // Extension shortcuts come from a potentially-remote source, so they are read only on a
+        // background thread (see TuiShortcutController) and never on the UI key path. Kick off the
+        // first refresh here; invalidations below clear the cache and schedule another refresh.
+        _ = shortcutController.RefreshExtensionShortcutsAsync(hostLifetime.Token);
+        renderCoordinator.OnExtensionShortcutsChanged = () =>
+        {
+            shortcutController.InvalidateExtensionShortcuts();
+            _ = shortcutController.RefreshExtensionShortcutsAsync(hostLifetime.Token);
+        };
 
         // sessionRefresh / onAbortRequested are set after construction to break circular dependency with commandController.
         Func<CancellationToken, Task>? sessionRefresh = null;
@@ -199,7 +204,7 @@ public sealed class TuiHost(TuiHostOptions options)
             next => { state = next; renderCoordinator.RequestRender(); },
             () => runtime.Abort(),
             () => appContext.Post(() => appContext.RequestStop(shell.Window)),
-            () => TuiHotkeyText.RenderFromDescriptors(keybindingsStore.CommandDescriptors, options.GetExtensionShortcuts?.Invoke() ?? []),
+            () => TuiHotkeyText.RenderFromBindings(keybindingsStore.CommandDescriptors, shortcutController.BuildExtensionShortcutBindings()),
             commandText => new TuiCommandDispatchRequest(commandText, SelectInlineWithLoggingAsync,
                 (string text, CancellationToken ct) => PromptDialog.InputAsync(text, ct, dispatcher: appContext),
                 (msg, isErr, _) =>
