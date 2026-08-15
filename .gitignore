@@ -536,3 +536,6 @@ docs/plans
 docs/superpowers
 
 javascript/
+# Superpowers SDD plan workspaces (ledger/brief/review scratch)
+
+.superpowers/
