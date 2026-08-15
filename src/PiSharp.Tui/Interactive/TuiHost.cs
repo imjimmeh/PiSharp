@@ -225,7 +225,8 @@ public sealed class TuiHost(TuiHostOptions options)
             options.DispatchCommandAsync,
             token => sessionRefresh?.Invoke(token) ?? Task.CompletedTask,
             () => runtime.Phase,
-            OnAbortRequested: () => onAbortRequested?.Invoke()),
+            OnAbortRequested: () => onAbortRequested?.Invoke(),
+            UpdateState: stateStore.Update),
             options.LoggerFactory);
         // Wire interactive UI requests (select/input/confirm from daemon slash
         // commands or server extension UI) to the local dialog pipeline. With no
@@ -239,7 +240,7 @@ public sealed class TuiHost(TuiHostOptions options)
             => await ConfirmDialog.ConfirmAsync(title, message, ct, dispatcher: appContext) ? "allow" : "deny";
 
         var sessionContext = new TuiSessionContext { CurrentRuntime = runtime, HeaderExpanded = headerExpanded };
-        var stateGateway = new TuiStateGateway(() => stateStore.Snapshot(), s => stateStore.Replace(s), renderCoordinator, appContext, cancellationToken);
+        var stateGateway = new TuiStateGateway(() => stateStore.Snapshot(), s => stateStore.Replace(s), renderCoordinator, appContext, cancellationToken, updateState: stateStore.Update);
         var harnessLifecycle = new TuiHarnessLifecycleCoordinator(
             sessionContext, options, appContext, renderCoordinator,
             stateStore, LoadSessionSnapshotAsync, ApplySessionSnapshot, options.LoggerFactory);

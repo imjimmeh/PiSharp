@@ -11,8 +11,17 @@ internal sealed class TuiStateGateway(
     Action<TuiRenderState> setState,
     TuiRenderCoordinator renderCoordinator,
     ITuiApplicationContext appContext,
-    CancellationToken cancellationToken)
+    CancellationToken cancellationToken,
+    Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState>? updateState = null)
 {
+    private readonly Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState> _updateState =
+        updateState ?? (update =>
+        {
+            var next = update(getState());
+            setState(next);
+            return next;
+        });
+
     internal TuiRenderState State => getState();
 
     internal void Set(TuiRenderState next)
@@ -22,7 +31,10 @@ internal sealed class TuiStateGateway(
     }
 
     internal void Update(Func<TuiRenderState, TuiRenderState> update)
-        => Set(update(getState()));
+    {
+        _updateState(update);
+        renderCoordinator.RequestRender();
+    }
 
     internal async Task RunOnTuiAsync(Action action)
     {

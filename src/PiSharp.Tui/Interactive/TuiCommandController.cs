@@ -14,7 +14,8 @@ public sealed record TuiCommandControllerOptions(
     Func<TuiCommandDispatchRequest, CancellationToken, Task<TuiCommandDispatchResult>>? DispatchCommandAsync = null,
     Func<CancellationToken, Task>? RefreshAfterPossibleSessionChangeAsync = null,
     Func<AgentHarnessPhase>? GetCurrentPhase = null,
-    Action? OnAbortRequested = null);
+    Action? OnAbortRequested = null,
+    Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState>? UpdateState = null);
 
 public sealed class TuiCommandController(TuiCommandControllerOptions options, ILoggerFactory? loggerFactory = null)
 {
@@ -113,9 +114,15 @@ public sealed class TuiCommandController(TuiCommandControllerOptions options, IL
             _commandInProgress = false;
         }
     }
-
     private void SetState(Func<TuiRenderState, TuiRenderState> update)
-        => options.SetState(update(options.GetState()));
+    {
+        if (options.UpdateState is not null)
+        {
+            options.UpdateState(update);
+            return;
+        }
+        options.SetState(update(options.GetState()));
+    }
 
     private static T RunWithoutSynchronizationContext<T>(Func<T> work)
     {

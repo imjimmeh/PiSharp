@@ -120,7 +120,7 @@ internal sealed class TuiTranscriptInteractionController
             _appContext.Post(() =>
             {
                 if (snapshot is not null) _applySessionSnapshot(snapshot, false);
-                _gateway.Set(_gateway.State.AppendSystem("Forked conversation from selected message."));
+                _gateway.Update(s => s.AppendSystem("Forked conversation from selected message."));
                 _renderCoordinator.Render();
             });
         }

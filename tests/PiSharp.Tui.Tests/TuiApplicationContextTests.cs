@@ -19,19 +19,39 @@ namespace PiSharp.Tui.Tests;
 
 public sealed class FakeTuiDispatcher : ITuiDispatcher
 {
+    private readonly object _lock = new();
     private readonly List<Action> _posted = [];
     private readonly Dictionary<object, (TimeSpan Interval, Func<bool> Callback)> _timeouts = [];
     private int _nextToken;
 
-    public IReadOnlyList<Action> Posted => _posted;
-    public int TimeoutCount => _timeouts.Count;
+    public IReadOnlyList<Action> Posted
+    {
+        get
+        {
+            lock (_lock) return _posted.ToArray();
+        }
+    }
+    public int TimeoutCount
+    {
+        get
+        {
+            lock (_lock) return _timeouts.Count;
+        }
+    }
 
-    public void Post(Action action) => _posted.Add(action);
+    public void Post(Action action)
+    {
+        lock (_lock) _posted.Add(action);
+    }
 
     public void PumpPosted()
     {
-        var actions = _posted.ToArray();
-        _posted.Clear();
+        Action[] actions;
+        lock (_lock)
+        {
+            actions = _posted.ToArray();
+            _posted.Clear();
+        }
         foreach (var action in actions) action();
     }
 

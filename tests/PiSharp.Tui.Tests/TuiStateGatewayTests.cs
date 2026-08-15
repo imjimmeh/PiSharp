@@ -46,4 +46,38 @@ public sealed class TuiStateGatewayTests
 
         Assert.NotSame(before, gateway.State);
     }
+
+    [Fact]
+    public void UpdateUsesAtomicStoreUpdateWhenProvided()
+    {
+        var appContext = new FakeTuiApplicationContext();
+        var store = new RenderStateStore(EmptyState());
+        var shell = new TuiShellView();
+        var renderCoordinator = new TuiRenderCoordinator(
+            shell, store.Snapshot, store.Replace, appContext, EmptyFooterSnapshot);
+        var gateway = new TuiStateGateway(
+            store.Snapshot, store.Replace, renderCoordinator, appContext, CancellationToken.None,
+            updateState: store.Update);
+
+        Parallel.For(0, 500, _ => gateway.Update(s => s with { PendingMessageCount = s.PendingMessageCount + 1 }));
+
+        Assert.Equal(500, store.Snapshot().PendingMessageCount);
+    }
+
+    [Fact]
+    public void UpdateWithoutAtomicUpdaterStillAppliesTransformAndRequestsRender()
+    {
+        var appContext = new FakeTuiApplicationContext();
+        var state = EmptyState();
+        var shell = new TuiShellView();
+        var renderCoordinator = new TuiRenderCoordinator(
+            shell, () => state, s => state = s, appContext, EmptyFooterSnapshot);
+        var gateway = new TuiStateGateway(
+            () => state, s => state = s, renderCoordinator, appContext, CancellationToken.None);
+
+        gateway.Update(s => s.AppendSystem("hello"));
+
+        Assert.Contains(state.Transcript, item => (item.Text ?? string.Empty).Contains("hello"));
+        Assert.Single(appContext.Dispatcher.Posted);
+    }
 }

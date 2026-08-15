@@ -63,7 +63,7 @@ internal sealed class TuiShortcutActionHandler
 
         _session.AbortPending = true;
         _session.CurrentRuntime.Abort();
-        _gateway.Set(_gateway.State.AppendSystem("Abort requested.",
+        _gateway.Update(s => s.AppendSystem("Abort requested.",
             systemMessageTag: "abort",
             removeDelayAfterEvent: TimeSpan.FromSeconds(2),
             expiresAfter: TimeSpan.FromSeconds(30)) with

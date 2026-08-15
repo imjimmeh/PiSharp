@@ -116,11 +116,10 @@ internal sealed class TuiPromptSubmissionCoordinator
                 _session.CurrentRuntime.Steer(AgentMessages.User(content));
                 await _gateway.RunOnTuiAsync(() =>
                 {
-                    var pendingCount = _gateway.State.PendingMessageCount + 1;
-                    _gateway.Set(_gateway.State.AppendSystem($"Message queued ({pendingCount} pending).",
+                    _gateway.Update(s => s.AppendSystem($"Message queued ({s.PendingMessageCount + 1} pending).",
                         expiresAfter: TimeSpan.FromSeconds(6),
                         systemMessageTag: "pending-message") with
-                    { PendingMessageCount = pendingCount });
+                    { PendingMessageCount = s.PendingMessageCount + 1 });
                 }).ConfigureAwait(false);
             }
         }

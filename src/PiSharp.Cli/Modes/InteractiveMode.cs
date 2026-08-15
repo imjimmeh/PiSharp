@@ -393,6 +393,7 @@ public static class InteractiveMode
         var completionCache = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         int shortcutRefreshInFlight = 0;
         int loadStatusRefreshInFlight = 0;
+        int completionRefreshInFlight = 0;
 
         async Task RefreshShortcutCacheAsync()
         {
@@ -440,6 +441,10 @@ public static class InteractiveMode
                 logger?.LogDebug(exception, "Remote command completion refresh failed; keeping previous cache");
                 lock (completionCacheGate) if (completionCache.TryGetValue(text, out var cached) && cached.Count == 0) completionCache.Remove(text);
             }
+            finally
+            {
+                Interlocked.Exchange(ref completionRefreshInFlight, 0);
+            }
         }
 
         IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>> GetCachedRemoteShortcuts()
@@ -466,7 +471,8 @@ public static class InteractiveMode
                 completionCache[text] = [];
             }
 
-            _ = Task.Run(() => RefreshCompletionCacheAsync(text));
+            if (Interlocked.CompareExchange(ref completionRefreshInFlight, 1, 0) == 0)
+                _ = Task.Run(() => RefreshCompletionCacheAsync(text));
             return [];
         }
 
