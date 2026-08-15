@@ -284,7 +284,7 @@ public sealed class McpClientHost : IDisposable
                 _context.Log($"MCP: rejecting contributed server '{name}' (settings configuration wins).");
                 continue;
             }
-            var withSource = contributed with { Name = name, Source = $"extension:{contributed.Source}" };
+            var withSource = contributed with { Name = name, Source = $"extension:{contributed.SourceId ?? contributed.Source}" };
             _knownServers[name] = withSource;
             if (withSource.Validate(out var error))
             {

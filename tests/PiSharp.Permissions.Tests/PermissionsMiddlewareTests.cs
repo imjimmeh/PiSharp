@@ -7,6 +7,7 @@ using Xunit;
 
 namespace PiSharp.Permissions.Tests;
 
+[Collection("CapabilityGates")]
 public sealed class PermissionsMiddlewareTests
 {
     private static JsonElement Args(object args) => JsonSerializer.SerializeToElement(args);
@@ -293,6 +294,92 @@ public sealed class PermissionsMiddlewareTests
         Assert.False(context.Blocked);
         Assert.True(nextCalled);
         Assert.Empty(ui.Requests);
+    }
+
+
+
+    // --- Fail-closed unknown tools (Phase F) ---
+
+    [Fact]
+    public async Task UnknownTool_HeadlessPrompt_Blocks()
+    {
+        var (api, middleware) = await CreateGateAsync(); // HasUi=false, headless prompt
+        var (context, nextCalled) = await RunWithNextFlagAsync(middleware, "my-custom-tool", Args(new { input = "x" }));
+
+        Assert.True(context.Blocked);
+        Assert.False(nextCalled);
+        Assert.Contains("headless", context.BlockReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UnknownToolWithCommand_HeadlessPrompt_Blocks()
+    {
+        var (_, middleware) = await CreateGateAsync();
+        var (context, nextCalled) = await RunWithNextFlagAsync(middleware, "my-runner", Args(new { command = "run.sh" }));
+
+        Assert.True(context.Blocked);
+        Assert.False(nextCalled);
+    }
+
+    [Fact]
+    public async Task McpToolWithCommand_HeadlessPrompt_Blocks()
+    {
+        var (_, middleware) = await CreateGateAsync();
+        var (context, nextCalled) = await RunWithNextFlagAsync(middleware, "mcp.fileserver.exec", Args(new { command = "run.sh" }));
+
+        Assert.True(context.Blocked);
+        Assert.False(nextCalled);
+    }
+
+    [Fact]
+    public async Task UnknownTool_InteractivePrompt_Asks()
+    {
+        var ui = new FakeApprovalUi();
+        ui.EnqueueVerdict("allow");
+        var (api, middleware) = await CreateGateAsync(a =>
+        {
+            a.HasUi = true;
+            a.Ui = ui;
+        });
+
+        var (context, nextCalled) = await RunWithNextFlagAsync(middleware, "my-custom-tool", Args(new { input = "x" }));
+
+        Assert.False(context.Blocked);
+        Assert.True(nextCalled);
+        Assert.Single(ui.Requests);
+    }
+
+    [Fact]
+    public async Task UnknownTool_AutomaticMode_Allows()
+    {
+        var ui = new FakeApprovalUi();
+        var (_, middleware) = await CreateGateAsync(a =>
+        {
+            a.HasUi = true;
+            a.Ui = ui;
+            a.Settings.SetAsync("mode", PermissionsPolicy.ModeAutomatic).Wait();
+        });
+
+        var (context, nextCalled) = await RunWithNextFlagAsync(middleware, "my-custom-tool", Args(new { input = "x" }));
+
+        Assert.False(context.Blocked);
+        Assert.True(nextCalled);
+        Assert.Empty(ui.Requests);
+    }
+
+    [Fact]
+    public async Task UnknownTool_StrictMode_Blocks()
+    {
+        var (_, middleware) = await CreateGateAsync(a =>
+        {
+            a.Settings.SetAsync("mode", PermissionsPolicy.ModeStrict).Wait();
+            a.Settings.SetAsync("allow", new List<PermissionRule> { new("read") }).Wait();
+        });
+
+        var (context, nextCalled) = await RunWithNextFlagAsync(middleware, "my-custom-tool", Args(new { input = "x" }));
+
+        Assert.True(context.Blocked);
+        Assert.False(nextCalled);
     }
 
     [Fact]

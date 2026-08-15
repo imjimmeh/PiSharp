@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using PiSharp.Ai.Auth;
+using PiSharp.Extensions;
 
 namespace PiSharp.Mcp;
 
@@ -56,7 +57,8 @@ public sealed record McpServerConfig(
     string HttpMode = "streamable-http",
     IReadOnlyDictionary<string, string>? Headers = null,
     McpAuthConfig? Auth = null,
-    bool Enabled = true)
+    bool Enabled = true,
+    string? SourceId = null)
 {
     private static readonly Regex NamePattern = new("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$", RegexOptions.CultureInvariant);
 
@@ -135,13 +137,15 @@ public sealed record McpCredential(string AccessToken, string? RefreshToken = nu
 public sealed record McpTransportContext(
     IOAuthStorage? AuthStorage,
     Func<string, CancellationToken, Task> OpenUrlAsync,
-    Action<string> Log)
+    Action<string> Log,
+    SpawnApproval? SpawnGate = null)
 {
     public static McpTransportContext Create(
         IOAuthStorage? authStorage,
         Func<string, CancellationToken, Task>? openUrlAsync = null,
-        Action<string>? log = null)
-        => new(authStorage, openUrlAsync ?? McpBrowserLauncher.OpenAsync, log ?? (_ => { }));
+        Action<string>? log = null,
+        SpawnApproval? spawnGate = null)
+        => new(authStorage, openUrlAsync ?? McpBrowserLauncher.OpenAsync, log ?? (_ => { }), spawnGate);
 }
 
 /// <summary>

@@ -212,7 +212,6 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
             ReplaySkills(runtime.Harness);
             extensionManager.Registry.Changed += ApplyExtensionRegistryChangeAsync;
         }
-
         PopulateResourceBinding(binding, runtime);
     }
 

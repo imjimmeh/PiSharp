@@ -21,20 +21,48 @@ public sealed class DangerousOpDetectorTests
 
     [Theory]
     [InlineData("git reset --hard HEAD")]
-    [InlineData("rm -rf /tmp/build")]
-    public void BashCategoryOf_DestructiveCommands_ClassifyGitPush(string command)
+    [InlineData("git reset --hard HEAD~2")]
+    [InlineData("git -C /repo reset --hard")]
+    public void BashCategoryOf_GitResetHard_ClassifyGitPush(string command)
     {
         Assert.Equal(DangerousOpDetector.GitPush, DangerousOpDetector.BashCategoryOf(command));
         Assert.NotEqual(DangerousOpDetector.Bash, DangerousOpDetector.BashCategoryOf(command));
     }
 
     [Theory]
-    [InlineData("echo hello")]
-    [InlineData("git status")]
-    [InlineData("npm test")]
-    public void BashCategoryOf_OrdinaryCommands_ClassifyBash(string command)
+    [InlineData("rm -rf /tmp/build")]
+    [InlineData("rm --recursive --force /")]
+    [InlineData("rm -fr /")]
+    [InlineData("rm -r -f /")]
+    [InlineData("rm -rfv /")]
+    [InlineData("rm -f -r /")]
+    [InlineData("sudo rm -rf /var/tmp")]
+    [InlineData("cd /opt && rm -rf node_modules")]
+    public void BashCategoryOf_RmRfVariants_ClassifyRmRf(string command)
     {
-        Assert.Equal(DangerousOpDetector.Bash, DangerousOpDetector.BashCategoryOf(command));
+        Assert.Equal(DangerousOpDetector.RmRf, DangerousOpDetector.BashCategoryOf(command));
+        Assert.NotEqual(DangerousOpDetector.Bash, DangerousOpDetector.BashCategoryOf(command));
+        Assert.NotEqual(DangerousOpDetector.GitPush, DangerousOpDetector.BashCategoryOf(command));
+    }
+
+
+    [Fact]
+    public void BashCategoryOf_LongFlagRecursiveForce_IsNotPlainBash()
+    {
+        // Regression: today RmRfPattern(\brm\s+-[a-zA-Z]*r[a-zA-Z]*f\b) misses
+        // "--recursive --force" spelled with long flags.
+        Assert.NotEqual(DangerousOpDetector.Bash, DangerousOpDetector.BashCategoryOf("rm --recursive --force /"));
+        Assert.Equal(DangerousOpDetector.RmRf, DangerousOpDetector.BashCategoryOf("rm --recursive --force /"));
+    }
+
+    [Theory]
+    [InlineData("rm -r /tmp")]
+    [InlineData("rm -f /tmp/file")]
+    [InlineData("rmdir -rf /tmp")]
+    [InlineData("rm --recursive /tmp")]
+    [InlineData("rm --force /tmp/file")]
+    public void BashCategoryOf_NonRmRfCombos_ClassifyBash(string command)
+    {
         Assert.Equal(DangerousOpDetector.Bash, DangerousOpDetector.BashCategoryOf(command));
     }
 
@@ -150,14 +178,114 @@ public sealed class DangerousOpDetectorTests
     }
 
     [Fact]
-    public async Task CategoryAsync_UnlistedTool_None()
+    public async Task CategoryAsync_UnlistedTool_IsUnknown()
     {
         var env = new FakeExecutionEnv { Cwd = "C:/project" };
         var args = JsonSerializer.SerializeToElement(new { });
 
         var category = await DangerousOpDetector.CategoryAsync("my-tool", args, env);
 
+        Assert.Equal(DangerousOpDetector.Unknown, category);
+    }
+
+    [Fact]
+    public async Task CategoryAsync_ReadTool_IsNone()
+    {
+        var env = new FakeExecutionEnv { Cwd = "C:/project" };
+        var args = JsonSerializer.SerializeToElement(new { path = "anywhere.txt" });
+
+        var category = await DangerousOpDetector.CategoryAsync("read", args, env);
+
         Assert.Equal(DangerousOpDetector.None, category);
+    }
+
+    [Fact]
+    public async Task CategoryAsync_UnknownToolWithInsidePath_IsUnknown()
+    {
+        var env = new FakeExecutionEnv { Cwd = "C:/project" };
+        var args = JsonSerializer.SerializeToElement(new { path = "notes/new.txt" });
+
+        var category = await DangerousOpDetector.CategoryAsync("my-tool", args, env);
+
+        Assert.Equal(DangerousOpDetector.Unknown, category);
+    }
+
+    [Fact]
+    public async Task CategoryAsync_UnknownToolWithOutsidePath_IsWriteOutsideCwd()
+    {
+        var env = new FakeExecutionEnv { Cwd = "C:/project" };
+        var args = JsonSerializer.SerializeToElement(new { path = "../outside.txt" });
+
+        var category = await DangerousOpDetector.CategoryAsync("my-tool", args, env);
+
+        Assert.Equal(DangerousOpDetector.WriteOutsideCwd, category);
+    }
+
+    [Fact]
+    public async Task CategoryAsync_McpToolWithCommand_IsMcpSpawn()
+    {
+        var env = new FakeExecutionEnv { Cwd = "C:/project" };
+        var args = JsonSerializer.SerializeToElement(new { command = "run.sh" });
+
+        var category = await DangerousOpDetector.CategoryAsync("mcp.fileserver.exec", args, env);
+
+        Assert.Equal(DangerousOpDetector.McpSpawn, category);
+    }
+
+    [Fact]
+    public async Task CategoryAsync_McpToolWithExecArg_IsMcpSpawn()
+    {
+        var env = new FakeExecutionEnv { Cwd = "C:/project" };
+        var args = JsonSerializer.SerializeToElement(new { exec = "node server.js" });
+
+        var category = await DangerousOpDetector.CategoryAsync("mcp.registry.run", args, env);
+
+        Assert.Equal(DangerousOpDetector.McpSpawn, category);
+    }
+
+    [Fact]
+    public async Task CategoryAsync_McpToolWithoutCommand_IsUnknown()
+    {
+        var env = new FakeExecutionEnv { Cwd = "C:/project" };
+        var args = JsonSerializer.SerializeToElement(new { query = "q" });
+
+        var category = await DangerousOpDetector.CategoryAsync("mcp.fileserver.read", args, env);
+
+        Assert.Equal(DangerousOpDetector.Unknown, category);
+    }
+
+    [Fact]
+    public async Task CategoryAsync_UnlistedToolWithCommandArg_IsUnknown()
+    {
+        // A generic custom tool carrying a command argument is still unclassifiable
+        // (Ask posture) — only MCP-prefixed tools escalate to McpSpawn.
+        var env = new FakeExecutionEnv { Cwd = "C:/project" };
+        var args = JsonSerializer.SerializeToElement(new { command = "my-custom-runner" });
+
+        var category = await DangerousOpDetector.CategoryAsync("my-runner", args, env);
+
+        Assert.Equal(DangerousOpDetector.Unknown, category);
+    }
+
+    [Fact]
+    public void Category_UnknownToolEmptyArgs_IsUnknown()
+    {
+        var category = DangerousOpDetector.Category("some-extension-tool", "{}", null, "C:/project");
+        Assert.Equal(DangerousOpDetector.Unknown, category);
+    }
+
+    [Fact]
+    public void Category_KnownSafeReadTool_IsNone()
+    {
+        var category = DangerousOpDetector.Category("read", "{\"path\":\"a.txt\"}", null, "C:/project");
+        Assert.Equal(DangerousOpDetector.None, category);
+    }
+
+    [Fact]
+    public void Category_McpSpawnSyncPath_IsMcpSpawn()
+    {
+        var category = DangerousOpDetector.Category("mcp.tools.exec", "{\"command\":\"npm run x\"}", null, "C:/project");
+        Assert.Equal(DangerousOpDetector.McpSpawn, category);
     }
 
     [Fact]

@@ -16,6 +16,10 @@ public sealed class ExtensionRuntimeBinding
     private readonly Dictionary<string, ExtensionFlagRegistration> _flagRegistrations = new(StringComparer.Ordinal);
     private readonly Dictionary<string, object?> _flagValues = new(StringComparer.Ordinal);
 
+    private static readonly Func<AgentMessage, ExtensionMessageDelivery, bool, CancellationToken, Task> DefaultSendMessageAsync
+        = (_, _, _, _) => Task.CompletedTask;
+    private static readonly Func<string, JsonElement, CancellationToken, Task<AgentToolResult<object?>>> DefaultExecuteToolByNameAsync
+        = (name, _, _) => Task.FromResult(new AgentToolResult<object?>([new TextContent($"Tool '{name}' is not available in this extension host.")], null));
     public ExtensionRuntimeBinding(string cwd, bool hasUi, IExtensionUi ui)
     {
         Cwd = cwd;
@@ -45,8 +49,7 @@ public sealed class ExtensionRuntimeBinding
     public SearchProviderRegistry? SearchProviders { get; set; }
     public IExtensionTelemetryApi Telemetry { get; set; } = NoOpTelemetryApi.Instance;
     public Func<ExtensionSessionReplacementResult, IExtensionReplacementSessionApi?, CancellationToken, Task>? WithSessionCallback { get; set; }
-
-    public Func<AgentMessage, ExtensionMessageDelivery, bool, CancellationToken, Task> SendMessageAsync { get; set; } = (_, _, _, _) => Task.CompletedTask;
+    public Func<AgentMessage, ExtensionMessageDelivery, bool, CancellationToken, Task> SendMessageAsync { get; set; } = DefaultSendMessageAsync;
     public Func<string, ExtensionMessageDelivery, CancellationToken, Task> SendUserMessageAsync { get; set; } = (_, _, _) => Task.CompletedTask;
     public Func<string, object, CancellationToken, Task> AppendEntryAsync { get; set; } = (_, _, _) => Task.CompletedTask;
     public Func<string, object, bool, object?, CancellationToken, Task>? AppendCustomMessageEntryAsync { get; set; }
@@ -68,8 +71,7 @@ public sealed class ExtensionRuntimeBinding
         = (_, _, _) => Task.FromResult(new ExtensionSessionReplacementResult(true, "Extension runtime is not bound."));
     public Func<CancellationToken, Task<bool>> IsIdleAsync { get; set; } = _ => Task.FromResult(true);
     public Func<CancellationToken, Task<bool>> HasPendingMessagesAsync { get; set; } = _ => Task.FromResult(false);
-    public Func<string, JsonElement, CancellationToken, Task<AgentToolResult<object?>>> ExecuteToolByNameAsync { get; set; }
-        = (name, _, _) => Task.FromResult(new AgentToolResult<object?>([new TextContent($"Tool '{name}' is not available in this extension host.")], null));
+    public Func<string, JsonElement, CancellationToken, Task<AgentToolResult<object?>>> ExecuteToolByNameAsync { get; set; } = DefaultExecuteToolByNameAsync;
     public Func<string, string, string, ExtensionCompleteRequest?, CancellationToken, Task<ExtensionCompletionResult>> CompleteSimpleAsync { get; set; }
         = (_, _, _, _, _) => Task.FromResult(new ExtensionCompletionResult(ExtensionCompletionStatus.Error, null, "Extension runtime is not bound.", null));
     public Func<string, string, IReadOnlyList<AgentMessage>?, string?, ExtensionCompleteRequest?, bool, CancellationToken, Task<ExtensionCompletionResult>> CompleteAsync { get; set; }
@@ -183,6 +185,33 @@ public sealed class ExtensionRuntimeBinding
     {
         Ui = ui;
         HasUi = hasUi;
+    }
+
+    /// <summary>
+    /// Throws when any core capability is still on its no-op default. Core capabilities are
+    /// <see cref="ExecutionEnv"/>, <see cref="SendMessageAsync"/> and
+    /// <see cref="ExecuteToolByNameAsync"/>: without them an extension silently no-ops (empty
+    /// messages, "not available" tool results) and the failure hides. The host MUST call
+    /// <see cref="BindingsComplete"/> after wiring these before any extension is initialized.
+    /// </summary>
+    public void ValidateBound()
+    {
+        var missing = new List<string>();
+        if (ExecutionEnv is null) missing.Add(nameof(ExecutionEnv));
+        if (ReferenceEquals(SendMessageAsync, DefaultSendMessageAsync)) missing.Add(nameof(SendMessageAsync));
+        if (ReferenceEquals(ExecuteToolByNameAsync, DefaultExecuteToolByNameAsync)) missing.Add(nameof(ExecuteToolByNameAsync));
+        if (missing.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Extension runtime binding was not fully wired before use; missing core capabilities: {string.Join(", ", missing)}. " +
+                "This is a host wiring bug — an unbound binding silently no-ops instead of failing.");
+        }
+    }
+
+    /// <summary>Marks the binding as fully wired, converting a silent no-op into a startup error.</summary>
+    public void BindingsComplete()
+    {
+        ValidateBound();
     }
 
     public ExtensionRuntimeActions ToActions() => new(Cwd, HasUi, Ui,

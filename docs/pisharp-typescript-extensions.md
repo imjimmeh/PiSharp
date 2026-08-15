@@ -326,7 +326,32 @@ When the model calls a bridged TypeScript tool, PiSharp sends a JSON-RPC request
 
 The Node side returns content, details, terminate, and error state. PiSharp maps this into `AgentToolResult<object?>` and publishes normal tool events.
 
+## Security posture
+
+TypeScript extensions run out-of-process in Node.js, but they are still arbitrary code running
+under your user account with a JSON-RPC channel back into the PiSharp runtime. Installing an
+untrusted `.ts`/`.js` extension is equivalent to running that code as your user; only install
+extensions you trust.
+
+Tool calls made by the model — including bridged TypeScript tools — pass through the same
+permission gate (`pisharp-permissions`) as native tools: `allow`/`ask`/`deny` rules plus the
+mode posture (`prompt`, `automatic`, `strict`). A bridged extension cannot bypass the gate.
+
+Local subprocess management is gated the same way as for native extensions:
+
+- Extension shell execution through `pi.exec` / the execution environment is checked against the
+  live policy using the `bash` category and fails closed (`strict` denies un-allow-listed
+  commands; headless `prompt` has no approval UI and denies; `automatic` keeps resolving
+  `ask` → `allow`).
+- stdio MCP servers that spawn a local process are gated in `strict` mode (an `mcp.spawn`
+  allow-list rule is required); `prompt` and `automatic` modes spawn as before.
+
+Kill switches remain the simplest posture: run native-only with `--no-ts-extensions`, or disable
+every extension with `--no-extensions` / `--no-resources` (see
+[Disabling TypeScript extensions](#disabling-typescript-extensions)).
+
 ## Providers
+
 
 TypeScript extensions can register providers through bridge descriptors. PiSharp adapts them with `TsProviderAdapter` and registers them with `PiSharp.Ai.PublicApi`. If the provider has callback-based behavior, PiSharp calls back into Node as needed.
 

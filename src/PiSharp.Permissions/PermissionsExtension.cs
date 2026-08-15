@@ -61,6 +61,35 @@ public sealed class PermissionsExtension : IExtension, IAsyncDisposable
                 ReloadPolicy();
         }));
 
+        // F5/F6: install the spawn capability gates so extension shell exec and stdio MCP server
+        // spawns fail closed under the live policy. Strict mode denies un-allow-listed spawns;
+        // automatic mode resolves Ask→Allow (historic default unchanged); prompt mode in a
+        // headless session denies (no interactive approval UI on the spawn path).
+        CapabilityGates.ShellExec = request =>
+        {
+            var policy = Policy;
+            var headless = api is { HasUi: false };
+            var decision = policy.Evaluate(
+                "bash",
+                System.Text.Json.JsonSerializer.Serialize(new { request.Command, request.Args }),
+                DangerousOpDetector.BashCategoryOf(request.Command),
+                headless);
+            return decision.Action == PermissionAction.Allow ? null : $"extension shell '{request.Command}' blocked: {decision.Reason}";
+        };
+        CapabilityGates.McpSpawn = request =>
+        {
+            var policy = Policy;
+            // Only strict mode gates MCP spawns (keep prompt/automatic UX unchanged).
+            if (policy.Mode != "strict") return null;
+            var headless = api is { HasUi: false };
+            var decision = policy.Evaluate(
+                "mcp.spawn",
+                System.Text.Json.JsonSerializer.Serialize(new { request.Command, request.Args, request.SourceId }),
+                DangerousOpDetector.Unknown,
+                headless);
+            return decision.Action == PermissionAction.Allow ? null : decision.Reason;
+        };
+
         return Task.CompletedTask;
     }
 
@@ -88,6 +117,10 @@ public sealed class PermissionsExtension : IExtension, IAsyncDisposable
             subscriptions = [.. _subscriptions];
             _subscriptions.Clear();
         }
+        // Uninstall the spawn gate when the permission extension goes away so a defunct
+        // extension can no longer keep gating (or keep denying) other code paths.
+        CapabilityGates.ShellExec = null;
+        CapabilityGates.McpSpawn = null;
         foreach (var subscription in subscriptions) subscription.Dispose();
         return ValueTask.CompletedTask;
     }

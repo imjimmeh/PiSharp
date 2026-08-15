@@ -19,6 +19,7 @@
     <ProjectReference Include="..\PiSharp.TsBridge\PiSharp.TsBridge.csproj" />
     <ProjectReference Include="..\PiSharp.Compatibility\PiSharp.Compatibility.csproj" />
     <ProjectReference Include="..\PiSharp.Packages\PiSharp.Packages.csproj" />
+    <ProjectReference Include="..\PiSharp.Permissions\PiSharp.Permissions.csproj" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
   </ItemGroup>
 

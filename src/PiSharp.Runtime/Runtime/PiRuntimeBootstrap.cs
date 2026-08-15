@@ -15,6 +15,7 @@ using PiSharp.Ai.Auth;
 using PiSharp.Compatibility.Resources;
 using PiSharp.Compatibility.Settings;
 using PiSharp.Extensions;
+using PiSharp.Permissions;
 using PiSharp.PluginHost;
 using PiSharp.TsBridge;
 using ISystemPromptComposer = PiSharp.Agent.Core.Prompting.ISystemPromptComposer;
@@ -92,7 +93,7 @@ public static class PiRuntimeBootstrap
             => tools.Tools.Select(tool => tool.Name).Concat(extensions.Tools.Select(tool => tool.Value.Name)).Distinct(StringComparer.Ordinal).ToArray();
         var extensionBinding = new ExtensionRuntimeBinding(options.Env.Cwd, false, NoExtensionUi.Instance)
         {
-            ExecutionEnv = options.Env,
+            ExecutionEnv = new GatedExecutionEnv(options.Env),
             UrlRegistry = urlRegistry,
             FileContentExtractors = fileContentExtractorRegistry,
             SearchProviders = searchProviderRegistry,
@@ -335,6 +336,12 @@ public static class PiRuntimeBootstrap
                 CachedBackgroundExtensionPaths = backgroundExtensionPaths.ToArray()
             });
         runtime.BindExtensionRuntime();
+
+        // F5: fail loud if any core binding capability is still on its no-op default — the host
+        // (this bootstrap) guarantees ExecutionEnv (wrapped by GatedExecutionEnv above) and the
+        // binder wires SendMessageAsync / ExecuteToolByNameAsync. Doing this here, not inside
+        // BindRuntimeActions, keeps direct-SessionRuntime consumers (tests/embeds) working.
+        extensionBinding.BindingsComplete();
         runtime.BindHarnessEventForwarding();
         if (options.Telemetry is not null) runtime.BindTelemetryInstrumentation();
         await runtime.Harness.DispatchSessionStartAsync("startup", cancellationToken);

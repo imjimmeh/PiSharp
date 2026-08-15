@@ -10,11 +10,11 @@ namespace PiSharp.Permissions.Tests.Fakes;
 /// Minimal <see cref="IExecutionEnv"/> fake: path resolution against <see cref="Cwd"/> and an
 /// in-memory existing-file probe. The remaining file/shell surface throws (not exercised).
 /// </summary>
-public sealed class FakeExecutionEnv : IExecutionEnv
+public class FakeExecutionEnv : IExecutionEnv
 {
     private readonly HashSet<string> _existingFiles = new(StringComparer.OrdinalIgnoreCase);
 
-    public string Cwd { get; set; } = "C:/project";
+    public virtual string Cwd { get; set; } = "C:/project";
 
     public void AddExistingFile(string absolutePath) => _existingFiles.Add(Normalize(absolutePath));
 
@@ -75,7 +75,7 @@ public sealed class FakeExecutionEnv : IExecutionEnv
     public Task CleanupAsync(CancellationToken cancellationToken = default)
         => UnsupportedTask();
 
-    public Task<Result<ShellResult, ExecutionError>> ExecAsync(string command, ExecutionOptions? options = null, CancellationToken cancellationToken = default)
+    public virtual Task<Result<ShellResult, ExecutionError>> ExecAsync(string command, ExecutionOptions? options = null, CancellationToken cancellationToken = default)
         => Unsupported<Result<ShellResult, ExecutionError>>();
 
     private static Task<T> Unsupported<T>() => Task.FromException<T>(new NotSupportedException("Not implemented in the fake."));

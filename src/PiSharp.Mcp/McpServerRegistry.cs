@@ -33,12 +33,17 @@ public static class McpServerRegistry
     public static IReadOnlyList<IMcpTransportFactory> GetFactories()
         => Factories.Values.ToArray();
 
-    /// <summary>Registers an extension-contributed server (ephemeral; settings wins on conflict).</summary>
+    /// <summary>
+    /// Registers an extension-contributed server (ephemeral; settings wins on conflict). The
+    /// server keeps the provenance <see cref="McpServerConfig.SourceId"/> = <paramref name="sourceId"/>
+    /// on the stored config so the host can honor the originating extension in spawn-gate
+    /// decisions.
+    /// </summary>
     public static void RegisterServer(string sourceId, McpServerConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (string.IsNullOrWhiteSpace(sourceId)) throw new ArgumentException("Source id is required.", nameof(sourceId));
-        ContributedServers[sourceId] = config;
+        ContributedServers[sourceId] = config with { SourceId = sourceId };
     }
 
     public static void UnregisterBySource(string sourceId)

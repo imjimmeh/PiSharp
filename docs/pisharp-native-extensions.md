@@ -336,7 +336,62 @@ api.Use(async (context, next, cancellationToken) =>
 
 Middleware can also call `ModifyToolResult()` to replace content, details, or error state after a tool returns.
 
+## Security posture
+
+Installed native extensions run in-process with full access to the PiSharp process — treat
+`pisharp install` of an untrusted DLL as equivalent to running arbitrary code with your user
+account. Only install extensions you trust.
+
+Tool calls made by the model (including extension-registered tools) pass through the permission
+gate (`pisharp-permissions`): `allow`/`ask`/`deny` rules plus the mode posture (`prompt`,
+`automatic`, `strict`). See the permissions extension documentation for rule syntax.
+
+### Extension shell execution is gated
+
+The `ExecutionEnv.ExecAsync` surface handed to extensions is wrapped by
+`GatedExecutionEnv`: every shell invocation is checked against the live policy using the `bash`
+tool category (so `bash` allow rules apply) and fail closed:
+
+- `strict` — an un-allow-listed command is denied.
+- `prompt` + headless session — denied (there is no interactive approval UI on the spawn path).
+- `prompt` + interactive — resolves through the ask posture; when it must prompt it is denied
+  (the spawn path has no UI).
+- `automatic` — `ask` resolves to allow (unchanged default behavior).
+
+````csharp
+// Extension code:
+var result = await api.ExecutionEnv.ExecAsync("git status", ct);
+// result may be Err(ExecutionError{Code=SpawnError}) when the gate blocks the command.
+````
+
+The gate is installed by the permissions extension when it initializes. Without the permissions
+extension installed there is no gate and `ExecAsync` passes through, preserving the historic
+un-gated posture.
+
+### stdio MCP servers are gated
+
+MCP servers that spawn a local process (stdio transport) are checked when the transport is
+created. In `strict` mode the spawn must be allow-listed via an `mcp.spawn` tool rule, otherwise
+the server enters a per-server error state instead of spawning.
+
+```text
+allow: mcp.spawn
+```
+
+`prompt` and `automatic` modes leave stdio spawns running as before. Extension-contributed
+servers (registered through the MCP server registry) carry their originating extension id as
+provenance (`SourceId`), which the host includes in the gate decision and surfaces in the server
+source label (`extension:<id>`).
+
+### Unbound bindings fail loudly
+
+`ExtensionRuntimeBinding.BindingsComplete()` (called by the host after wiring) validates that the
+core capabilities — `ExecutionEnv`, `SendMessageAsync`, `ExecuteToolByNameAsync` — are wired and
+throws `InvalidOperationException` otherwise, converting a silent no-op (empty messages, "tool not
+available" results) into a startup error.
+
 ## UI API
+
 
 `IExtensionUi` supports:
 
