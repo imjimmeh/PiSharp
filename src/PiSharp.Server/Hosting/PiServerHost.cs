@@ -23,6 +23,13 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
     /// <summary>Fires when <see cref="StopAsync"/> is invoked. The foreground daemon waits on this to exit.</summary>
     public CancellationToken ShutdownToken => _stopCts.Token;
 
+    /// <summary>
+    /// The session registry built by <see cref="StartAsync"/> and registered as a DI singleton.
+    /// Assigned once a host is started; used by the daemon launcher to resolve the active session
+    /// for the <c>process_input</c> lane. Null until <see cref="StartAsync"/> completes.
+    /// </summary>
+    public ServerSessionRegistry Registry { get; private set; } = null!;
+
     public async Task StartAsync(int port = 0)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions());
@@ -32,7 +39,9 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
         builder.Services.AddSingleton(new ApiKeyValidator(new ApiKeyOptions { ApiKey = options.ApiKey }));
         var metricsAggregator = Metrics;
         builder.Services.AddSingleton(metricsAggregator);
-        builder.Services.AddSingleton(new ServerSessionRegistry(CreateRuntimeFactory(options, Metrics), options.IdleTimeout));
+        var registry = new ServerSessionRegistry(CreateRuntimeFactory(options, Metrics), options.IdleTimeout);
+        Registry = registry;
+        builder.Services.AddSingleton(registry);
         builder.Services.AddSingleton(new PiServerCommandDelegates(
             options.RunCommandAsync,
             options.CompleteCommandAsync,

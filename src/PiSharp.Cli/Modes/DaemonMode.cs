@@ -90,7 +90,12 @@ public static class DaemonMode
                 .AddDebug();
             _ = CliFileLogging.AddConfiguredFileLogging(builder, Directory.GetCurrentDirectory());
         });
-        var host = new PiServerHost(new PiServerHostOptions { ApiKey = apiKey, LoggerFactory = loggerFactory });
+        PiServerHost? host = null;
+        var hostOptions = DaemonCommandHost.CreateHostOptions(
+            apiKey,
+            loggerFactory,
+            resolveSession: () => host?.Registry?.Sessions.MaxBy(s => s.Id, StringComparer.Ordinal));
+        host = new PiServerHost(hostOptions);
         await host.StartAsync(port);
         await store.WriteAsync(new DaemonLease(Environment.ProcessId, host.Port, apiKey, DateTimeOffset.UtcNow, version), cancellationToken);
         await console.Out.WriteLineAsync($"daemon listening on http://127.0.0.1:{host.Port}".AsMemory(), cancellationToken);
