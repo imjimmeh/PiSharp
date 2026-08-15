@@ -156,50 +156,130 @@ public sealed class SystemExecutionEnv(string cwd, ILoggerFactory? loggerFactory
         => resolvedPath.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase)
            && resolvedPath.Contains("\\agent\\sessions\\", StringComparison.OrdinalIgnoreCase);
 
+    private const int MaxCaptureLines = 50_000;
+    private const int MaxCaptureBytes = 1024 * 1024;
+    private const string CaptureTruncatedMarker = ".[truncated]";
+
     public async Task<Result<ShellResult, ExecutionError>> ExecAsync(string command, ExecutionOptions? options = null, CancellationToken cancellationToken = default)
     {
         using var timeoutCts = options?.Timeout is null ? null : new CancellationTokenSource(options.Timeout.Value);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts?.Token ?? CancellationToken.None);
+        using var process = CreateProcess(command, options);
         try
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh",
-                Arguments = OperatingSystem.IsWindows() ? $"/c {command}" : $"-lc \"{command.Replace("\"", "\\\"")}\"",
-                WorkingDirectory = options?.Cwd is null ? Cwd : Resolve(options.Cwd),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-            if (options?.Environment is not null)
-            {
-                foreach (var (key, value) in options.Environment) startInfo.Environment[key] = value;
-            }
-
-            using var process = new Process { StartInfo = startInfo };
-            var stdout = new StringBuilder();
-            var stderr = new StringBuilder();
-            process.OutputDataReceived += (_, e) => HandleLine(e.Data, stdout, options?.OnStdout, options?.OnOutputBytes, linkedCts.Token);
-            process.ErrorDataReceived += (_, e) => HandleLine(e.Data, stderr, options?.OnStderr, options?.OnOutputBytes, linkedCts.Token);
-
             if (!process.Start()) return Result.Err<ShellResult, ExecutionError>(new ExecutionError(ExecutionErrorCode.SpawnError, "Failed to start command."));
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            await process.WaitForExitAsync(linkedCts.Token);
-            return Result.Ok<ShellResult, ExecutionError>(new ShellResult(stdout.ToString(), stderr.ToString(), process.ExitCode));
+
+            var stdout = new CaptureState();
+            var stderr = new CaptureState();
+            var stdoutReader = ReadLinesAsync(process.StandardOutput, stdout, options?.OnStdout, options?.OnOutputBytes, linkedCts.Token);
+            var stderrReader = ReadLinesAsync(process.StandardError, stderr, options?.OnStderr, options?.OnOutputBytes, linkedCts.Token);
+
+            var exitTask = process.WaitForExitAsync(linkedCts.Token);
+            await Task.WhenAll(exitTask, stdoutReader, stderrReader);
+            return Result.Ok<ShellResult, ExecutionError>(new ShellResult(stdout.Builder.ToString(), stderr.Builder.ToString(), process.ExitCode));
         }
         catch (OperationCanceledException ex) when (timeoutCts?.IsCancellationRequested == true && !cancellationToken.IsCancellationRequested)
         {
+            KillProcessTree(process);
             return Result.Err<ShellResult, ExecutionError>(new ExecutionError(ExecutionErrorCode.Timeout, "Command timed out.", ex));
         }
         catch (OperationCanceledException ex)
         {
+            KillProcessTree(process);
             return Result.Err<ShellResult, ExecutionError>(new ExecutionError(ExecutionErrorCode.Aborted, "Command aborted.", ex));
         }
         catch (Exception ex)
         {
+            KillProcessTree(process);
             return Result.Err<ShellResult, ExecutionError>(new ExecutionError(ExecutionErrorCode.SpawnError, ex.Message, ex));
         }
+        finally
+        {
+            KillProcessTree(process);
+        }
+    }
+
+    private Process CreateProcess(string command, ExecutionOptions? options)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh",
+            Arguments = OperatingSystem.IsWindows() ? $"/c {command}" : $"-lc \"{command.Replace("\"", "\\\"")}\"",
+            WorkingDirectory = options?.Cwd is null ? Cwd : Resolve(options.Cwd),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        if (options?.Environment is not null)
+        {
+            foreach (var (key, value) in options.Environment) startInfo.Environment[key] = value;
+        }
+        return new Process { StartInfo = startInfo };
+    }
+
+    /// <summary>
+    /// Best-effort kill of the child process tree so a cancelled or timed-out
+    /// command cannot leave orphaned descendants behind. The process may have
+    /// exited on its own, so every step is guarded.
+    /// </summary>
+    private static void KillProcessTree(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(2000);
+            }
+        }
+        catch (Exception)
+        {
+            // The process exited (or was already reaped) between checks.
+        }
+    }
+
+    private static async Task ReadLinesAsync(
+        StreamReader reader,
+        CaptureState capture,
+        Action<string>? callback,
+        ShellOutputBytesCallback? bytesCallback,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (line is null) return;
+            AppendToCapture(capture, line);
+            callback?.Invoke(line);
+            if (bytesCallback is not null)
+            {
+                var bytes = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+                await bytesCallback(bytes, cancellationToken);
+            }
+        }
+    }
+
+    private static void AppendToCapture(CaptureState capture, string line)
+    {
+        if (capture.Builder.Length >= MaxCaptureBytes || capture.LineCount >= MaxCaptureLines)
+        {
+            if (!capture.Truncated)
+            {
+                capture.Builder.Append(CaptureTruncatedMarker);
+                capture.Truncated = true;
+            }
+            return;
+        }
+        capture.Builder.AppendLine(line);
+        capture.LineCount++;
+    }
+
+    /// <summary>Mutable per-stream capture with O(1) cap checks.</summary>
+    private sealed class CaptureState
+    {
+        public StringBuilder Builder { get; } = new();
+        public int LineCount { get; set; }
+        public bool Truncated { get; set; }
     }
 
     public Task CleanupAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
