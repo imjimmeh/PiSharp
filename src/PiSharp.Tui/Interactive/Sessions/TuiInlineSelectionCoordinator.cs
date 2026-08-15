@@ -77,7 +77,11 @@ internal sealed class TuiInlineSelectionCoordinator : IDisposable
         _selectionRegistration = null;
         _prompt.AllowEmptySubmit = false;
         _prompt.AcceptedSuggestionSuffix = " ";
-        if (clearPrompt) _prompt.SetPromptText(string.Empty);
+        if (clearPrompt)
+        {
+            _prompt.SetPromptText(string.Empty);
+            _prompt.DismissSuggestions();
+        }
         _scheduleRender();
     }
 }

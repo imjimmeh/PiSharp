@@ -151,6 +151,8 @@ public sealed class PromptEditor : TextView, IPromptEditorSurface
 
     public void RefreshSuggestions() => _controller.RefreshSuggestions();
 
+    public void DismissSuggestions() => _controller.TryDismissSuggestions();
+
     public void AcceptFirstSuggestion() => _controller.AcceptFirstSuggestion();
 
     public void MoveSuggestionSelection(int delta) => _controller.MoveSuggestionSelection(delta);
