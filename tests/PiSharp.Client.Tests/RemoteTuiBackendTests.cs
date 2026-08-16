@@ -67,6 +67,36 @@ public sealed class RemoteTuiBackendTests
     }
 
     [Fact]
+    public async Task Steer_DispatchesCommand()
+    {
+        var transport = new BackendFakeTransport();
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
+
+        backend.Steer(AgentMessages.User("test steer message"));
+
+        await WaitUntilAsync(() => transport.Commands.Any(c => c.Envelope.Type == ServerCommandTypes.Steer));
+        var steer = transport.Commands.First(c => c.Envelope.Type == ServerCommandTypes.Steer);
+        Assert.Equal(SessionId, steer.Envelope.ServerSessionId);
+    }
+
+    [Fact]
+    public async Task RecoverFromGapAsync_ResyncsStateAndSendsAttachCommand()
+    {
+        var transport = new BackendFakeTransport
+        {
+            Responder = type => ServerResponse.Ok("st", type, new ServerSessionState(SessionId, "r1", "p1", "test", "cwd", TestModel, ThinkingLevel.Off, false, false, 0, 10))
+        };
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
+
+        await backend.RecoverFromGapAsync(CancellationToken.None);
+
+        var attachCommand = Assert.Single(transport.Commands, c => c.Envelope.Type == ServerCommandTypes.Attach);
+        Assert.Equal(SessionId, attachCommand.Envelope.ServerSessionId);
+    }
+
+    [Fact]
     public async Task PromptAsync_SendsPromptCommand()
     {
         var transport = new BackendFakeTransport();

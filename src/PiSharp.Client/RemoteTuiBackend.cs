@@ -193,11 +193,18 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     public void Steer(AgentMessage message)
     {
         var sessionId = ServerSessionId;
-        if (sessionId is null) return;
+        if (sessionId is null)
+        {
+            _logger.LogWarning("Steer requested but ServerSessionId is null");
+            return;
+        }
         _ = SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.Steer, ServerSessionId: sessionId),
             new { message = ExtractText(message), triggerIfIdle = false },
-            CancellationToken.None);
+            CancellationToken.None).ContinueWith(t =>
+            {
+                if (t.IsFaulted) _logger.LogWarning(t.Exception, "Steer command failed for sessionId={SessionId}", sessionId);
+            }, TaskScheduler.Default);
     }
 
     public Func<CancellationToken, Task>? OnHarnessReplaced { get; set; }

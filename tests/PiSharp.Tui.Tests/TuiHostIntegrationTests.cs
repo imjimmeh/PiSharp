@@ -1375,6 +1375,35 @@ public sealed class TuiHostIntegrationTests
     }
 
     [Fact]
+    public async Task ProcessInputAsyncHandledTrueLogsInfoAndSkipsRuntimePromptDispatch()
+    {
+        var hookTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Func<string, IReadOnlyList<ImageContent>?, string, CancellationToken, Task<TuiInputHookResult>> processInputAsync = (text, images, source, ct) =>
+        {
+            hookTcs.TrySetResult();
+            return Task.FromResult(new TuiInputHookResult(Handled: true, Text: text, Images: null));
+        };
+
+        var harne = TuiIntegrationTestHost.CreateHarness("ok");
+        await using var running = await TuiIntegrationTestHost.StartAsync(
+            runtime: TuiIntegrationTestHost.CreateRuntimeFacade(harne), processInputAsync: processInputAsync);
+
+        var promptText = "handled by extension";
+        await running.SubmitPromptAsync(promptText);
+        await hookTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await running.WaitUntilAsync(text => !text.Contains(promptText));
+
+        var context = await harne.Session.BuildContextAsync();
+        var userMessages = context.Messages.OfType<UserMessage>().ToArray();
+        Assert.DoesNotContain(userMessages, m => m.Content.OfType<TextContent>().Any(c => c.Text.Contains(promptText)));
+
+        var result = await running.StopAsync();
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
     public async Task ProcessInputAsyncFailureShowsErrorAndRestoresPromptText()
     {
         Func<string, IReadOnlyList<ImageContent>?, string, CancellationToken, Task<TuiInputHookResult>> processInputAsync = (_, _, _, _) =>

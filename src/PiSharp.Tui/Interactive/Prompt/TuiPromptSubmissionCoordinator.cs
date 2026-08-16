@@ -90,6 +90,7 @@ internal sealed class TuiPromptSubmissionCoordinator
                 : await _options.ProcessInputAsync(text, null, "interactive", token).ConfigureAwait(false);
             if (input.Handled)
             {
+                _logger.LogInformation("TUI prompt handled by input hook textLength={TextLength}", text.Length);
                 await _gateway.RunOnTuiAsync(() => _shell.Prompt.RecordSubmittedPrompt(text)).ConfigureAwait(false);
                 return;
             }
