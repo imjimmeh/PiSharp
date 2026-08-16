@@ -494,8 +494,16 @@ public sealed class PiServerWebSocketHandler(
     {
         var command = RequirePayload<ProcessInputRequest>(json);
         var live = RequireSession(RequiredSessionId(envelope));
-        if (delegates?.ProcessInputAsync is null) return ServerResponse.Fail(envelope.Id, envelope.Type, "not_available", $"Command '{envelope.Type}' is not available on this daemon.");
-        var result = await live.RunExclusiveAsync((runtime, token) => delegates.ProcessInputAsync(command, token), cancellationToken);
+        ProcessInputResult result;
+        if (delegates?.ProcessInputAsync is not null)
+        {
+            result = await live.RunExclusiveAsync((runtime, token) => delegates.ProcessInputAsync(command, token), cancellationToken);
+        }
+        else
+        {
+            var hookResult = await live.RunExclusiveAsync((runtime, token) => runtime.DispatchInputAsync(command.Text, command.Images, command.Source, token), cancellationToken);
+            result = new ProcessInputResult(hookResult.Handled, hookResult.Text, hookResult.Images);
+        }
         return ServerResponse.Ok(envelope.Id, envelope.Type, result);
     }
 

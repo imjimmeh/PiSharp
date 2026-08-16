@@ -888,6 +888,66 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 2m, Output: 10m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
+        new("amazon-bedrock", "global.openai.gpt-5.6-luna", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "global.openai.gpt-5.6-luna",
+            Api: "bedrock-converse-stream",
+            Name: "GPT-5.6 Luna (Global)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.22m, Output: 1.32m, CacheRead: 0.022m, CacheWrite: 0.275m))),
+
+        new("amazon-bedrock", "global.openai.gpt-5.6-sol", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "global.openai.gpt-5.6-sol",
+            Api: "bedrock-converse-stream",
+            Name: "GPT-5.6 Sol (Global)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 5.5m, Output: 33m, CacheRead: 0.55m, CacheWrite: 6.875m))),
+
+        new("amazon-bedrock", "global.openai.gpt-5.6-terra", new ModelDescriptor(
+            Provider: "amazon-bedrock",
+            Id: "global.openai.gpt-5.6-terra",
+            Api: "bedrock-converse-stream",
+            Name: "GPT-5.6 Terra (Global)",
+            BaseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+            Reasoning: true,
+            ContextWindow: 1050000,
+            MaxTokens: 128000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 2.2m, Output: 13.2m, CacheRead: 0.22m, CacheWrite: 2.75m))),
+
         new("amazon-bedrock", "google.gemma-3-27b-it", new ModelDescriptor(
             Provider: "amazon-bedrock",
             Id: "google.gemma-3-27b-it",
@@ -15908,6 +15968,26 @@ public static class BuiltInModels
             },
             Input: ["text"],
             Cost: new ModelCost(Input: 1.74m, Output: 3.48m, CacheRead: 0.2m))),
+
+        new("together", "deepseek-ai/DeepSeek-V4-Pro-0813", new ModelDescriptor(
+            Provider: "together",
+            Id: "deepseek-ai/DeepSeek-V4-Pro-0813",
+            Api: "openai-completions",
+            Name: "DeepSeek V4 Pro 0813",
+            BaseUrl: "https://api.together.xyz/v1",
+            Reasoning: true,
+            ContextWindow: 1048576,
+            MaxTokens: 384000,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text"],
+            Cost: new ModelCost(Input: 1.32m, Output: 3.96m, CacheRead: 0.13m))),
 
         new("together", "essentialai/Rnj-1-Instruct", new ModelDescriptor(
             Provider: "together",
