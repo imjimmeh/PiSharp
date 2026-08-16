@@ -46,7 +46,8 @@ public sealed class ClientWebSocketTransport : IClientTransport
     // JsonElement — exactly the shape ClientEventReducer documents for envelopes "arrived over the wire".
     private static readonly Func<string, object?, AgentSessionEvent> CreateSessionEvent = BuildEventFactory();
 
-    private readonly ClientWebSocket _socket = new()    private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerResponse>> _pending = new();
+    private readonly ClientWebSocket _socket = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerResponse>> _pending = new();
     private readonly Channel<ServerEventEnvelope> _events = Channel.CreateUnbounded<ServerEventEnvelope>();
     private readonly Channel<ServerResponse> _late = Channel.CreateBounded<ServerResponse>(64);
     private readonly CancellationTokenSource _readerCts = new();
@@ -116,7 +117,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
             finally
             {
                 _sendLock.Release();
-            });
+            }
 
             var effectiveTimeout = timeoutOverride
                 ?? (CommandTimeouts.TryGetValue(envelope.Type, out var tableTimeout) ? tableTimeout : _commandTimeout);

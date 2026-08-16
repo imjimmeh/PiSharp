@@ -12221,7 +12221,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 384000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.435m, Output: 0.87m, CacheRead: 0.003625m))),
+            Cost: new ModelCost(Input: 0.66m, Output: 1.98m, CacheRead: 0.022m))),
 
         new("openrouter", "dots-studio/dots-3-note-preview:free", new ModelDescriptor(
             Provider: "openrouter",
