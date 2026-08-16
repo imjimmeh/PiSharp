@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PiSharp.Abstractions.Messages;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Client;
 using PiSharp.Extensions;
@@ -487,6 +488,59 @@ public sealed class DaemonIntegrationTests
         Assert.NotNull(result);
         Assert.True(result!.Handled);
         Assert.Equal("true", result.Message);
+    }
+
+    [Fact]
+    public async Task PromptSubmission_OverRemoteWebSocket_DispatchesPromptAndDeliversEventsToHarnessListener()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: sessionId),
+            new { sinceSequence = 0L },
+            CancellationToken.None);
+
+        await using var backend = new RemoteTuiBackend(conn, NullLogger.Instance)
+        {
+            ServerSessionId = sessionId,
+        };
+
+        var userMessageTcs = new TaskCompletionSource<UserMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var turnStartTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        using var sub = backend.Subscribe((evt, _) =>
+        {
+            if (evt is AgentHarnessEvent.Core { Event: AgentEvent.TurnStart })
+                turnStartTcs.TrySetResult();
+            if (evt is AgentHarnessEvent.Core { Event: AgentEvent.MessageStart { Message: UserMessage user } })
+                userMessageTcs.TrySetResult(user);
+            return Task.CompletedTask;
+        });
+
+        await backend.PromptAsync("hello from remote integration test", [], CancellationToken.None);
+
+        await turnStartTcs.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        var userMsg = await userMessageTcs.Task.WaitAsync(TimeSpan.FromSeconds(8));
+
+        Assert.NotNull(userMsg);
+        Assert.Contains(userMsg.Content.OfType<TextContent>(), c => c.Text == "hello from remote integration test");
     }
 
     // --- helpers ---
