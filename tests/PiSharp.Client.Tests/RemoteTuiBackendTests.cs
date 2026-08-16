@@ -67,7 +67,7 @@ public sealed class RemoteTuiBackendTests
     }
 
     [Fact]
-    public async Task Steer_DispatchesCommand()
+    public async Task Steer_DispatchesCommandWithTriggerIfIdleTrue()
     {
         var transport = new BackendFakeTransport();
         var connection = new ClientSessionConnection(transport, NullLogger.Instance);
@@ -78,6 +78,8 @@ public sealed class RemoteTuiBackendTests
         await WaitUntilAsync(() => transport.Commands.Any(c => c.Envelope.Type == ServerCommandTypes.Steer));
         var steer = transport.Commands.First(c => c.Envelope.Type == ServerCommandTypes.Steer);
         Assert.Equal(SessionId, steer.Envelope.ServerSessionId);
+        var triggerIfIdle = (bool?)PayloadValue(steer.Payload, "triggerIfIdle");
+        Assert.True(triggerIfIdle, "Steer command payload must set triggerIfIdle: true so daemon executes prompt if harness is idle");
     }
 
     [Fact]

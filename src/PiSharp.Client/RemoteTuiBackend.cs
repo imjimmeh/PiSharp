@@ -200,7 +200,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         }
         _ = SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.Steer, ServerSessionId: sessionId),
-            new { message = ExtractText(message), triggerIfIdle = false },
+            new { message = ExtractText(message), triggerIfIdle = true },
             CancellationToken.None).ContinueWith(t =>
             {
                 if (t.IsFaulted) _logger.LogWarning(t.Exception, "Steer command failed for sessionId={SessionId}", sessionId);
