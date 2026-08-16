@@ -49,6 +49,24 @@ public sealed class RemoteTuiBackendTests
     }
 
     [Fact]
+    public void ToHarnessEvent_WithNullOptionalPayloadFields_DoesNotThrowNullReferenceException()
+    {
+        var turnEndEnvelope = ServerEventEnvelope.FromFlat("s1", 1, AgentSessionEvent.FromCore(new AgentEvent.TurnEnd(new UserMessage([new TextContent("done")]), null)));
+
+        var harnessEvent = ClientToTuiAdapter.ToHarnessEvent(turnEndEnvelope);
+        Assert.NotNull(harnessEvent);
+        var turnEnd = Assert.IsType<AgentEvent.TurnEnd>(Assert.IsType<AgentHarnessEvent.Core>(harnessEvent).Event);
+        Assert.NotNull(turnEnd.ToolResults);
+
+        var toolEndEnvelope = ServerEventEnvelope.FromFlat("s1", 2, AgentSessionEvent.FromCore(new AgentEvent.ToolExecutionEnd("t1", "bash", null, false)));
+
+        var toolEndHarnessEvent = ClientToTuiAdapter.ToHarnessEvent(toolEndEnvelope);
+        Assert.NotNull(toolEndHarnessEvent);
+        var toolEnd = Assert.IsType<AgentEvent.ToolExecutionEnd>(Assert.IsType<AgentHarnessEvent.Core>(toolEndHarnessEvent).Event);
+        Assert.NotNull(toolEnd.Result);
+    }
+
+    [Fact]
     public async Task PromptAsync_SendsPromptCommand()
     {
         var transport = new BackendFakeTransport();

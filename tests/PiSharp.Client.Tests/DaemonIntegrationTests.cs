@@ -543,6 +543,66 @@ public sealed class DaemonIntegrationTests
         Assert.Contains(userMsg.Content.OfType<TextContent>(), c => c.Text == "hello from remote integration test");
     }
 
+    [Fact]
+    public async Task PromptCommand_WithSessionIdInEnvelopeOnly_Succeeds()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        var promptResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.Prompt, ServerSessionId: sessionId),
+            new { message = "test prompt in header only" },
+            CancellationToken.None);
+
+        Assert.True(promptResp.Success, promptResp.Error?.Message);
+    }
+
+    [Fact]
+    public async Task SteerCommand_WithSessionIdInEnvelopeOnly_Succeeds()
+    {
+        var root = NewTempDir();
+        await using var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+        });
+        await host.StartAsync(0);
+
+        var transport = new ClientWebSocketTransport(NullLogger.Instance, TimeSpan.FromSeconds(30));
+        await using var conn = new ClientSessionConnection(transport, NullLogger.Instance);
+        await conn.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/"), ApiKey, CancellationToken.None);
+
+        var createResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.CreateSession),
+            CreatePayload(root),
+            CancellationToken.None);
+        Assert.True(createResp.Success, createResp.Error?.Message);
+        var sessionId = ((JsonElement)createResp.Data!).GetProperty("serverSessionId").GetString()!;
+
+        var steerResp = await conn.SendAsync(
+            new ServerCommandEnvelope(ServerCommandTypes.Steer, ServerSessionId: sessionId),
+            new { message = "test steer in header only", triggerIfIdle = false },
+            CancellationToken.None);
+
+        Assert.True(steerResp.Success, steerResp.Error?.Message);
+    }
+
     // --- helpers ---
 
     private static object CreatePayload(string root) => new

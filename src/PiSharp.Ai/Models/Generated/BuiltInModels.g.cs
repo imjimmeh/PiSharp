@@ -14993,7 +14993,7 @@ public static class BuiltInModels
             ContextWindow: 262144,
             MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.15m, Output: 1m, CacheRead: 0.05m))),
+            Cost: new ModelCost(Input: 0.14m, Output: 1m, CacheRead: 0.05m))),
 
         new("openrouter", "qwen/qwen3.6-flash", new ModelDescriptor(
             Provider: "openrouter",

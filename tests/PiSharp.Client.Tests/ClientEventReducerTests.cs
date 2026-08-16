@@ -125,8 +125,7 @@ public sealed class ClientEventReducerTests
     {
         var state = ClientSessionState.Empty;
 
-        // agent_start is a valid flat type the reducer does not handle.
-        var next = ClientEventReducer.Apply(state, Envelope(7, new AgentEvent.AgentStart()));
+        var next = ClientEventReducer.Apply(state, EnvelopeOwn(7, new AgentHarnessOwnEvent.SessionStart("custom")));
 
         Assert.Equal(7L, next.LastAppliedSequence);
         Assert.Empty(next.Transcript);

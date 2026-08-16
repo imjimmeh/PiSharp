@@ -122,12 +122,12 @@ public static class ClientToTuiAdapter
 
     private static AgentHarnessEvent? MapAgentEnd(object? data)
         => FromPayload<AgentEndPayload>(data) is { } payload
-            ? new AgentHarnessEvent.Core(new AgentEvent.AgentEnd(payload.Messages))
+            ? new AgentHarnessEvent.Core(new AgentEvent.AgentEnd(payload.Messages ?? []))
             : null;
 
     private static AgentHarnessEvent? MapTurnEnd(object? data)
         => FromPayload<TurnEndPayload>(data) is { Message: { } message } payload
-            ? new AgentHarnessEvent.Core(new AgentEvent.TurnEnd(message, payload.ToolResults))
+            ? new AgentHarnessEvent.Core(new AgentEvent.TurnEnd(message, payload.ToolResults ?? []))
             : null;
 
     private static AgentHarnessEvent? MapMessageStart(object? data)
@@ -153,12 +153,12 @@ public static class ClientToTuiAdapter
 
     private static AgentHarnessEvent? MapToolUpdate(object? data)
         => FromPayload<ToolExecutionUpdatePayload>(data) is { ToolCallId: not null } payload
-            ? new AgentHarnessEvent.Core(new AgentEvent.ToolExecutionUpdate(payload.ToolCallId, payload.ToolName ?? string.Empty, payload.Arguments, payload.PartialResult))
+            ? new AgentHarnessEvent.Core(new AgentEvent.ToolExecutionUpdate(payload.ToolCallId, payload.ToolName ?? string.Empty, payload.Arguments, payload.PartialResult ?? string.Empty))
             : null;
 
     private static AgentHarnessEvent? MapToolEnd(object? data)
         => FromPayload<ToolExecutionEndPayload>(data) is { ToolCallId: not null } payload
-            ? new AgentHarnessEvent.Core(new AgentEvent.ToolExecutionEnd(payload.ToolCallId, payload.ToolName ?? string.Empty, payload.Result, payload.IsError))
+            ? new AgentHarnessEvent.Core(new AgentEvent.ToolExecutionEnd(payload.ToolCallId, payload.ToolName ?? string.Empty, payload.Result ?? string.Empty, payload.IsError))
             : null;
 
     private static AgentHarnessEvent? MapModelSelect(object? data)
