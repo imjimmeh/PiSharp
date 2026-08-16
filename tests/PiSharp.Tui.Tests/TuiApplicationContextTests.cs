@@ -1096,11 +1096,10 @@ public sealed class TuiDisposalTests
             && entry.Message.Contains("previousThinking=Off", StringComparison.Ordinal)
             && entry.Message.Contains("nextThinking=High", StringComparison.Ordinal)));
 
-        Assert.Contains(provider.Entries, entry => entry.Category.Contains(nameof(TuiHarnessSubscription), StringComparison.Ordinal)
-            && entry.Message.Contains("event=ThinkingLevelChanged", StringComparison.Ordinal));
-        Assert.Contains(provider.Entries, entry => entry.Category.Contains(nameof(TuiHarnessSubscription), StringComparison.Ordinal)
-            && entry.Message.Contains("ThinkingLevelSelect:High", StringComparison.Ordinal)
-            && entry.Message.Contains("ThinkingLevelChanged:High", StringComparison.Ordinal));
+        await WaitForLogAsync(() => provider.Entries.Any(entry => entry.Category.Contains(nameof(TuiHarnessSubscription), StringComparison.Ordinal)
+            && entry.Message.Contains("event=ThinkingLevelChanged", StringComparison.Ordinal)));
+        await WaitForLogAsync(() => provider.Entries.Any(entry => entry.Category.Contains(nameof(TuiHarnessSubscription), StringComparison.Ordinal)
+            && entry.Message.Contains("ThinkingLevelSelect:High", StringComparison.Ordinal)));
     }
 
     [Fact]

@@ -108,6 +108,7 @@ internal sealed class PromptEditorController(IPromptEditorSurface surface)
         surface.SetPromptText(string.Empty);
         if (_suggestions.Clear()) SuggestionsChanged?.Invoke();
         _history.ResetNavigation();
+        IsSubmitting = false;
         try
         {
             await Submitted(text, cancellationToken).ConfigureAwait(false);
@@ -118,10 +119,6 @@ internal sealed class PromptEditorController(IPromptEditorSurface surface)
             surface.FocusAtEnd();
             RefreshSuggestions();
             throw;
-        }
-        finally
-        {
-            IsSubmitting = false;
         }
     }
 

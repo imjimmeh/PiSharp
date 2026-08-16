@@ -362,6 +362,41 @@ public sealed class PromptEditorTests
     }
 
     [Fact]
+    public async Task SubmitAsync_AllowsSubsequentSubmissionsWhilePreviousHandlerIsAwaitingInteractiveInput()
+    {
+        var prompt = new PromptEditor();
+        var submittedList = new List<string>();
+        var firstSubmitStarted = new TaskCompletionSource<string>();
+        var firstSubmitComplete = new TaskCompletionSource();
+
+        prompt.Submitted += (text, _) =>
+        {
+            submittedList.Add(text);
+            if (text == "first")
+            {
+                firstSubmitStarted.TrySetResult(text);
+                return firstSubmitComplete.Task;
+            }
+            return Task.CompletedTask;
+        };
+
+        prompt.SetPromptText("first");
+        var firstTask = prompt.SubmitAsync();
+
+        await firstSubmitStarted.Task;
+        Assert.Single(submittedList, "first");
+
+        prompt.SetPromptText("second");
+        await prompt.SubmitAsync();
+
+        Assert.Equal(2, submittedList.Count);
+        Assert.Equal(["first", "second"], submittedList);
+
+        firstSubmitComplete.TrySetResult();
+        await firstTask;
+    }
+
+    [Fact]
     public async Task BracketedPasteInsertsMultilineContentWithoutSubmitting()
     {
         var submitted = false;

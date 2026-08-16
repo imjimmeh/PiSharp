@@ -5,7 +5,7 @@
   },
   "projects": {
     "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj": {
-      "version": "0.0.0-dev",
+      "version": "2026.8.16.183042",
       "restore": {
         "projectUniqueName": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Compatibility\\PiSharp.Compatibility.csproj",
         "projectName": "PiSharp.Compatibility",
@@ -355,7 +355,7 @@
       }
     },
     "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Packages\\PiSharp.Packages.csproj": {
-      "version": "0.0.0-dev",
+      "version": "2026.8.16.183042",
       "restore": {
         "projectUniqueName": "G:\\code\\AI\\pi\\PiSharp\\src\\PiSharp.Packages\\PiSharp.Packages.csproj",
         "projectName": "PiSharp.Packages",
