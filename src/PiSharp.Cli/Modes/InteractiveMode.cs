@@ -408,6 +408,7 @@ public static class InteractiveMode
         var completionCache = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         int shortcutRefreshInFlight = 0;
         int loadStatusRefreshInFlight = 0;
+        long lastLoadStatusRefreshTicks = 0;
         int completionRefreshInFlight = 0;
 
         async Task RefreshShortcutCacheAsync()
@@ -476,8 +477,15 @@ public static class InteractiveMode
         TuiExtensionLoadStatus GetCachedRemoteLoadStatus()
         {
             if (backend.ServerSessionId is null) return new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
-            if (Interlocked.CompareExchange(ref loadStatusRefreshInFlight, 1, 0) == 0)
-                _ = Task.Run(() => RefreshLoadStatusCacheAsync());
+            var now = Environment.TickCount64;
+            if (now - Interlocked.Read(ref lastLoadStatusRefreshTicks) > 2000)
+            {
+                if (Interlocked.CompareExchange(ref loadStatusRefreshInFlight, 1, 0) == 0)
+                {
+                    Interlocked.Exchange(ref lastLoadStatusRefreshTicks, now);
+                    _ = Task.Run(() => RefreshLoadStatusCacheAsync());
+                }
+            }
             lock (loadStatusCacheGate) return loadStatusCache;
         }
 

@@ -23,6 +23,7 @@ This file helps coding agents work productively in PiSharp.
 - Native extension details: [docs/pisharp-native-extensions.md](docs/pisharp-native-extensions.md)
 - TypeScript extension bridge details: [docs/pisharp-typescript-extensions.md](docs/pisharp-typescript-extensions.md)
 - Built-in tools and contracts: [docs/pisharp-tools.md](docs/pisharp-tools.md)
+- Remote TUI fault analysis (model-switch failure, session-snapshot wire contract, UI-bridge auto-cancel): [docs/pisharp-remote-tui-model-switch.md](docs/pisharp-remote-tui-model-switch.md)
 
 ## Build and test commands
 

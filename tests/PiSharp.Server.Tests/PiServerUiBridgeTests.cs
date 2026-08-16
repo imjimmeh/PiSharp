@@ -121,6 +121,42 @@ public sealed class PiServerUiBridgeTests
         Assert.Equal("alpha", response.Value);
     }
 
+    /// <summary>The auto-cancel path must tell the attached client: when a pending <c>ui_request</c>
+    /// times out server-side, the bridge emits a flat <c>ui_cancelled</c> event carrying the request
+    /// id onto the same session lane, so the client can end its own interactive select instead of
+    /// leaving the inline selection active forever (which swallows subsequent TUI submits).</summary>
+    [Fact]
+    public async Task Request_ShortResponseTimeout_EmitsUiCancelledForTheRequest()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var bridge = new ServerUiBridge(registry);
+        var target = await CreateSessionAsync(registry);
+
+        var intent = new ServerUiIntent("ui-cancel-1", "select", "Pick", "Choose one", ["a"], null);
+        var responseTask = bridge.RequestUiAsync(intent, target, TimeSpan.FromMilliseconds(200), CancellationToken.None);
+
+        using var readerCts = new CancellationTokenSource(ReaderTimeout);
+        var requestId = await ReadFirstUiRequestIdAsync(target, readerCts.Token);
+        Assert.Equal(intent.RequestId, requestId);
+
+        await ReadUntilRequestEventAsync(target, intent.RequestId, "ui_cancelled", readerCts.Token);
+
+        var response = await responseTask;
+        Assert.True(response.Cancelled);
+    }
+
+    /// <summary>Reads the session's event lane until a flat event of <paramref name="type"/> carrying
+    /// <paramref name="requestId"/> is observed (fails fast via <paramref name="cancellationToken"/>).</summary>
+    private static async Task ReadUntilRequestEventAsync(LiveServerSession session, string requestId, string type, CancellationToken cancellationToken)
+    {
+        await foreach (var envelope in session.ReadEventsAsync(0, cancellationToken))
+        {
+            if (envelope.Event.Type != type) continue;
+            using var data = JsonDocument.Parse(JsonSerializer.Serialize(envelope.Event.Data));
+            if (data.RootElement.TryGetProperty("requestId", out var prop) && prop.GetString() == requestId) return;
+        }
+    }
+
     /// <summary>Per-kind default timeout resolution (Task 9): interactive kinds get a generous
     /// default, fire-and-forget kinds keep the short bridge default.</summary>
     [Fact]

@@ -69,6 +69,10 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     private bool _turnActive;
     private long _maxSequence;
     private bool _recovering;
+    /// <summary>Per-request handler cancellation for in-flight <c>ui_request</c>s, keyed by request
+    /// id; a <c>ui_cancelled</c> envelope cancels the matching entry so the handler
+    /// (e.g. <c>SelectInlineAsync</c>) ends and releases the UI.</summary>
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _pendingUiRequests = new(StringComparer.Ordinal);
 
     public RemoteTuiBackend(ClientSessionConnection connection, ILogger logger)
     {
@@ -613,6 +617,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         AgentHarnessEvent? harnessEvent;
         bool isUiRequest;
+        bool isUiCancelled;
         bool gap;
 
         lock (_sync)
@@ -631,6 +636,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
                 gap = true;
                 harnessEvent = null;
                 isUiRequest = false;
+                isUiCancelled = false;
             }
             else
             {
@@ -639,7 +645,8 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
                 _state = ClientEventReducer.Apply(_state, envelope);
                 TrackLifecycle(envelope);
                 isUiRequest = envelope.Event.Type == "ui_request";
-                harnessEvent = isUiRequest ? null : ClientToTuiAdapter.ToHarnessEvent(envelope);
+                isUiCancelled = envelope.Event.Type == "ui_cancelled";
+                harnessEvent = isUiRequest || isUiCancelled ? null : ClientToTuiAdapter.ToHarnessEvent(envelope);
             }
         }
 
@@ -650,9 +657,17 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             return;
         }
 
+        if (isUiCancelled)
+        {
+            // Daemon ended the request (response timeout or parent-token cancellation): cancel the
+            // per-request handler token so an active inline select releases.
+            CancelPendingUiRequest(envelope);
+            return;
+        }
+
         if (isUiRequest)
         {
-            await HandleUiRequestAsync(envelope, token);
+            HandleUiRequestAsync(envelope, token);
             return;
         }
 
@@ -696,11 +711,25 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         }
     }
 
-    private async Task HandleUiRequestAsync(ServerEventEnvelope envelope, CancellationToken token)
+    /// <summary>
+    /// Starts the UI request handler off the inbox pump and tracks a per-request linked
+    /// cancellation so a <c>ui_cancelled</c> envelope can end it. The handler blocks until the user
+    /// answers or the request is cancelled (<c>SelectInlineAsync</c> waits on user input or its
+    /// token), so awaiting it inline would stall the inbox — a queued <c>ui_cancelled</c> envelope
+    /// would never be processed and the inline selection would leak forever.
+    /// </summary>
+    private void HandleUiRequestAsync(ServerEventEnvelope envelope, CancellationToken token)
     {
         var intent = ClientToTuiAdapter.FromPayload<ServerUiIntent>(envelope.Event.Data);
         if (intent is null) return;
 
+        var linked = CancellationTokenSource.CreateLinkedTokenSource(token);
+        _pendingUiRequests[intent.RequestId] = linked;
+        _ = InvokeUiRequestHandlerAsync(envelope, intent, linked);
+    }
+
+    private async Task InvokeUiRequestHandlerAsync(ServerEventEnvelope envelope, ServerUiIntent intent, CancellationTokenSource linked)
+    {
         ServerUiResponse response;
         var handler = UiRequestHandler;
         if (handler is null)
@@ -712,19 +741,43 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         {
             try
             {
-                response = await handler(intent, token);
+                response = await handler(intent, linked.Token).ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException)
+            {
+                // The daemon cancelled the request (ui_cancelled): the handler released its UI.
+                response = new ServerUiResponse(intent.RequestId, null, Cancelled: true);
+            }
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "UI request handler failed for {RequestId}; cancelling", intent.RequestId);
                 response = new ServerUiResponse(intent.RequestId, null, Cancelled: true);
             }
         }
 
+        _pendingUiRequests.TryRemove(intent.RequestId, out _);
+
         await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.UiResponse, ServerSessionId: envelope.ServerSessionId),
             new { requestId = response.RequestId, value = response.Value, cancelled = response.Cancelled },
             CancellationToken.None);
+    }
+
+    /// <summary>Ends a pending UI request on the daemon's behalf (it auto-cancelled): cancels the
+    /// per-request handler token so <c>SelectInlineAsync</c>'s registered callback releases the
+    /// inline selection.</summary>
+    private void CancelPendingUiRequest(ServerEventEnvelope envelope)
+    {
+        var requestId = ExtractRequestId(envelope.Event.Data);
+        if (requestId is null) return;
+        if (_pendingUiRequests.TryRemove(requestId, out var cts)) cts.Cancel();
+    }
+
+    private static string? ExtractRequestId(object? data)
+    {
+        if (data is null) return null;
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(data, ServerJsonSerializer.Options));
+        return document.RootElement.TryGetProperty("requestId", out var prop) ? prop.GetString() : null;
     }
 
     // --- command plumbing ---

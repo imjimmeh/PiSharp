@@ -149,7 +149,7 @@ internal sealed class TuiPromptSubmissionCoordinator
     {
         try
         {
-            await Task.Run(() => _session.CurrentRuntime.PromptAsync(text, images, token), token).ConfigureAwait(false);
+            await _session.CurrentRuntime.PromptAsync(text, images, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

@@ -46,11 +46,11 @@ public sealed class ClientWebSocketTransport : IClientTransport
     // JsonElement — exactly the shape ClientEventReducer documents for envelopes "arrived over the wire".
     private static readonly Func<string, object?, AgentSessionEvent> CreateSessionEvent = BuildEventFactory();
 
-    private readonly ClientWebSocket _socket = new();
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerResponse>> _pending = new();
+    private readonly ClientWebSocket _socket = new()    private readonly ConcurrentDictionary<string, TaskCompletionSource<ServerResponse>> _pending = new();
     private readonly Channel<ServerEventEnvelope> _events = Channel.CreateUnbounded<ServerEventEnvelope>();
     private readonly Channel<ServerResponse> _late = Channel.CreateBounded<ServerResponse>(64);
     private readonly CancellationTokenSource _readerCts = new();
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly TimeSpan _commandTimeout;
     private readonly ILogger _logger;
     private int _disposed;
@@ -65,6 +65,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
 
     /// <summary>Responses that arrived after their command timed out (see <see cref="IClientTransport.LateResponses"/>).</summary>
     public ChannelReader<ServerResponse> LateResponses => _late.Reader;
+
     public async Task ConnectAsync(Uri uri, string apiKey, CancellationToken ct)
     {
         // The daemon serves the socket at /ws; accept a bare ws://host:port uri as shorthand.
@@ -106,8 +107,16 @@ public sealed class ClientWebSocketTransport : IClientTransport
 
         try
         {
-            _logger.LogDebug("WebSocket command sent: {Command}", envelope.Type);
-            await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct).ConfigureAwait(false);
+            await _sendLock.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                _logger.LogDebug("WebSocket command sent: {Command}", envelope.Type);
+                await _socket.SendAsync(json, WebSocketMessageType.Text, endOfMessage: true, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                _sendLock.Release();
+            });
 
             var effectiveTimeout = timeoutOverride
                 ?? (CommandTimeouts.TryGetValue(envelope.Type, out var tableTimeout) ? tableTimeout : _commandTimeout);
@@ -173,6 +182,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         {
             _socket.Dispose();
             _readerCts.Dispose();
+            _sendLock.Dispose();
         }
     }
 

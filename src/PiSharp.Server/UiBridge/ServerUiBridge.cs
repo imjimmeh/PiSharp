@@ -64,16 +64,21 @@ public sealed class ServerUiBridge : IServerUiBridge
         _pending[intent.RequestId] = tcs;
         try
         {
-            EmitUiRequest(intent, target);
+            var targetSession = EmitUiRequest(intent, target);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(responseTimeout ?? TimeoutFor(intent.Kind));
-            using var registration = timeout.Token.Register(() => tcs.TrySetResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true)));
+            using var registration = timeout.Token.Register(() =>
+            {
+                tcs.TrySetResult(new ServerUiResponse(intent.RequestId, null, Cancelled: true));
+                EmitUiCancelled(intent.RequestId, targetSession);
+            });
             try
             {
                 return await tcs.Task.ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                EmitUiCancelled(intent.RequestId, targetSession);
                 return new ServerUiResponse(intent.RequestId, null, Cancelled: true);
             }
         }
@@ -88,13 +93,13 @@ public sealed class ServerUiBridge : IServerUiBridge
         if (_pending.TryGetValue(requestId, out var tcs)) tcs.TrySetResult(new ServerUiResponse(requestId, value, cancelled));
     }
 
-    private void EmitUiRequest(ServerUiIntent intent, LiveServerSession? target)
+    private LiveServerSession? EmitUiRequest(ServerUiIntent intent, LiveServerSession? target)
     {
         var session = target ?? SelectSession();
         if (session is null)
         {
             _logger.LogDebug("UI request {RequestId} has no target session; treating as cancelled", intent.RequestId);
-            return;
+            return null;
         }
 
         session.EmitEvent(AgentSessionEvent.FromServer("ui_request", new
@@ -107,6 +112,18 @@ public sealed class ServerUiBridge : IServerUiBridge
             component = intent.Component,
             extensionId = intent.ExtensionId
         }));
+        return session;
+    }
+
+    /// <summary>
+    /// Notifies the attached client that a pending <c>ui_request</c> was auto-cancelled server-side
+    /// (response timeout or parent-token cancellation), so the client can end its own interactive
+    /// select instead of leaving it pending and swallowing subsequent TUI submits.
+    /// </summary>
+    private void EmitUiCancelled(string requestId, LiveServerSession? session)
+    {
+        if (session is null) return;
+        session.EmitEvent(AgentSessionEvent.FromServer("ui_cancelled", new { requestId }));
     }
 
     /// <summary>

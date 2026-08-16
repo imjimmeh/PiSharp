@@ -671,7 +671,7 @@ public sealed class PiServerWebSocketHandler(
             runtime.Session.Metadata.Id,
             runtime.Session.Metadata.Path,
             await runtime.Session.GetSessionNameAsync(token),
-            await runtime.GetForkableEntriesAsync(token)), cancellationToken);
+            await runtime.Session.GetBranchAsync(cancellationToken: token)), cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type, snapshot);
     }
 

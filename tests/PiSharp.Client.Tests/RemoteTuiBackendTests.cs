@@ -191,6 +191,39 @@ public sealed class RemoteTuiBackendTests
     }
 
     [Fact]
+    public async Task UiCancelled_EndsPendingUiRequestAsCancelled()
+    {
+        var transport = new BackendFakeTransport();
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
+        backend.UiRequestHandler = async (intent, token) =>
+        {
+            try
+            {
+                // Mirrors TuiInlineSelectionCoordinator.SelectInlineAsync, which only completes when
+                // its per-request token is cancelled (the registered callback ends the selection).
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected: the ui_cancelled envelope cancels the per-request handler token.
+            }
+            return new ServerUiResponse(intent.RequestId, null, Cancelled: true);
+        };
+
+        var intent = new ServerUiIntent("r-cancel", "select", "Pick", "Choose one", ["a"], null);
+        transport.Events.Writer.TryWrite(ServerEventEnvelope.FromFlat(
+            SessionId, 1, AgentSessionEvent.FromServer("ui_request", intent)));
+        transport.Events.Writer.TryWrite(ServerEventEnvelope.FromFlat(
+            SessionId, 2, AgentSessionEvent.FromServer("ui_cancelled", new { requestId = "r-cancel" })));
+
+        await WaitUntilAsync(() => transport.Commands.Any(command => command.Envelope.Type == ServerCommandTypes.UiResponse));
+        var (_, payload) = Assert.Single(transport.Commands, command => command.Envelope.Type == ServerCommandTypes.UiResponse);
+        Assert.Equal("r-cancel", (string?)PayloadValue(payload, "requestId"));
+        Assert.Equal(true, (bool?)PayloadValue(payload, "cancelled"));
+    }
+
+    [Fact]
     public async Task LateRunCommandWithShouldExit_RaisesLateCommandShouldExit()
     {
         var transport = new BackendFakeTransport();

@@ -692,6 +692,30 @@ public sealed class PiServerWebSocketHandlerTests
         Assert.Equal("not_available", response.Error?.Code);
     }
 
+    [Fact]
+    public async Task GetSessionSnapshot_ReturnsFullBranchEntries()
+    {
+        var registry = new ServerSessionRegistry((request, _) => CreateRuntimeAsync(request.Cwd));
+        var handler = CreateHandler(registry);
+        var cwd = TempRoot();
+        var createResponse = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(
+            new { id = "c", type = ServerCommandTypes.CreateSession, cwd }, ServerJsonSerializer.Options));
+        var created = Assert.IsType<ServerSessionCreated>(createResponse.Data);
+        Assert.True(registry.TryGet(created.ServerSessionId, out var live));
+        await live.Runtime.Session.AppendModelChangeAsync("provider-x", "model-y");
+
+        var response = await handler.DispatchTextCommandAsync(JsonSerializer.Serialize(
+            new { id = "s", type = ServerCommandTypes.GetSessionSnapshot, serverSessionId = created.ServerSessionId },
+            ServerJsonSerializer.Options));
+
+        Assert.True(response.Success);
+        var snapshot = Assert.IsType<ServerSessionSnapshot>(response.Data);
+        var entry = Assert.IsType<ModelChangeEntry>(Assert.Single(snapshot.BranchEntries));
+        Assert.Equal("provider-x", entry.Provider);
+        Assert.Equal("model-y", entry.ModelId);
+        Assert.False(string.IsNullOrEmpty(entry.Id));
+    }
+
     private sealed record RenderLinesPayload(IReadOnlyList<string>? Lines);
 
     /// <summary>Stub tool that renders its own call/result lines (mirrors TS-bridge renderable tools).</summary>

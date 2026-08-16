@@ -87,9 +87,20 @@ public sealed class SessionTreeEntryJsonConverter : JsonConverter<SessionTreeEnt
     }
 
     private static (string Id, string? ParentId, DateTimeOffset Timestamp) ReadCommon(JsonElement root)
-        => (root.GetProperty("id").GetString() ?? string.Empty,
-            root.TryGetProperty("parentId", out var parent) && parent.ValueKind != JsonValueKind.Null ? parent.GetString() : null,
-            DateTimeOffset.Parse(root.GetProperty("timestamp").GetString() ?? DateTimeOffset.UtcNow.ToString("O")));
+    {
+        var id = TryGetPropertyString(root, "id") ?? TryGetPropertyString(root, "Id") ?? string.Empty;
+        var parentId = TryGetPropertyString(root, "parentId") ?? TryGetPropertyString(root, "ParentId");
+        var timestampStr = TryGetPropertyString(root, "timestamp") ?? TryGetPropertyString(root, "Timestamp");
+        var timestamp = timestampStr is not null && DateTimeOffset.TryParse(timestampStr, out var parsedTs)
+            ? parsedTs
+            : DateTimeOffset.UtcNow;
+        return (id, parentId, timestamp);
+    }
+
+    private static string? TryGetPropertyString(JsonElement root, string propertyName)
+        => root.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
+            ? prop.GetString()
+            : null;
 
     private static object? ReadOptional(JsonElement root, string property)
         => root.TryGetProperty(property, out var value) && value.ValueKind != JsonValueKind.Null ? value.Clone() : null;
