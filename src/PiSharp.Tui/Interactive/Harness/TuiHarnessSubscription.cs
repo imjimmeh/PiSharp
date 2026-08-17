@@ -15,8 +15,6 @@ internal sealed class TuiHarnessSubscription(
     Action<CancellationToken> scheduleRender,
     Action<Action> dispatch,
     Func<string, CancellationToken, Task<IAgentTool?>>? resolveTool,
-    Func<CancellationToken, Task<TuiSessionSnapshot?>> loadSessionSnapshot,
-    Action<TuiSessionSnapshot, bool> applySessionSnapshot,
     TimeSpan? eventBatchInterval = null,
     ILoggerFactory? loggerFactory = null,
     Func<bool>? isAbortPending = null) : IDisposable
@@ -105,7 +103,6 @@ internal sealed class TuiHarnessSubscription(
         foreach (var queued in batch)
         {
             var token = queued.CancellationToken.IsCancellationRequested ? CancellationToken.None : queued.CancellationToken;
-            if (ShouldRefreshSessionSnapshot(queued.Event)) _ = RefreshSessionSnapshotAfterEventAsync(token);
             _ = RenderExtensionToolAsync(queued.Event, token).ContinueWith(task =>
             {
                 if (task is { IsCompletedSuccessfully: true, Result: true }) dispatch(() => scheduleRender(default));
@@ -117,27 +114,6 @@ internal sealed class TuiHarnessSubscription(
     {
         _eventPump?.Dispose();
         _eventPump = null;
-    }
-
-    private async Task RefreshSessionSnapshotAfterEventAsync(CancellationToken token)
-    {
-        try
-        {
-            var snapshot = await loadSessionSnapshot(token);
-            if (snapshot is null) return;
-            dispatch(() =>
-            {
-                applySessionSnapshot(snapshot, true);
-                scheduleRender(token);
-            });
-        }
-        catch (OperationCanceledException) when (token.IsCancellationRequested)
-        {
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Session snapshot refresh failed");
-        }
     }
 
     private async Task<bool> RenderExtensionToolAsync(AgentHarnessEvent evt, CancellationToken token)
@@ -168,9 +144,6 @@ internal sealed class TuiHarnessSubscription(
 
         return false;
     }
-
-    private static bool ShouldRefreshSessionSnapshot(AgentHarnessEvent evt)
-        => evt is AgentHarnessEvent.Core { Event: AgentEvent.TurnEnd or AgentEvent.AgentEnd };
 
     private static string? DescribeThinkingEvent(AgentHarnessEvent evt)
         => evt switch

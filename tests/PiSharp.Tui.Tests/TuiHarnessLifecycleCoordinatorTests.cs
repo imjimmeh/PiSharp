@@ -64,6 +64,41 @@ public sealed class TuiHarnessLifecycleCoordinatorTests
     }
 
     [Fact]
+    public async Task TurnEndDoesNotRefetchSessionSnapshot()
+    {
+        var appContext = new FakeTuiApplicationContext();
+        var state = EmptyState();
+        var store = new RenderStateStore(state);
+        var shell = new TuiShellView();
+        var renderCoordinator = new TuiRenderCoordinator(
+            shell, () => state, s => state = s, appContext, EmptyFooterSnapshot);
+        var facade = new CapturingFacade();
+        var sessionContext = new TuiSessionContext { CurrentRuntime = facade };
+        var options = new TuiHostOptions(facade, "sid", null, _ => Task.FromResult<string?>(null));
+        var snapshotLoads = 0;
+        var coordinator = new TuiHarnessLifecycleCoordinator(
+            sessionContext, options, appContext, renderCoordinator, store,
+            _ => { Interlocked.Increment(ref snapshotLoads); return Task.FromResult<TuiSessionSnapshot?>(null); },
+            (_, _) => { }, null);
+        coordinator.BindInitialHarnessSubscription();
+
+        var listener = facade.Listener
+            ?? throw new InvalidOperationException("subscription did not subscribe to the facade");
+
+        // TurnStart drives the store to busy so the subsequent TurnEnd transition is observable.
+        await Task.Run(() => listener(new AgentHarnessEvent.Core(new AgentEvent.TurnStart()), CancellationToken.None));
+        await WaitForConditionAsync(() => store.Snapshot().IsBusy, TimeSpan.FromSeconds(2));
+        Assert.Equal(0, snapshotLoads);
+
+        await Task.Run(() => listener(new AgentHarnessEvent.Core(new AgentEvent.TurnEnd(null, [])), CancellationToken.None));
+        await WaitForConditionAsync(() => !store.Snapshot().IsBusy, TimeSpan.FromSeconds(2));
+
+        // The render loop is fed purely by streamed events: no get_session_snapshot after the turn.
+        Assert.Equal(0, snapshotLoads);
+        Assert.Equal("Idle", store.Snapshot().Status);
+    }
+
+    [Fact]
     public async Task Event_reduction_lands_on_store_and_schedules_render()
     {
         var facade = new CapturingFacade();
@@ -75,9 +110,7 @@ public sealed class TuiHarnessLifecycleCoordinatorTests
             store,
             scheduleRender: _ => renderCalled.Set(),
             dispatch: action => action(),
-            resolveTool: null,
-            loadSessionSnapshot: _ => Task.FromResult<TuiSessionSnapshot?>(null),
-            applySessionSnapshot: (_, _) => { });
+            resolveTool: null);
         subscription.Bind();
 
         var listener = facade.Listener
@@ -111,9 +144,7 @@ public sealed class TuiHarnessLifecycleCoordinatorTests
                 resolverStarted.Set();
                 await releaseResolver.Task.WaitAsync(token);
                 return renderer;
-            },
-            loadSessionSnapshot: _ => Task.FromResult<TuiSessionSnapshot?>(null),
-            applySessionSnapshot: (_, _) => { });
+            });
         subscription.Bind();
 
         var listener = facade.Listener

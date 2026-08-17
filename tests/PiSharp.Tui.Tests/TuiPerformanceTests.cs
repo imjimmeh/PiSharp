@@ -114,8 +114,6 @@ public sealed class TuiPerformanceTests
             _ => scheduledRenders++,
             action => action(),
             resolveTool: null,
-            loadSessionSnapshot: _ => Task.FromResult<TuiSessionSnapshot?>(null),
-            applySessionSnapshot: (_, _) => { },
             eventBatchInterval: TuiTimingOptions.Default.HarnessEventBatchInterval);
 
         subscription.Bind();

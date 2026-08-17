@@ -47,8 +47,6 @@ internal sealed class TuiHarnessLifecycleCoordinator(
             token => renderCoordinator.RequestRender(token),
             appContext.Post,
             options.ResolveTool,
-            loadSessionSnapshotAsync,
-            applySessionSnapshot,
             options.TimingOptions?.HarnessEventBatchInterval,
             loggerFactory,
             isAbortPending: () => session.AbortPending);

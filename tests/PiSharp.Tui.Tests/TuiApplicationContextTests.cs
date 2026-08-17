@@ -1077,8 +1077,6 @@ public sealed class TuiDisposalTests
             _ => { },
             action => action(),
             resolveTool: null,
-            loadSessionSnapshot: _ => Task.FromResult<TuiSessionSnapshot?>(null),
-            applySessionSnapshot: (_, _) => { },
             loggerFactory: loggerFactory);
 
         subscription.Bind();
