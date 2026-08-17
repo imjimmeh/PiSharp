@@ -2444,26 +2444,6 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.35m, Output: 0.75m))),
 
-        new("cerebras", "zai-glm-4.7", new ModelDescriptor(
-            Provider: "cerebras",
-            Id: "zai-glm-4.7",
-            Api: "openai-completions",
-            Name: "Z.AI GLM-4.7",
-            BaseUrl: "https://api.cerebras.ai/v1",
-            Reasoning: true,
-            ContextWindow: 131072,
-            MaxTokens: 40960,
-            ThinkingLevelMap: new Dictionary<string, int>
-            {
-                ["minimal"] = 1024,
-                ["low"] = 1024,
-                ["medium"] = 4096,
-                ["high"] = 16384,
-                ["xhigh"] = 32000,
-            },
-            Input: ["text"],
-            Cost: new ModelCost(Input: 2.25m, Output: 2.75m, CacheRead: 2.25m))),
-
         // cloudflare-ai-gateway
 
         new("cloudflare-ai-gateway", "anthropic/claude-fable-5", new ModelDescriptor(

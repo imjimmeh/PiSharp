@@ -15,6 +15,8 @@ namespace PiSharp.Ai.Providers.Shared;
 
 public abstract class HttpModelProvider : IModelProvider
 {
+    public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromMinutes(10);
+
     protected readonly HttpClient HttpClient;
     protected readonly IProviderCredentialResolver CredentialResolver;
     protected readonly ILogger Logger;
@@ -22,7 +24,7 @@ public abstract class HttpModelProvider : IModelProvider
     protected HttpModelProvider(string api, HttpClient? httpClient = null, IProviderCredentialResolver? credentialResolver = null, ILoggerFactory? loggerFactory = null)
     {
         Api = api;
-        HttpClient = httpClient ?? new HttpClient();
+        HttpClient = httpClient ?? new HttpClient { Timeout = DefaultRequestTimeout };
         CredentialResolver = credentialResolver ?? new ProviderCredentialResolver();
         Logger = loggerFactory?.CreateLogger(GetType()) ?? NullLogger.Instance;
     }
