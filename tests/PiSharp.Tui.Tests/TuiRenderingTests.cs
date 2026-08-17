@@ -153,9 +153,10 @@ public sealed class TuiRenderingTests
     [Fact]
     public void ThemeExposesSemanticTokensForParitySurfaces()
     {
-        Assert.Equal("#343541", TuiTheme.GetTokenHex(TuiThemeToken.UserMessageBackground));
-        Assert.Equal("#282832", TuiTheme.GetTokenHex(TuiThemeToken.ToolPendingBackground));
-        Assert.Equal(ColorName16.White, TuiTheme.GetTokenAttribute(TuiThemeToken.UserMessageText).Foreground);
+        Assert.Equal("#1e1a12", TuiTheme.GetTokenHex(TuiThemeToken.UserMessageBackground));
+        Assert.Equal("#1c1a16", TuiTheme.GetTokenHex(TuiThemeToken.ToolPendingBackground));
+        Assert.Equal(new Terminal.Gui.Color(0xe8, 0xe0, 0xd5), TuiTheme.GetTokenAttribute(TuiThemeToken.UserMessageText).Foreground);
+        Assert.Equal(new Terminal.Gui.Color(0x1e, 0x1a, 0x12), TuiTheme.GetTokenAttribute(TuiThemeToken.UserMessageText).Background);
         Assert.NotEqual(TuiTheme.DefaultColorScheme.Normal, TuiTheme.GetTokenAttribute(TuiThemeToken.ToolErrorBackground));
     }
 

@@ -8,7 +8,7 @@ public sealed record AnsiStyledRun(string Text, Terminal.Gui.Attribute Attribute
 
 public sealed record AnsiStyledText(IReadOnlyList<AnsiStyledRun> Runs)
 {
-    public static Terminal.Gui.Attribute BrightTextAttribute { get; } = new(ColorName16.White, ColorName16.Black);
+    public static Terminal.Gui.Attribute BrightTextAttribute { get; } = new(new Color("#e8e0d5"), new Color("#16130f"));
 
     public string Text => string.Concat(Runs.Select(run => run.Text));
 
