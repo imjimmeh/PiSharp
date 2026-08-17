@@ -25,6 +25,6 @@ public sealed class WorkingIndicatorView : WrappedTextView
         var message = indicator?.Message ?? state.WorkingMessage ?? DefaultMessage;
         var spinner = indicator?.Spinner ?? DefaultFrames[Math.Abs(frameIndex) % DefaultFrames.Length];
         var text = string.IsNullOrEmpty(spinner) ? message : $"{spinner} {message}";
-        RenderWrapped([text], () => Render(state, frameIndex));
+        RenderWrapped([$"\u001b[96m{text}\u001b[39m"], () => Render(state, frameIndex));
     }
 }

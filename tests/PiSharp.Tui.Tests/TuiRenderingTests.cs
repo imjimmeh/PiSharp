@@ -1243,6 +1243,18 @@ public sealed class TuiRenderingTests
     }
 
     [Fact]
+    public void WorkingIndicatorRunsAreEmberAccentWhenBusy()
+    {
+        var indicator = new WorkingIndicatorView();
+        var state = (Empty() with { IsBusy = true }).SetWorkingMessage("thinking");
+        indicator.Render(state, 0);
+
+        Assert.All(indicator.StyledRuns, run =>
+            Assert.Equal(TuiTheme.GetTokenAttribute(TuiThemeToken.Accent), run.Attribute));
+        Assert.Contains("thinking", indicator.Text?.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FooterSnapshotAggregatesUsageAndVisibleFields()
     {
         var usage = new UsageInfo(Input: 10, Output: 15, CacheRead: 3, CacheWrite: 2, TotalTokens: 30, Cost: new UsageCost(Total: 0.0123m));
