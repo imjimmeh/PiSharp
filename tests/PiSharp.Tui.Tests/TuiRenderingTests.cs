@@ -285,6 +285,14 @@ public sealed class TuiRenderingTests
     }
 
     [Fact]
+    public void FooterStatusTokenIsErrorAttrWhenStatusIsError()
+    {
+        var footer = new FooterView();
+        footer.Render(Empty() with { Status = "error: failed" }, new TuiFooterSnapshot("repo", "main", 10, 20, 5, 35, 0.123m, 42d, 100, false, new Dictionary<string, string>()));
+        Assert.Contains(footer.StyledRuns, run => run.Attribute == TuiTheme.GetTokenAttribute(TuiThemeToken.Error));
+    }
+
+    [Fact]
     public void MessageRendererCoversUserAssistantThinkingImageAndSystemRows()
     {
         var state = Empty();

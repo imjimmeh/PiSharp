@@ -27,8 +27,13 @@ public sealed class FooterView : WrappedTextView
 
         var tools = activeTools is { Count: > 0 } ? string.Join(",", activeTools) : "none";
         var branch = string.IsNullOrWhiteSpace(snapshot.GitBranch) ? string.Empty : $" ({snapshot.GitBranch})";
-
-        var firstLine = $"{snapshot.Cwd}{branch} • {state.Status} • tools:{tools}";
+        var statusSgr = state.IsBusy
+            ? "\u001b[96m"   // Accent
+            : state.Status?.StartsWith("error", StringComparison.OrdinalIgnoreCase) == true
+                ? "\u001b[31m" // Error
+                : "\u001b[32m"; // Success
+        var statusText = $"{statusSgr}{state.Status}\u001b[39m";
+        var firstLine = $"{snapshot.Cwd}{branch} • {statusText} • tools:{tools}";
 
         string contextPart;
         if (!snapshot.ContextPercentKnown)
