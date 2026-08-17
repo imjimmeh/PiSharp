@@ -8,6 +8,8 @@ public sealed class ChatView : WidthReflowView
 {
     private readonly record struct InteractionPress(TuiInteractionTarget Target, int ViewRow, int Column);
 
+    public const int ChatHorizontalGutter = 2;
+
     private readonly ChatRowCache _cache = new(TuiMessageRenderer.Render);
     private readonly ChatTranscriptRowPlanner _rowPlanner = new();
     private readonly TextSelectionManager _selection;

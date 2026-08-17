@@ -1786,6 +1786,18 @@ public sealed class TuiRenderingTests
     }
 
     [Fact]
+    public void ShellAccentPromptBorderOnFocusAndGuttersChat()
+    {
+        var shell = new TuiShellView();
+
+        shell.PromptBottomBorder.ColorScheme = TuiTheme.PromptBorderColorScheme;
+        Assert.Equal(TuiTheme.PromptBorderColorScheme, shell.PromptBottomBorder.ColorScheme);
+
+        Assert.Equal(Pos.Absolute(ChatView.ChatHorizontalGutter), shell.Chat.X);
+        Assert.Equal(Pos.AnchorEnd(ChatView.ChatHorizontalGutter + 1), shell.ChatScrollBar.X);
+    }
+
+    [Fact]
     public void ScrollBarPositionSyncsFromChatViewScrollTop()
     {
         var chat = new ChatView { Height = 3 };

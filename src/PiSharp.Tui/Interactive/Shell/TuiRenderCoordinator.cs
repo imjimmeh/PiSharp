@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Tui.Interactive.Components;
+using PiSharp.Tui.Interactive.Theme;
 using Terminal.Gui;
 
 namespace PiSharp.Tui.Interactive.Shell;
@@ -195,6 +196,8 @@ internal sealed class TuiRenderCoordinator : IDisposable
         {
             prompt.FocusAtEnd();
         }
+        _shell.PromptBottomBorder.ColorScheme = prompt.HasFocus ? TuiTheme.AccentPromptBorderScheme : TuiTheme.PromptBorderColorScheme;
+        _shell.PromptTitle.ColorScheme = prompt.HasFocus ? TuiTheme.AccentPromptBorderScheme : TuiTheme.PromptBorderColorScheme;
     }
 
 

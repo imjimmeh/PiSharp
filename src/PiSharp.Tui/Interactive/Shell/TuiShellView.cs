@@ -58,9 +58,9 @@ internal sealed class TuiShellView
         };
         Chat = new ChatView
         {
-            X = 0,
+            X = Pos.Absolute(ChatView.ChatHorizontalGutter),
             Y = 3 + MenuBarHeight,
-            Width = Dim.Fill(1),
+            Width = Dim.Fill(1 + ChatView.ChatHorizontalGutter),
             Height = Dim.Fill(7)
         };
         WorkingIndicator = new WorkingIndicatorView
@@ -126,7 +126,7 @@ internal sealed class TuiShellView
         };
         ChatScrollBar = new ScrollBar
         {
-            X = Pos.AnchorEnd(1),
+            X = Pos.AnchorEnd(ChatView.ChatHorizontalGutter + 1),
             Y = 3 + MenuBarHeight,
             Width = 1,
             Height = Dim.Fill(7),
@@ -217,9 +217,11 @@ internal sealed class TuiShellView
         LeftSidebar.Height = Dim.Fill(bottomReserved);
         RightSidebar.Height = Dim.Fill(bottomReserved);
 
-        Chat.X = LeftSidebar.Visible ? Pos.Right(LeftSidebar) : Pos.Absolute(0);
-        Chat.Width = Dim.Fill(1 + (RightSidebar.Visible ? (int)(Window.Frame.Width * SidebarWidthPercent / 100.0) : 0));
-        ChatScrollBar.X = RightSidebar.Visible ? Pos.Left(RightSidebar) - 1 : Pos.AnchorEnd(1);
+        Chat.X = LeftSidebar.Visible ? Pos.Right(LeftSidebar) : Pos.Absolute(ChatView.ChatHorizontalGutter);
+        Chat.Width = Dim.Fill((LeftSidebar.Visible ? 1 : ChatView.ChatHorizontalGutter + 1) + (RightSidebar.Visible ? (int)(Window.Frame.Width * SidebarWidthPercent / 100.0) : 0));
+        ChatScrollBar.X = RightSidebar.Visible
+            ? Pos.Left(RightSidebar) - 1
+            : LeftSidebar.Visible ? Pos.AnchorEnd(1) : Pos.AnchorEnd(ChatView.ChatHorizontalGutter + 1);
 
         Footer.Y = Pos.AnchorEnd(footerHeight);
         PromptBottomBorder.Y = Pos.AnchorEnd(footerHeight + TuiLayoutMetrics.PromptBorderHeight);
