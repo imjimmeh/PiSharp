@@ -33,7 +33,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
     public static readonly IReadOnlyDictionary<string, TimeSpan> CommandTimeouts = new Dictionary<string, TimeSpan>(StringComparer.Ordinal)
     {
         [ServerCommandTypes.RunCommand] = TimeSpan.FromMinutes(10),
-        [ServerCommandTypes.ProcessInput] = TimeSpan.FromMinutes(10),
+        [ServerCommandTypes.ProcessInput] = TimeSpan.FromSeconds(30),
         [ServerCommandTypes.CreateSession] = TimeSpan.FromSeconds(90),
         [ServerCommandTypes.CompleteCommand] = TimeSpan.FromSeconds(15),
         [ServerCommandTypes.GetAvailableModels] = TimeSpan.FromSeconds(15),

@@ -109,6 +109,18 @@ public sealed class ClientWebSocketTransportTimeoutTests
     }
 
     [Fact]
+    public void ProcessInput_UsesBoundedTimeout()
+    {
+        // process_input reflects user keystrokes through the transport, so it must fail fast
+        // (a bounded window) rather than pin the whole turn on an unbounded wait.
+        Assert.True(
+            ClientWebSocketTransport.CommandTimeouts.TryGetValue(ServerCommandTypes.ProcessInput, out var timeout)
+            && timeout > TimeSpan.Zero
+            && timeout <= TimeSpan.FromSeconds(30),
+            $"process_input should default to a bounded timeout of at most 30s; got {timeout}");
+    }
+
+    [Fact]
     public async Task TimedOutResponse_IsNotDiscarded()
     {
         await using var server = await DelayedResponseServer.StartAsync(delay: TimeSpan.FromMilliseconds(150));
