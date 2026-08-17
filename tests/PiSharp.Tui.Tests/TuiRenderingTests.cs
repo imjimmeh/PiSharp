@@ -293,6 +293,21 @@ public sealed class TuiRenderingTests
     }
 
     [Fact]
+    public void FooterRendersWithoutThrowingWhenExtensionStatusesIsNull()
+    {
+        var footer = new FooterView();
+        var state = Empty();
+
+        // Remote TUI path builds the footer snapshot from ServerFooterSnapshot, which carries no
+        // extension statuses, so ExtensionStatuses is null (mirrors ClientToTuiAdapter.ToSessionSnapshot).
+        var snapshot = new TuiFooterSnapshot("cwd", null, 0, 0, 0, 0, 0, 0, 0, false);
+
+        footer.Render(state, snapshot, widthOverride: 80);
+
+        Assert.Contains("tools:none", footer.Text?.ToString() ?? string.Empty);
+    }
+
+    [Fact]
     public void MessageRendererCoversUserAssistantThinkingImageAndSystemRows()
     {
         var state = Empty();

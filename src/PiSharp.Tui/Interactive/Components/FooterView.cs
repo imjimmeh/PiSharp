@@ -65,9 +65,10 @@ public sealed class FooterView : WrappedTextView
         var lines = new List<string> { firstLine };
         lines.AddRange(FormatStatsLines(statsLeft, rightSide, width));
 
-        if (snapshot.ExtensionStatuses.Count > 0)
+        var extensionStatuses = snapshot.ExtensionStatuses ?? new Dictionary<string, string>();
+        if (extensionStatuses.Count > 0)
         {
-            lines.Add(string.Join(' ', snapshot.ExtensionStatuses.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => StyleExtensionText(SanitizeStatus(pair.Value)))));
+            lines.Add(string.Join(' ', extensionStatuses.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => StyleExtensionText(SanitizeStatus(pair.Value)))));
         }
 
         _logger.LogDebug(
@@ -77,7 +78,7 @@ public sealed class FooterView : WrappedTextView
             width,
             snapshot.GitBranch,
             customFooterLines.Length,
-            snapshot.ExtensionStatuses.Count);
+            extensionStatuses.Count);
         RenderWrapped(lines, () => Render(state, snapshot, activeTools, widthOverride), widthOverride);
     }
 
