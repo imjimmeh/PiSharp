@@ -686,13 +686,31 @@ public sealed class PiServerWebSocketHandler(
     private async Task<ServerResponse> GetSessionSnapshotAsync(ServerCommandEnvelope envelope, CancellationToken cancellationToken)
     {
         var live = RequireSession(RequiredSessionId(envelope));
-        var snapshot = await live.RunExclusiveAsync(async (runtime, token) => new ServerSessionSnapshot(
-            runtime.Session.Metadata.Id,
-            runtime.Session.Metadata.Path,
-            await runtime.Session.GetSessionNameAsync(token),
-            await runtime.Session.GetBranchAsync(cancellationToken: token),
-            runtime.Harness.Model,
-            runtime.Harness.ThinkingLevel), cancellationToken);
+        var snapshot = await live.RunExclusiveAsync(async (runtime, token) =>
+        {
+            var branchEntries = await runtime.Session.GetBranchAsync(cancellationToken: token);
+            var sessionName = await runtime.Session.GetSessionNameAsync(token);
+            var footer = await live.BuildFooterSnapshotAsync(token).ConfigureAwait(false);
+            var modifiedFiles = await live.GetModifiedFilesAsync(token).ConfigureAwait(false);
+            var loadStatus = runtime.GetExtensionLoadSummary();
+            var shortcuts = runtime.ExtensionManager?.Registry.Shortcuts ?? [];
+            var commands = delegates?.GetCommandsAsync is not null
+                ? await delegates.GetCommandsAsync(live, token).ConfigureAwait(false)
+                : [];
+
+            return new ServerSessionSnapshot(
+                runtime.Session.Metadata.Id,
+                runtime.Session.Metadata.Path,
+                sessionName,
+                branchEntries,
+                runtime.Harness.Model,
+                runtime.Harness.ThinkingLevel,
+                footer,
+                modifiedFiles,
+                loadStatus,
+                shortcuts,
+                commands);
+        }, cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type, snapshot);
     }
 

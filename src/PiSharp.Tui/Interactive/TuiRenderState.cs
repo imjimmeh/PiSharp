@@ -70,7 +70,12 @@ public sealed record TuiRenderState(
     IReadOnlyList<SessionTreeEntry>? SessionBranchEntries = null,
     IReadOnlyList<TuiMenuEntry>? CustomMenuEntries = null,
     bool LeftSidebarVisible = true,
-    bool RightSidebarVisible = true)
+    bool RightSidebarVisible = true,
+    TuiFooterSnapshot? FooterSnapshot = null,
+    IReadOnlyList<string>? ModifiedFiles = null,
+    TuiExtensionLoadStatus? ExtensionLoadStatus = null,
+    IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>>? ExtensionShortcuts = null,
+    IReadOnlyList<string>? AvailableCommands = null)
 {
     public IReadOnlyDictionary<string, string> Statuses => ExtensionStatuses ?? new Dictionary<string, string>();
     public IReadOnlyList<TuiMenuEntry> CustomMenus => CustomMenuEntries ?? [];
@@ -290,6 +295,33 @@ public sealed record TuiRenderState(
             AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ThinkingLevelSelect select } => this with { ThinkingLevel = select.Level },
             AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ThinkingLevelChanged changed } => this with { ThinkingLevel = changed.Level },
             AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SystemMessage system } => AppendSystem(system.Text, system.IsError),
+            AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionMetrics metrics } => this with
+            {
+                FooterSnapshot = new TuiFooterSnapshot(
+                    metrics.Cwd,
+                    metrics.GitBranch,
+                    metrics.InputTokens,
+                    metrics.OutputTokens,
+                    metrics.CacheTokens,
+                    metrics.TotalTokens,
+                    metrics.TotalCost,
+                    metrics.ContextPercent,
+                    metrics.ContextWindow,
+                    metrics.AutoCompact)
+                {
+                    ContextPercentKnown = metrics.ContextPercentKnown
+                }
+            },
+            AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ExtensionLoadStatusUpdate loadStatus } => this with
+            {
+                ExtensionLoadStatus = new TuiExtensionLoadStatus(
+                    loadStatus.Total,
+                    loadStatus.Active,
+                    loadStatus.BlockingActive,
+                    loadStatus.Ready,
+                    loadStatus.Failed)
+            },
+            AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ModifiedFilesUpdate modified } => this with { ModifiedFiles = modified.Files },
             _ => this
         };
         return evt is AgentHarnessEvent.Core { Event: AgentEvent.AgentEnd }
@@ -357,6 +389,39 @@ public sealed record TuiRenderState(
                     break;
                 case AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SystemMessage system }:
                     Append(new TuiTranscriptItem("system", system.Text, IsError: system.IsError));
+                    break;
+                case AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionMetrics metrics }:
+                    state = state with
+                    {
+                        FooterSnapshot = new TuiFooterSnapshot(
+                            metrics.Cwd,
+                            metrics.GitBranch,
+                            metrics.InputTokens,
+                            metrics.OutputTokens,
+                            metrics.CacheTokens,
+                            metrics.TotalTokens,
+                            metrics.TotalCost,
+                            metrics.ContextPercent,
+                            metrics.ContextWindow,
+                            metrics.AutoCompact)
+                        {
+                            ContextPercentKnown = metrics.ContextPercentKnown
+                        }
+                    };
+                    break;
+                case AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ExtensionLoadStatusUpdate loadStatus }:
+                    state = state with
+                    {
+                        ExtensionLoadStatus = new TuiExtensionLoadStatus(
+                            loadStatus.Total,
+                            loadStatus.Active,
+                            loadStatus.BlockingActive,
+                            loadStatus.Ready,
+                            loadStatus.Failed)
+                    };
+                    break;
+                case AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.ModifiedFilesUpdate modified }:
+                    state = state with { ModifiedFiles = modified.Files };
                     break;
             }
         }

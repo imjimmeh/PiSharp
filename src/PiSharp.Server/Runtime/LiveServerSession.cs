@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Harness;
+using PiSharp.Agent.Sessions;
 using PiSharp.Extensions;
 using PiSharp.Server.Contracts;
 namespace PiSharp.Server.Runtime;
@@ -198,16 +199,69 @@ public sealed class LiveServerSession : IAsyncDisposable
         }
         return Task.CompletedTask;
     }
+    public async Task<ServerFooterSnapshot> BuildFooterSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        var branchEntries = await Runtime.Session.GetBranchAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var cwd = Runtime.Session.Metadata.Cwd;
+        var metrics = SessionMetricsCalculator.Calculate(branchEntries, cwd, Runtime.Harness.Model.ContextWindow, Runtime.AutoCompactionEnabled);
+
+        return new ServerFooterSnapshot(
+            metrics.Cwd,
+            metrics.GitBranch,
+            metrics.InputTokens,
+            metrics.OutputTokens,
+            metrics.CacheTokens,
+            metrics.TotalTokens,
+            metrics.TotalCost,
+            metrics.ContextPercent,
+            metrics.ContextPercentKnown,
+            metrics.ContextWindow,
+            metrics.AutoCompact);
+    }
+
+    public async Task<IReadOnlyList<string>> GetModifiedFilesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var cwd = Runtime.Session.Metadata.Cwd;
+            return await ModifiedFilesTracker.GetModifiedFilesAsync(cwd, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     private void BindCurrentHarness()
     {
         _subscription?.Dispose();
-        _subscription = Runtime.Harness.Subscribe((evt, _) =>
+        _subscription = Runtime.Harness.Subscribe(async (evt, token) =>
         {
             var sequence = Interlocked.Increment(ref _sequence);
             var envelope = ServerEventEnvelope.FromFlat(Id, sequence, evt.ToFlat());
             EventLog.Append(envelope);
             foreach (var subscriber in _subscribers.Values) subscriber.Writer.TryWrite(envelope);
-            return Task.CompletedTask;
+
+            if (evt is AgentHarnessEvent.Core { Event: AgentEvent.TurnEnd or AgentEvent.AgentEnd }
+                or AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.CompactionEnd or AgentHarnessOwnEvent.SessionTree })
+            {
+                try
+                {
+                    var footer = await BuildFooterSnapshotAsync(token).ConfigureAwait(false);
+                    var metricsEvt = AgentSessionEvent.FromOwn(new AgentHarnessOwnEvent.SessionMetrics(
+                        footer.Cwd, footer.GitBranch, footer.InputTokens, footer.OutputTokens,
+                        footer.CacheTokens, footer.TotalTokens, footer.TotalCost,
+                        footer.ContextPercent, footer.ContextPercentKnown, footer.ContextWindow, footer.AutoCompact));
+                    EmitEvent(metricsEvt);
+
+                    var modifiedFiles = await GetModifiedFilesAsync(token).ConfigureAwait(false);
+                    EmitEvent(AgentSessionEvent.FromOwn(new AgentHarnessOwnEvent.ModifiedFilesUpdate(modifiedFiles)));
+                }
+                catch
+                {
+                    // Gracefully ignore background metrics generation failures
+                }
+            }
         });
     }
 

@@ -6,6 +6,7 @@ using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Models;
 using PiSharp.Continuity.Contracts;
 using PiSharp.Extensions;
+using PiSharp.Runtime;
 using PiSharp.Server.Runtime;
 using PiSharp.Server.UiBridge;
 
@@ -325,13 +326,31 @@ public sealed record ServerUiResponse(string RequestId, object? Value = null, bo
 
 public sealed record ServerStartupMessages(IReadOnlyList<string> Messages);
 
+public sealed record ServerFooterSnapshot(
+    string Cwd,
+    string? GitBranch,
+    int InputTokens,
+    int OutputTokens,
+    int CacheTokens,
+    int TotalTokens,
+    decimal TotalCost,
+    double ContextPercent,
+    bool ContextPercentKnown,
+    int ContextWindow,
+    bool AutoCompact);
+
 public sealed record ServerSessionSnapshot(
     string SessionId,
     string? SessionFile,
     string? SessionName,
     IReadOnlyList<object> BranchEntries,
     ModelDescriptor? Model = null,
-    ThinkingLevel? ThinkingLevel = null);
+    ThinkingLevel? ThinkingLevel = null,
+    ServerFooterSnapshot? Footer = null,
+    IReadOnlyList<string>? ModifiedFiles = null,
+    ExtensionLoadSummary? ExtensionLoadStatus = null,
+    IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>>? Shortcuts = null,
+    IReadOnlyList<string>? Commands = null);
 
 /// <summary>Carries the live session and UI bridge into host-provided command delegates.</summary>
 public sealed record PiServerHostContext(LiveServerSession Session, IServerUiBridge UiBridge);

@@ -76,6 +76,23 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _pendingUiRequests = new(StringComparer.Ordinal);
     private readonly BackgroundTaskTracker _taskTracker;
 
+    private IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>> _cachedShortcuts = [];
+    private TuiExtensionLoadStatus _cachedLoadStatus = new(0, 0, 0, 0, 0);
+    private IReadOnlyList<string> _cachedCommands = [];
+    private IReadOnlyList<string> _cachedModifiedFiles = [];
+
+    public IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>> CachedShortcuts => _cachedShortcuts;
+    public TuiExtensionLoadStatus CachedLoadStatus => _cachedLoadStatus;
+    public IReadOnlyList<string> CachedCommands => _cachedCommands;
+    public IReadOnlyList<string> CachedModifiedFiles => _cachedModifiedFiles;
+
+    public IReadOnlyList<string> CompleteCachedCommands(string text)
+    {
+        if (_cachedCommands.Count == 0) return [];
+        if (string.IsNullOrWhiteSpace(text)) return _cachedCommands;
+        return _cachedCommands.Where(cmd => cmd.StartsWith(text, StringComparison.OrdinalIgnoreCase)).ToArray();
+    }
+
     public RemoteTuiBackend(ClientSessionConnection connection, ILogger logger)
     {
         _connection = connection;
@@ -454,7 +471,12 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
         var snapshot = FromServerPayload<ServerSessionSnapshot>(response.Data)
             ?? throw new InvalidOperationException("get_session_snapshot returned no snapshot.");
-        return ClientToTuiAdapter.ToSessionSnapshot(snapshot);
+        var tuiSnapshot = ClientToTuiAdapter.ToSessionSnapshot(snapshot);
+        if (tuiSnapshot.Shortcuts is not null) _cachedShortcuts = tuiSnapshot.Shortcuts;
+        if (tuiSnapshot.ExtensionLoadStatus is not null) _cachedLoadStatus = tuiSnapshot.ExtensionLoadStatus;
+        if (tuiSnapshot.Commands is not null) _cachedCommands = tuiSnapshot.Commands;
+        if (tuiSnapshot.ModifiedFiles is not null) _cachedModifiedFiles = tuiSnapshot.ModifiedFiles;
+        return tuiSnapshot;
     }
 
     public async Task ForkFromEntryAsync(string entryId, CancellationToken token = default)
@@ -750,6 +772,14 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             case "thinking_level_changed":
             case "thinking_level_select":
                 if (ClientToTuiAdapter.ExtractThinkingLevel(envelope.Event.Data) is { } level) _thinkingLevel = level;
+                break;
+            case "extension_load_status":
+                if (ClientToTuiAdapter.FromPayload<ClientToTuiAdapter.ExtensionLoadStatusWire>(envelope.Event.Data) is { } ls)
+                    _cachedLoadStatus = new TuiExtensionLoadStatus(ls.Total, ls.Active, ls.BlockingActive, ls.Ready, ls.Failed);
+                break;
+            case "modified_files":
+                if (ClientToTuiAdapter.FromPayload<ClientToTuiAdapter.ModifiedFilesWire>(envelope.Event.Data) is { Files: { } mf })
+                    _cachedModifiedFiles = mf;
                 break;
         }
     }

@@ -405,6 +405,7 @@ public static class InteractiveMode
 
         TuiFooterSnapshot CreateRemoteFooterSnapshot(TuiRenderState state)
         {
+            if (state.FooterSnapshot is { } pushed) return pushed;
             try
             {
                 return footerSnapshotProvider.CreateSnapshotFromSessionEntries(state, cwd, state.SessionBranchEntries);
@@ -416,121 +417,13 @@ public static class InteractiveMode
             }
         }
 
-        // --- non-blocking remote daemon caches (Task 4) ---
-        // The UI thread and the pump/render workers must never block on a daemon RPC. Each option
-        // body below returns the last fetched value synchronously and refreshes it on a background
-        // worker; a latch keeps at most one fetch in flight per source. Fetch workers publish into
-        // these caches under plain locks — none of the caches is owned by the main loop, so routing
-        // the write through the app context would add latency without a correctness benefit.
-        var shortcutCacheGate = new object();
-        var loadStatusCacheGate = new object();
-        var completionCacheGate = new object();
-        IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>> shortcutCache = [];
-        var loadStatusCache = new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
-        var completionCache = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        int shortcutRefreshInFlight = 0;
-        int loadStatusRefreshInFlight = 0;
-        long lastLoadStatusRefreshTicks = 0;
-        int completionRefreshInFlight = 0;
-
-        async Task RefreshShortcutCacheAsync()
-        {
-            try
-            {
-                var fetched = await backend.GetExtensionShortcutsAsync(CancellationToken.None).ConfigureAwait(false);
-                lock (shortcutCacheGate) shortcutCache = fetched;
-                logger.LogDebug("Remote extension shortcut cache refreshed shortcutCount={ShortcutCount}", fetched.Count);
-            }
-            catch (Exception exception)
-            {
-                logger?.LogDebug(exception, "Remote extension shortcut refresh failed; keeping previous cache");
-            }
-            finally
-            {
-                Interlocked.Exchange(ref shortcutRefreshInFlight, 0);
-            }
-        }
-
-        async Task RefreshLoadStatusCacheAsync()
-        {
-            try
-            {
-                var fetched = await backend.GetExtensionLoadStatusAsync(CancellationToken.None).ConfigureAwait(false);
-                lock (loadStatusCacheGate) loadStatusCache = fetched;
-                logger.LogDebug("Remote extension load status cache refreshed total={Total} active={Active} ready={Ready} failed={Failed}", fetched.Total, fetched.Active, fetched.Ready, fetched.Failed);
-            }
-            catch (Exception exception)
-            {
-                logger?.LogDebug(exception, "Remote extension load status refresh failed; keeping previous cache");
-            }
-            finally
-            {
-                Interlocked.Exchange(ref loadStatusRefreshInFlight, 0);
-            }
-        }
-
-        async Task RefreshCompletionCacheAsync(string text)
-        {
-            try
-            {
-                var completions = await backend.CompleteCommandAsync(text, CancellationToken.None).ConfigureAwait(false);
-                lock (completionCacheGate) completionCache[text] = completions;
-                logger.LogDebug("Remote command completion cache refreshed textLength={TextLength} completionCount={CompletionCount}", text.Length, completions.Count);
-            }
-            catch (Exception exception)
-            {
-                logger?.LogDebug(exception, "Remote command completion refresh failed; keeping previous cache");
-                lock (completionCacheGate) if (completionCache.TryGetValue(text, out var cached) && cached.Count == 0) completionCache.Remove(text);
-            }
-            finally
-            {
-                Interlocked.Exchange(ref completionRefreshInFlight, 0);
-            }
-        }
-
-        IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>> GetCachedRemoteShortcuts()
-        {
-            if (backend.ServerSessionId is null) return [];
-            if (Interlocked.CompareExchange(ref shortcutRefreshInFlight, 1, 0) == 0)
-                _ = Task.Run(() => RefreshShortcutCacheAsync());
-            lock (shortcutCacheGate) return shortcutCache;
-        }
-
-        TuiExtensionLoadStatus GetCachedRemoteLoadStatus()
-        {
-            if (backend.ServerSessionId is null) return new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
-            var now = Environment.TickCount64;
-            if (now - Interlocked.Read(ref lastLoadStatusRefreshTicks) > 2000)
-            {
-                if (Interlocked.CompareExchange(ref loadStatusRefreshInFlight, 1, 0) == 0)
-                {
-                    Interlocked.Exchange(ref lastLoadStatusRefreshTicks, now);
-                    _ = Task.Run(() => RefreshLoadStatusCacheAsync());
-                }
-            }
-            lock (loadStatusCacheGate) return loadStatusCache;
-        }
-
-        IReadOnlyList<string> GetCachedRemoteCompletions(string text)
-        {
-            lock (completionCacheGate)
-            {
-                if (completionCache.TryGetValue(text, out var cached)) return cached;
-                completionCache[text] = [];
-            }
-
-            if (Interlocked.CompareExchange(ref completionRefreshInFlight, 1, 0) == 0)
-                _ = Task.Run(() => RefreshCompletionCacheAsync(text));
-            return [];
-        }
-
         var options = new TuiHostOptions(
             backend,
             SessionId: "connecting",
             SessionFile: null,
             backend.GetSessionNameAsync,
             DispatchCommandAsync: backend.DispatchCommandAsync,
-            CompleteCommand: GetCachedRemoteCompletions,
+            CompleteCommand: backend.CompleteCachedCommands,
             WorkingDirectory: cwd,
             FooterSnapshot: CreateRemoteFooterSnapshot,
             ConfigureUiBridge: bridge =>
@@ -551,7 +444,7 @@ public static class InteractiveMode
             },
             Theme: null,
             KeybindingsPath: ResolveRemoteKeybindingsPath(cwd),
-            GetExtensionShortcuts: GetCachedRemoteShortcuts,
+            GetExtensionShortcuts: () => backend.CachedShortcuts,
             GetExtensionRegistry: () => null,
             ResolveTool: backend.ResolveToolAsync,
             CycleThinkingLevelAsync: backend.CycleThinkingLevelAsync,
@@ -564,7 +457,7 @@ public static class InteractiveMode
             ProcessInputAsync: backend.ProcessInputAsync,
             GetSessionSnapshotAsync: backend.GetSessionSnapshotAsync,
             ForkFromEntryAsync: backend.ForkFromEntryAsync,
-            GetExtensionLoadStatus: GetCachedRemoteLoadStatus,
+            GetExtensionLoadStatus: () => backend.CachedLoadStatus,
             ExtensionLoadCommandWhitelist: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/quit" },
             LoggerFactory: activeLoggerFactory)
         {

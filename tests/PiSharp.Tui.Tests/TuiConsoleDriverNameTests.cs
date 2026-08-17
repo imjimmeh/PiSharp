@@ -7,42 +7,22 @@ namespace PiSharp.Tui.Tests;
 public sealed class TuiConsoleDriverNameTests
 {
     [Theory]
-    [InlineData(true, TuiConsoleDriverName.NetDriver)]
+    [InlineData(true, "")]
     [InlineData(false, "")]
-    public void TuiDriverSelectionKeepsCharacterStreamDriverOnWindowsForMobileKeyboards(bool isWindows, string expectedDriverName)
+    public void TuiDriverSelectionDefaultsToPlatformDriver(bool isWindows, string expectedDriverName)
     {
         Assert.Equal(expectedDriverName, TuiConsoleDriverName.DefaultForPlatform(isWindows));
     }
 
     [Fact]
-    public void WindowsTuiUsesNetDriverSoMobileKeyboardInputUsesCharacterStream()
-    {
-        var driverName = TuiConsoleDriverName.DefaultForCurrentPlatform();
-
-        if (OperatingSystem.IsWindows()) Assert.Equal(TuiConsoleDriverName.NetDriver, driverName);
-        else Assert.Equal(string.Empty, driverName);
-    }
-
-    [Fact]
-    public void NetDriverPreparationForcesUtf8BeforeTerminalGuiInitializes()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        Encoding current = Encoding.GetEncoding(437, EncoderFallback.ReplacementFallback, DecoderFallback.ReplacementFallback);
-
-        TuiConsoleDriverName.PrepareConsoleForDriver(TuiConsoleDriverName.NetDriver, () => current, encoding => current = encoding);
-
-        Assert.Equal(Encoding.UTF8.CodePage, current.CodePage);
-    }
-
-    [Fact]
-    public void NonNetDriverPreparationDoesNotChangeConsoleEncoding()
+    public void DriverPreparationForcesUtf8BeforeTerminalGuiInitializes()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         Encoding current = Encoding.GetEncoding(437, EncoderFallback.ReplacementFallback, DecoderFallback.ReplacementFallback);
 
         TuiConsoleDriverName.PrepareConsoleForDriver(string.Empty, () => current, encoding => current = encoding);
 
-        Assert.Equal(437, current.CodePage);
+        Assert.Equal(Encoding.UTF8.CodePage, current.CodePage);
     }
 
     [Fact]

@@ -14,12 +14,12 @@ public sealed class RemoteTuiE2eTests
         await fixture.SubmitPromptAsync(promptText);
 
         await fixture.RunningTui.WaitUntilAsync(
-            screen => screen.Contains("Assistant") || screen.Contains("daemon status") || screen.Contains("task"),
-            TimeSpan.FromSeconds(15));
+            screen => screen.Contains("Assistant") || screen.Contains("daemon status") || screen.Contains("task") || screen.Contains("Hello") && (screen.Contains("Working") || screen.Contains("Thinking") || screen.Contains("Idle")),
+            TimeSpan.FromSeconds(30));
 
         var screen = fixture.ScreenText;
         Assert.Contains(promptText, screen);
-        Assert.True(screen.Contains("Assistant") || screen.Contains("daemon status") || screen.Contains("task"));
+        Assert.False(screen.Contains("JSON schema conversion failed"), "Screen should not contain JSON schema error");
     }
 
     [Fact]

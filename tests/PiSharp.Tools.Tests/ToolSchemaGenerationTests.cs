@@ -61,6 +61,59 @@ public sealed class ToolSchemaGenerationTests
             schema.GetRawText());
     }
 
+    [Fact]
+    public void FromTypeGeneratesObjectSchemaForOpenTypesAndPreservesDescriptions()
+    {
+        var schema = ToolSchemaFactory.FromType<OpenTypesInput>();
+
+        Assert.Equal("object", schema.GetProperty("type").GetString());
+        var properties = schema.GetProperty("properties");
+
+        // Verify each open type is an object schema, NOT a boolean true
+        Assert.True(properties.TryGetProperty("element", out var element));
+        Assert.Equal(JsonValueKind.Object, element.ValueKind);
+        Assert.Equal("object", element.GetProperty("type").GetString());
+        Assert.Equal("Required JsonElement description", element.GetProperty("description").GetString());
+
+        Assert.True(properties.TryGetProperty("nullableElement", out var nullableElement));
+        Assert.Equal(JsonValueKind.Object, nullableElement.ValueKind);
+        Assert.Equal("Optional JsonElement description", nullableElement.GetProperty("description").GetString());
+        // Verify nullable open type schema is either type: object, type: [object, null], or anyOf containing object
+        var hasValidType = (nullableElement.TryGetProperty("type", out var nType) && (nType.ValueKind == JsonValueKind.String && nType.GetString() == "object" || nType.ValueKind == JsonValueKind.Array))
+            || (nullableElement.TryGetProperty("anyOf", out var anyOf) && anyOf.ValueKind == JsonValueKind.Array);
+        Assert.True(hasValidType, "nullableElement must declare a valid object type or anyOf union");
+
+        Assert.True(properties.TryGetProperty("node", out var node));
+        Assert.Equal(JsonValueKind.Object, node.ValueKind);
+        Assert.Equal("object", node.GetProperty("type").GetString());
+        Assert.Equal("JsonNode description", node.GetProperty("description").GetString());
+
+        Assert.True(properties.TryGetProperty("obj", out var obj));
+        Assert.Equal(JsonValueKind.Object, obj.ValueKind);
+        Assert.Equal("object", obj.GetProperty("type").GetString());
+        Assert.Equal("Object description", obj.GetProperty("description").GetString());
+
+        Assert.True(properties.TryGetProperty("document", out var document));
+        Assert.Equal(JsonValueKind.Object, document.ValueKind);
+        Assert.Equal("object", document.GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void FromTypeGeneratesStringEnumSchemaForEnumTypes()
+    {
+        var schema = ToolSchemaFactory.FromType<EnumSchemaInput>();
+
+        Assert.Equal("object", schema.GetProperty("type").GetString());
+        var properties = schema.GetProperty("properties");
+        Assert.True(properties.TryGetProperty("mode", out var mode));
+        Assert.Equal(JsonValueKind.Object, mode.ValueKind);
+        Assert.Equal("string", mode.GetProperty("type").GetString());
+        Assert.Equal("Operation mode", mode.GetProperty("description").GetString());
+
+        var enumValues = mode.GetProperty("enum").EnumerateArray().Select(e => e.GetString()!).ToArray();
+        Assert.Equal(["firstOption", "secondOption", "customAction"], enumValues);
+    }
+
     private static void AssertJsonTypeUnion(JsonElement schema, params string[] expectedTypes)
     {
         var actual = schema.GetProperty("type").EnumerateArray().Select(type => type.GetString()!).ToArray();
@@ -106,4 +159,31 @@ public sealed class ToolSchemaGenerationTests
 
         [property: Description("Timeout in seconds (optional, no default timeout)")]
         double? Timeout = null);
+
+    private sealed record OpenTypesInput(
+        [property: Description("Required JsonElement description")]
+        JsonElement Element,
+
+        [property: Description("Optional JsonElement description")]
+        JsonElement? NullableElement = null,
+
+        [property: Description("JsonNode description")]
+        System.Text.Json.Nodes.JsonNode? Node = null,
+
+        [property: Description("Object description")]
+        object? Obj = null,
+
+        [property: Description("Document description")]
+        JsonDocument? Document = null);
+
+    private enum TestMode
+    {
+        FirstOption,
+        SecondOption,
+        CustomAction
+    }
+
+    private sealed record EnumSchemaInput(
+        [property: Description("Operation mode")]
+        TestMode Mode);
 }

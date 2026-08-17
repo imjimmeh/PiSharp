@@ -61,6 +61,9 @@ public static class ClientToTuiAdapter
             "compaction_end" => MapCompactionEnd(envelope.Event.Data),
             "system_message" => MapSystemMessage(envelope.Event.Data),
             "theme_changed" => MapThemeChanged(envelope.Event.Data),
+            "session_metrics" => MapSessionMetrics(envelope.Event.Data),
+            "extension_load_status" => MapExtensionLoadStatus(envelope.Event.Data),
+            "modified_files" => MapModifiedFiles(envelope.Event.Data),
             // The server emits package changes under ExtensionEventNames.PackagesChanged.
             "extensions_changed" => MapPackagesChanged(envelope.Event.Data),
             "skills_changed" => MapSkillsChanged(envelope.Event.Data),
@@ -114,13 +117,48 @@ public static class ClientToTuiAdapter
             if (FromPayload<SessionTreeEntry>(entry) is { } parsed) entries.Add(parsed);
         }
 
+        TuiFooterSnapshot? footer = null;
+        if (snapshot.Footer is { } f)
+        {
+            footer = new TuiFooterSnapshot(
+                f.Cwd,
+                f.GitBranch,
+                f.InputTokens,
+                f.OutputTokens,
+                f.CacheTokens,
+                f.TotalTokens,
+                f.TotalCost,
+                f.ContextPercent,
+                f.ContextWindow,
+                f.AutoCompact)
+            {
+                ContextPercentKnown = f.ContextPercentKnown
+            };
+        }
+
+        TuiExtensionLoadStatus? loadStatus = null;
+        if (snapshot.ExtensionLoadStatus is { } ls)
+        {
+            loadStatus = new TuiExtensionLoadStatus(
+                ls.Total,
+                ls.Active,
+                ls.BlockingActive,
+                ls.Ready,
+                ls.Failed);
+        }
+
         return new TuiSessionSnapshot(
             snapshot.SessionId,
             snapshot.SessionFile,
             snapshot.SessionName,
             entries,
             snapshot.Model,
-            snapshot.ThinkingLevel);
+            snapshot.ThinkingLevel,
+            footer,
+            snapshot.ModifiedFiles,
+            loadStatus,
+            snapshot.Shortcuts,
+            snapshot.Commands);
     }
 
     public static ThinkingLevel? TryParseThinkingLevel(string? value)
@@ -298,4 +336,56 @@ public static class ClientToTuiAdapter
     private sealed record SystemMessageWire(string? Text, bool? IsError);
     private sealed record ThemeChangedWire(string? Name, object? Document);
     private sealed record ListChangedWire(IReadOnlyList<string>? Added, IReadOnlyList<string>? Removed, IReadOnlyList<string>? Updated);
+    private sealed record SessionMetricsWire(
+        string? Cwd,
+        string? GitBranch,
+        int InputTokens,
+        int OutputTokens,
+        int CacheTokens,
+        int TotalTokens,
+        decimal TotalCost,
+        double ContextPercent,
+        bool ContextPercentKnown,
+        int ContextWindow,
+        bool AutoCompact);
+    internal sealed record ExtensionLoadStatusWire(
+        int Total,
+        int Active,
+        int BlockingActive,
+        int Ready,
+        int Failed,
+        IReadOnlyList<AgentHarnessOwnEvent.ExtensionLoadDiagnosticRecord>? Failures);
+    internal sealed record ModifiedFilesWire(IReadOnlyList<string>? Files);
+
+    private static AgentHarnessEvent? MapSessionMetrics(object? data)
+        => FromPayload<SessionMetricsWire>(data) is { } w
+            ? new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.SessionMetrics(
+                w.Cwd ?? string.Empty,
+                w.GitBranch,
+                w.InputTokens,
+                w.OutputTokens,
+                w.CacheTokens,
+                w.TotalTokens,
+                w.TotalCost,
+                w.ContextPercent,
+                w.ContextPercentKnown,
+                w.ContextWindow,
+                w.AutoCompact))
+            : null;
+
+    private static AgentHarnessEvent? MapExtensionLoadStatus(object? data)
+        => FromPayload<ExtensionLoadStatusWire>(data) is { } w
+            ? new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.ExtensionLoadStatusUpdate(
+                w.Total,
+                w.Active,
+                w.BlockingActive,
+                w.Ready,
+                w.Failed,
+                w.Failures))
+            : null;
+
+    private static AgentHarnessEvent? MapModifiedFiles(object? data)
+        => FromPayload<ModifiedFilesWire>(data) is { Files: { } files }
+            ? new AgentHarnessEvent.Own(new AgentHarnessOwnEvent.ModifiedFilesUpdate(files))
+            : null;
 }

@@ -19,7 +19,7 @@ public sealed record TuiFooterSnapshot(
     double ContextPercent,
     int ContextWindow,
     bool AutoCompact,
-    IReadOnlyDictionary<string, string> ExtensionStatuses)
+    IReadOnlyDictionary<string, string>? ExtensionStatuses = null)
 {
     public bool ContextPercentKnown { get; init; } = true;
 }
@@ -191,7 +191,57 @@ public static class FooterDataProvider
     private static string ShortCwd(string cwd)
         => string.IsNullOrWhiteSpace(cwd) ? Environment.CurrentDirectory : Path.GetFileName(cwd.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string? Branch, DateTimeOffset LastChecked)> _branchCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _branchRefreshInFlight = new(StringComparer.OrdinalIgnoreCase);
+
     public static string? ResolveGitBranch(string cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return null;
+
+        var key = Path.GetFullPath(cwd);
+        var now = DateTimeOffset.UtcNow;
+
+        if (_branchCache.TryGetValue(key, out var cached))
+        {
+            if (now - cached.LastChecked > TimeSpan.FromSeconds(2) && _branchRefreshInFlight.TryAdd(key, 0))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var branch = await ResolveGitBranchAsync(key).ConfigureAwait(false);
+                        _branchCache[key] = (branch, DateTimeOffset.UtcNow);
+                    }
+                    finally
+                    {
+                        _branchRefreshInFlight.TryRemove(key, out _);
+                    }
+                });
+            }
+            return cached.Branch;
+        }
+
+        _branchCache[key] = (null, now);
+        if (_branchRefreshInFlight.TryAdd(key, 0))
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var branch = await ResolveGitBranchAsync(key).ConfigureAwait(false);
+                    _branchCache[key] = (branch, DateTimeOffset.UtcNow);
+                }
+                finally
+                {
+                    _branchRefreshInFlight.TryRemove(key, out _);
+                }
+            });
+        }
+
+        return null;
+    }
+
+    public static async Task<string?> ResolveGitBranchAsync(string cwd, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -205,8 +255,9 @@ public static class FooterDataProvider
             };
             using var process = Process.Start(start);
             if (process is null) return null;
-            process.WaitForExit(250);
-            var branch = process.StandardOutput.ReadToEnd().Trim();
+            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            var branch = (await outputTask.ConfigureAwait(false)).Trim();
             return string.IsNullOrWhiteSpace(branch) ? null : branch;
         }
         catch

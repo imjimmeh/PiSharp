@@ -17,6 +17,9 @@ public sealed class PromptEditor : TextView, IPromptEditorSurface
     private int _promptCursorOffset;
     private bool _isApplyingControllerText;
 
+    private string _lastEditedText = string.Empty;
+    private int _lastEditedCursorOffset = -1;
+
     public PromptEditor(PromptEditorKeyMap? keyMap = null, ILoggerFactory? loggerFactory = null)
     {
         _logger = loggerFactory?.CreateLogger<PromptEditor>() ?? NullLogger<PromptEditor>.Instance;
@@ -35,18 +38,22 @@ public sealed class PromptEditor : TextView, IPromptEditorSurface
 
             if (!key.Handled && (key.IsCtrl || key.IsAlt)) key.Handled = true;
         };
-        TextChanged += (_, _) =>
+
+        void OnTextOrContentsChanged()
         {
             if (_isApplyingControllerText) return;
+            var currentText = PromptText;
+            var currentOffset = CursorOffset;
+            if (string.Equals(_lastEditedText, currentText, StringComparison.Ordinal) && _lastEditedCursorOffset == currentOffset)
+                return;
 
+            _lastEditedText = currentText;
+            _lastEditedCursorOffset = currentOffset;
             _controller.HandleTextEdited();
-        };
-        ContentsChanged += (_, _) =>
-        {
-            if (_isApplyingControllerText) return;
+        }
 
-            _controller.HandleTextEdited();
-        };
+        TextChanged += (_, _) => OnTextOrContentsChanged();
+        ContentsChanged += (_, _) => OnTextOrContentsChanged();
         UnwrappedCursorPosition += (_, position) => TrackCursorOffset(OffsetFromUnwrappedPosition(position));
     }
 

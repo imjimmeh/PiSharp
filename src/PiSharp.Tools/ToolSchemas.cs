@@ -10,18 +10,25 @@ namespace PiSharp.Tools;
 
 public static class ToolSchemas
 {
-    private static readonly JsonSerializerOptions SchemaSerializerOptions = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerOptions SchemaSerializerOptions = CreateSchemaSerializerOptions();
+
+    private static JsonSerializerOptions CreateSchemaSerializerOptions()
     {
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
-        NumberHandling = JsonNumberHandling.Strict,
-        RespectNullableAnnotations = true,
-        RespectRequiredConstructorParameters = true
-    };
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+            NumberHandling = JsonNumberHandling.Strict,
+            RespectNullableAnnotations = true,
+            RespectRequiredConstructorParameters = true
+        };
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        return options;
+    }
 
     private static readonly JsonSchemaExporterOptions SchemaExporterOptions = new()
     {
         TreatNullObliviousAsNonNullable = true,
-        TransformSchemaNode = AddDescriptionMetadata
+        TransformSchemaNode = TransformSchemaNode
     };
 
     public static JsonElement FromType<T>() => FromType(typeof(T));
@@ -36,6 +43,7 @@ public static class ToolSchemas
             throw new InvalidOperationException($"Generated schema for '{type}' is not a JSON object.");
         }
 
+        SanitizeSchema(schemaObject, type);
         EnsureProviderCompatibleRoot(type, schemaObject);
         using var document = JsonDocument.Parse(schemaObject.ToJsonString());
         return document.RootElement.Clone();
@@ -89,16 +97,177 @@ public static class ToolSchemas
             writer.WriteEndObject();
         });
 
-    private static JsonNode AddDescriptionMetadata(JsonSchemaExporterContext context, JsonNode schema)
+    private static JsonNode TransformSchemaNode(JsonSchemaExporterContext context, JsonNode schema)
     {
-        var description = GetDescription(context.PropertyInfo?.AttributeProvider)
-            ?? GetDescription(context.PropertyInfo?.AssociatedParameter?.AttributeProvider);
+        if (schema is JsonValue value && value.TryGetValue<bool>(out var boolVal) && boolVal)
+        {
+            schema = new JsonObject
+            {
+                ["type"] = "object"
+            };
+        }
+        else if (schema is JsonObject obj)
+        {
+            if (obj.ContainsKey("enum") && !obj.ContainsKey("type"))
+            {
+                obj["type"] = "string";
+            }
+            else if (!obj.ContainsKey("type") && !obj.ContainsKey("$ref") && !obj.ContainsKey("anyOf") && !obj.ContainsKey("oneOf") && !obj.ContainsKey("allOf"))
+            {
+                obj["type"] = "object";
+            }
+        }
+
+        var description = GetDescription(context);
         if (description is not null && schema is JsonObject schemaObject)
         {
             schemaObject["description"] = description;
         }
 
         return schema;
+    }
+
+    public static void SanitizeSchema(JsonObject schemaObject, Type? rootType = null)
+    {
+        SanitizeNode(schemaObject);
+
+        if (rootType is not null && schemaObject.TryGetPropertyValue("properties", out var propsNode) && propsNode is JsonObject propsObj)
+        {
+            var props = rootType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            var ctors = rootType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+            foreach (var (propName, propSchemaNode) in propsObj.ToList())
+            {
+                if (propSchemaNode is JsonObject propObj && !propObj.ContainsKey("description"))
+                {
+                    var prop = props.FirstOrDefault(p => string.Equals(p.Name, propName, StringComparison.OrdinalIgnoreCase));
+                    var desc = GetDescription(prop);
+
+                    if (desc is null)
+                    {
+                        foreach (var ctor in ctors)
+                        {
+                            var param = ctor.GetParameters().FirstOrDefault(p => string.Equals(p.Name, propName, StringComparison.OrdinalIgnoreCase));
+                            desc = GetDescription(param);
+                            if (desc is not null) break;
+                        }
+                    }
+
+                    if (desc is not null)
+                    {
+                        propObj["description"] = desc;
+                    }
+                }
+            }
+        }
+    }
+
+    private static void SanitizeNode(JsonNode? node)
+    {
+        if (node is JsonObject obj)
+        {
+            if (obj.ContainsKey("enum") && !obj.ContainsKey("type"))
+            {
+                obj["type"] = "string";
+            }
+            else if (!obj.ContainsKey("type") && !obj.ContainsKey("$ref") && !obj.ContainsKey("anyOf") && !obj.ContainsKey("oneOf") && !obj.ContainsKey("allOf") && !obj.ContainsKey("properties") && !obj.ContainsKey("items"))
+            {
+                obj["type"] = "object";
+            }
+
+            if (!obj.ContainsKey("description"))
+            {
+                if (obj.TryGetPropertyValue("anyOf", out var anyOfNode) && anyOfNode is JsonArray anyOfArr)
+                {
+                    foreach (var branch in anyOfArr)
+                    {
+                        if (branch is JsonObject branchObj && branchObj.TryGetPropertyValue("description", out var desc) && desc is not null)
+                        {
+                            obj["description"] = desc.DeepClone();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            var keys = obj.Select(kvp => kvp.Key).ToList();
+            foreach (var key in keys)
+            {
+                var child = obj[key];
+                if (key == "properties" && child is JsonObject propertiesObj)
+                {
+                    var propNames = propertiesObj.Select(p => p.Key).ToList();
+                    foreach (var propName in propNames)
+                    {
+                        var propVal = propertiesObj[propName];
+                        if (propVal is JsonValue val && val.TryGetValue<bool>(out var b) && b)
+                        {
+                            propertiesObj[propName] = new JsonObject { ["type"] = "object" };
+                        }
+                        else
+                        {
+                            SanitizeNode(propVal);
+                        }
+                    }
+                }
+                else if (key == "items")
+                {
+                    if (child is JsonValue val && val.TryGetValue<bool>(out var b) && b)
+                    {
+                        obj[key] = new JsonObject { ["type"] = "object" };
+                    }
+                    else
+                    {
+                        SanitizeNode(child);
+                    }
+                }
+                else
+                {
+                    SanitizeNode(child);
+                }
+            }
+        }
+        else if (node is JsonArray arr)
+        {
+            for (int i = 0; i < arr.Count; i++)
+            {
+                var item = arr[i];
+                if (item is JsonValue val && val.TryGetValue<bool>(out var b) && b)
+                {
+                    arr[i] = new JsonObject { ["type"] = "object" };
+                }
+                else
+                {
+                    SanitizeNode(item);
+                }
+            }
+        }
+    }
+
+    private static string? GetDescription(JsonSchemaExporterContext context)
+    {
+        if (context.PropertyInfo is null) return null;
+
+        var desc = GetDescription(context.PropertyInfo.AttributeProvider)
+            ?? GetDescription(context.PropertyInfo.AssociatedParameter?.AttributeProvider);
+
+        if (desc is not null) return desc;
+
+        if (context.PropertyInfo.DeclaringType is { } declaringType)
+        {
+            var prop = declaringType.GetProperty(context.PropertyInfo.Name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            desc = GetDescription(prop);
+            if (desc is not null) return desc;
+
+            foreach (var ctor in declaringType.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                var param = ctor.GetParameters().FirstOrDefault(p => string.Equals(p.Name, context.PropertyInfo.Name, StringComparison.OrdinalIgnoreCase));
+                desc = GetDescription(param);
+                if (desc is not null) return desc;
+            }
+        }
+
+        return null;
     }
 
     private static string? GetDescription(ICustomAttributeProvider? attributeProvider)

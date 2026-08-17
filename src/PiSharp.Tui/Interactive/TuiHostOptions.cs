@@ -27,7 +27,12 @@ public sealed record TuiSessionSnapshot(
     string? SessionName,
     IReadOnlyList<SessionTreeEntry> BranchEntries,
     ModelDescriptor? Model = null,
-    ThinkingLevel? ThinkingLevel = null);
+    ThinkingLevel? ThinkingLevel = null,
+    TuiFooterSnapshot? FooterSnapshot = null,
+    IReadOnlyList<string>? ModifiedFiles = null,
+    TuiExtensionLoadStatus? ExtensionLoadStatus = null,
+    IReadOnlyList<OwnedExtensionRegistration<ExtensionShortcutRegistration>>? Shortcuts = null,
+    IReadOnlyList<string>? Commands = null);
 
 public sealed record TuiHostStartupResult(
     TuiThemeDocument? Theme,

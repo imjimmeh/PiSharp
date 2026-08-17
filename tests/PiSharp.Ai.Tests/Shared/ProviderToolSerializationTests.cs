@@ -54,6 +54,42 @@ public sealed class ProviderToolSerializationTests
         AssertGeneratedBashLikeSchema(PayloadFor(typeof(MistralProvider), context).GetProperty("tools")[0].GetProperty("function").GetProperty("parameters"));
     }
 
+    [Fact]
+    public void ProviderPayloadsSanitizeBooleanSchemasFromExternalTools()
+    {
+        var rawSchema = JsonDocument.Parse("""
+            {
+                "type": "object",
+                "properties": {
+                    "request": true,
+                    "params": true,
+                    "nested": {
+                        "type": "object",
+                        "properties": {
+                            "inner": true
+                        }
+                    }
+                }
+            }
+            """).RootElement;
+
+        var context = new AgentContext("system", Array.Empty<AgentMessage>(), [new FakeTool(rawSchema)]);
+        var anthropicTools = PayloadFor(typeof(AnthropicProvider), context).GetProperty("tools");
+        var inputSchema = anthropicTools[0].GetProperty("input_schema");
+
+        Assert.Equal("object", inputSchema.GetProperty("type").GetString());
+        var properties = inputSchema.GetProperty("properties");
+        Assert.Equal(JsonValueKind.Object, properties.GetProperty("request").ValueKind);
+        Assert.Equal("object", properties.GetProperty("request").GetProperty("type").GetString());
+
+        Assert.Equal(JsonValueKind.Object, properties.GetProperty("params").ValueKind);
+        Assert.Equal("object", properties.GetProperty("params").GetProperty("type").GetString());
+
+        var nested = properties.GetProperty("nested");
+        Assert.Equal(JsonValueKind.Object, nested.GetProperty("properties").GetProperty("inner").ValueKind);
+        Assert.Equal("object", nested.GetProperty("properties").GetProperty("inner").GetProperty("type").GetString());
+    }
+
     private static void AssertGeneratedBashLikeSchema(JsonElement schema)
     {
         Assert.Equal("object", schema.GetProperty("type").GetString());

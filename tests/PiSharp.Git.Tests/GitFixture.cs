@@ -20,6 +20,7 @@ public sealed class GitFixture : IAsyncDisposable
         var unique = $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Environment.ProcessId}-{Interlocked.Increment(ref _counter)}";
         RepoPath = Path.Combine(Path.GetTempPath(), "pisharp-git-fixture-" + unique);
         Directory.CreateDirectory(RepoPath);
+        Thread.Sleep(20);
 
         Run("init", "-q", "-b", "main");
         Run("config", "user.name", "Fixture User");
@@ -70,7 +71,7 @@ public sealed class GitFixture : IAsyncDisposable
     {
         var startInfo = new ProcessStartInfo
         {
-            FileName = "git",
+            FileName = OperatingSystem.IsWindows() ? "git.exe" : "git",
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

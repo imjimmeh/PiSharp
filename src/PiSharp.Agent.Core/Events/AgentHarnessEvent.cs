@@ -80,6 +80,30 @@ public sealed class AgentSessionEvent
             AgentHarnessOwnEvent.SessionBeforeTree e => new AgentSessionEvent("session_before_tree", new { preparation = e.Preparation }),
             AgentHarnessOwnEvent.SessionTree e => new AgentSessionEvent("session_tree", new { newLeafId = e.NewLeafId, oldLeafId = e.OldLeafId, summaryEntry = e.SummaryEntry, fromHook = e.FromHook }),
             AgentHarnessOwnEvent.ResourcesUpdate e => new AgentSessionEvent("resources_update", new { resources = e.Resources, previousResources = e.PreviousResources }),
+            AgentHarnessOwnEvent.SessionMetrics e => new AgentSessionEvent("session_metrics", new
+            {
+                cwd = e.Cwd,
+                gitBranch = e.GitBranch,
+                inputTokens = e.InputTokens,
+                outputTokens = e.OutputTokens,
+                cacheTokens = e.CacheTokens,
+                totalTokens = e.TotalTokens,
+                totalCost = e.TotalCost,
+                contextPercent = e.ContextPercent,
+                contextPercentKnown = e.ContextPercentKnown,
+                contextWindow = e.ContextWindow,
+                autoCompact = e.AutoCompact
+            }),
+            AgentHarnessOwnEvent.ExtensionLoadStatusUpdate e => new AgentSessionEvent("extension_load_status", new
+            {
+                total = e.Total,
+                active = e.Active,
+                blockingActive = e.BlockingActive,
+                ready = e.Ready,
+                failed = e.Failed,
+                failures = e.Failures
+            }),
+            AgentHarnessOwnEvent.ModifiedFilesUpdate e => new AgentSessionEvent("modified_files", new { files = e.Files }),
             AgentHarnessOwnEvent.AdvisorNote e => FromAdvisor(e.Event),
             AgentHarnessOwnEvent.SystemMessage e => new AgentSessionEvent("system_message", new { text = e.Text, isError = e.IsError }),
             AgentHarnessOwnEvent.CustomEvent e => new AgentSessionEvent(e.Name, e.Payload),
@@ -98,7 +122,8 @@ public sealed class AgentSessionEvent
         "before_agent_start", "before_prompt_render", "session_before_compact", "session_compact",
         "before_provider_request", "before_provider_payload", "after_provider_response", "tool_call",
         "tool_result", "save_point", "settled", "abort", "context", "session_before_tree",
-        "session_tree", "resources_update", "advisor_note"
+        "session_tree", "resources_update", "advisor_note", "system_message",
+        "session_metrics", "extension_load_status", "modified_files"
     };
 
     /// <summary>
@@ -350,4 +375,30 @@ public abstract record AgentHarnessOwnEvent
     public sealed record CustomEvent(
         string Name,
         object? Payload) : AgentHarnessOwnEvent;
+
+    public sealed record SessionMetrics(
+        string Cwd,
+        string? GitBranch,
+        int InputTokens,
+        int OutputTokens,
+        int CacheTokens,
+        int TotalTokens,
+        decimal TotalCost,
+        double ContextPercent,
+        bool ContextPercentKnown,
+        int ContextWindow,
+        bool AutoCompact) : AgentHarnessOwnEvent;
+
+    public sealed record ExtensionLoadStatusUpdate(
+        int Total,
+        int Active,
+        int BlockingActive,
+        int Ready,
+        int Failed,
+        IReadOnlyList<ExtensionLoadDiagnosticRecord>? Failures = null) : AgentHarnessOwnEvent;
+
+    public sealed record ExtensionLoadDiagnosticRecord(string Path, string Diagnostic);
+
+    public sealed record ModifiedFilesUpdate(
+        IReadOnlyList<string> Files) : AgentHarnessOwnEvent;
 }

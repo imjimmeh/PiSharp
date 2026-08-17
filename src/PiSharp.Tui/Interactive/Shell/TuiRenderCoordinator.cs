@@ -115,8 +115,8 @@ internal sealed class TuiRenderCoordinator : IDisposable
         _shell.SetEditorComponentSlot(editorComponent);
         _shell.PromptTitle.Text = selectionSession is null ? "─ Message" : $"─ {selectionSession.Title}";
 
-        _shell.Header.Render(state, _getHeaderExpanded(), _extensionLoadStatus);
-        var footerSnapshot = _createFooterSnapshot();
+        _shell.Header.Render(state, _getHeaderExpanded(), state.ExtensionLoadStatus ?? _extensionLoadStatus);
+        var footerSnapshot = state.FooterSnapshot ?? _createFooterSnapshot();
         _shell.Footer.Render(state, footerSnapshot, _getActiveTools());
         _shell.WorkingIndicator.Render(state, _workingFrameIndex);
 
@@ -164,11 +164,18 @@ internal sealed class TuiRenderCoordinator : IDisposable
         // store.Replace (off-thread ReduceBatch) is never clobbered by this read-modify-write.
         state = _updateState(s => TuiPendingEditorText.Apply(s, prompt).RemoveExpiredSystemRows(DateTimeOffset.UtcNow));
 
-        var now = DateTimeOffset.UtcNow;
-        if (now - _lastModifiedFilesRefresh > ModifiedFilesRefreshInterval)
+        if (state.ModifiedFiles is { } pushedFiles)
         {
-            _lastModifiedFilesRefresh = now;
-            _ = RefreshModifiedFilesAsync(_cancellationToken);
+            _shell.LeftSidebar.SetModifiedFiles(pushedFiles);
+        }
+        else
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (now - _lastModifiedFilesRefresh > ModifiedFilesRefreshInterval)
+            {
+                _lastModifiedFilesRefresh = now;
+                _ = RefreshModifiedFilesAsync(_cancellationToken);
+            }
         }
 
         _shell.Chat.Render(state);

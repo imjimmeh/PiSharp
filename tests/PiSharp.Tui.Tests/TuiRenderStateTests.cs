@@ -426,6 +426,104 @@ public sealed class TuiRenderStateTests
         Assert.Empty(state.BridgeSlots);
     }
 
+    [Fact]
+    public void ReduceBatch_AppliesSessionMetricsEvent()
+    {
+        var state = Empty();
+        var metrics = new AgentHarnessOwnEvent.SessionMetrics(
+            Cwd: "my-project",
+            GitBranch: "feature/daemon-push",
+            InputTokens: 100,
+            OutputTokens: 200,
+            CacheTokens: 50,
+            TotalTokens: 350,
+            TotalCost: 0.05m,
+            ContextPercent: 42.5,
+            ContextPercentKnown: true,
+            ContextWindow: 128000,
+            AutoCompact: true);
+
+        state = state.Reduce(new AgentHarnessEvent.Own(metrics));
+
+        Assert.NotNull(state.FooterSnapshot);
+        Assert.Equal("my-project", state.FooterSnapshot.Cwd);
+        Assert.Equal("feature/daemon-push", state.FooterSnapshot.GitBranch);
+        Assert.Equal(100, state.FooterSnapshot.InputTokens);
+        Assert.Equal(200, state.FooterSnapshot.OutputTokens);
+        Assert.Equal(50, state.FooterSnapshot.CacheTokens);
+        Assert.Equal(350, state.FooterSnapshot.TotalTokens);
+        Assert.Equal(0.05m, state.FooterSnapshot.TotalCost);
+        Assert.Equal(42.5, state.FooterSnapshot.ContextPercent);
+        Assert.True(state.FooterSnapshot.ContextPercentKnown);
+        Assert.Equal(128000, state.FooterSnapshot.ContextWindow);
+        Assert.True(state.FooterSnapshot.AutoCompact);
+    }
+
+    [Fact]
+    public void ReduceBatch_AppliesExtensionLoadStatusEvent()
+    {
+        var state = Empty();
+        var loadStatus = new AgentHarnessOwnEvent.ExtensionLoadStatusUpdate(
+            Total: 5,
+            Active: 1,
+            BlockingActive: 0,
+            Ready: 4,
+            Failed: 0);
+
+        state = state.Reduce(new AgentHarnessEvent.Own(loadStatus));
+
+        Assert.NotNull(state.ExtensionLoadStatus);
+        Assert.Equal(5, state.ExtensionLoadStatus.Total);
+        Assert.Equal(1, state.ExtensionLoadStatus.Active);
+        Assert.Equal(0, state.ExtensionLoadStatus.BlockingActive);
+        Assert.Equal(4, state.ExtensionLoadStatus.Ready);
+        Assert.Equal(0, state.ExtensionLoadStatus.Failed);
+    }
+
+    [Fact]
+    public void ReduceBatch_AppliesModifiedFilesEvent()
+    {
+        var state = Empty();
+        var modified = new AgentHarnessOwnEvent.ModifiedFilesUpdate(["file1.cs", "file2.cs"]);
+
+        state = state.Reduce(new AgentHarnessEvent.Own(modified));
+
+        Assert.NotNull(state.ModifiedFiles);
+        Assert.Equal(2, state.ModifiedFiles.Count);
+        Assert.Contains("file1.cs", state.ModifiedFiles);
+        Assert.Contains("file2.cs", state.ModifiedFiles);
+    }
+
+    [Fact]
+    public void ApplySnapshot_PreservesDaemonPushedMetadata()
+    {
+        var state = Empty();
+        var footer = new TuiFooterSnapshot("my-app", "main", 10, 20, 0, 30, 0.01m, 15.0, 100000, false);
+        var loadStatus = new TuiExtensionLoadStatus(3, 0, 0, 3, 0);
+        var snapshot = new TuiSessionSnapshot(
+            "sid-1",
+            "session.jsonl",
+            "My Session",
+            [],
+            FooterSnapshot: footer,
+            ModifiedFiles: ["app.cs"],
+            ExtensionLoadStatus: loadStatus,
+            Commands: ["/help", "/clear"]);
+
+        var applied = TuiSessionSwitch.ApplySnapshot(state, snapshot, preserveLocalSystemRows: false);
+
+        Assert.NotNull(applied.FooterSnapshot);
+        Assert.Equal("my-app", applied.FooterSnapshot.Cwd);
+        Assert.Equal("main", applied.FooterSnapshot.GitBranch);
+        Assert.NotNull(applied.ModifiedFiles);
+        Assert.Single(applied.ModifiedFiles);
+        Assert.Equal("app.cs", applied.ModifiedFiles[0]);
+        Assert.NotNull(applied.ExtensionLoadStatus);
+        Assert.Equal(3, applied.ExtensionLoadStatus.Ready);
+        Assert.NotNull(applied.AvailableCommands);
+        Assert.Equal(2, applied.AvailableCommands.Count);
+    }
+
     private static TuiRenderState Empty()
         => TuiRenderState.Empty("sid", "session.jsonl", new ModelDescriptor("test", "model", "test"), ThinkingLevel.Off, null);
 }

@@ -2466,9 +2466,9 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 10m, Output: 50m, CacheRead: 1m, CacheWrite: 12.5m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-haiku-4-5", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-haiku-4.5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-haiku-4-5",
+            Id: "anthropic/claude-haiku-4.5",
             Api: "openai-completions",
             Name: "Claude Haiku 4.5 (latest)",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
@@ -2486,9 +2486,9 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 1m, Output: 5m, CacheRead: 0.1m, CacheWrite: 1.25m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-opus-4-5", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-opus-4.5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-opus-4-5",
+            Id: "anthropic/claude-opus-4.5",
             Api: "openai-completions",
             Name: "Claude Opus 4.5 (latest)",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
@@ -2506,9 +2506,9 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-opus-4-6", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-opus-4.6", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-opus-4-6",
+            Id: "anthropic/claude-opus-4.6",
             Api: "openai-completions",
             Name: "Claude Opus 4.6",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
@@ -2526,9 +2526,9 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-opus-4-7", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-opus-4.7", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-opus-4-7",
+            Id: "anthropic/claude-opus-4.7",
             Api: "openai-completions",
             Name: "Claude Opus 4.7",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
@@ -2546,9 +2546,9 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-opus-4-8", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-opus-4.8", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-opus-4-8",
+            Id: "anthropic/claude-opus-4.8",
             Api: "openai-completions",
             Name: "Claude Opus 4.8",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
@@ -2586,9 +2586,9 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 5m, Output: 25m, CacheRead: 0.5m, CacheWrite: 6.25m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-sonnet-4-5", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-sonnet-4.5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-sonnet-4-5",
+            Id: "anthropic/claude-sonnet-4.5",
             Api: "openai-completions",
             Name: "Claude Sonnet 4.5 (latest)",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
@@ -2606,9 +2606,9 @@ public static class BuiltInModels
             Input: ["text", "image"],
             Cost: new ModelCost(Input: 3m, Output: 15m, CacheRead: 0.3m, CacheWrite: 3.75m))),
 
-        new("cloudflare-ai-gateway", "anthropic/claude-sonnet-4-6", new ModelDescriptor(
+        new("cloudflare-ai-gateway", "anthropic/claude-sonnet-4.6", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
-            Id: "anthropic/claude-sonnet-4-6",
+            Id: "anthropic/claude-sonnet-4.6",
             Api: "openai-completions",
             Name: "Claude Sonnet 4.6",
             BaseUrl: "https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway}/compat",
@@ -2716,7 +2716,7 @@ public static class BuiltInModels
             ContextWindow: 128000,
             MaxTokens: 16384,
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 2.5m, Output: 10m, CacheRead: 1.25m))),
+            Cost: new ModelCost(Input: 1.25m, Output: 5m, CacheRead: 0.625m))),
 
         new("cloudflare-ai-gateway", "openai/gpt-4o-mini", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -2728,7 +2728,7 @@ public static class BuiltInModels
             ContextWindow: 128000,
             MaxTokens: 16384,
             Input: ["text", "image"],
-            Cost: new ModelCost(Input: 0.15m, Output: 0.6m, CacheRead: 0.075m))),
+            Cost: new ModelCost(Input: 0.075m, Output: 0.3m, CacheRead: 0.0375m))),
 
         new("cloudflare-ai-gateway", "openai/gpt-5", new ModelDescriptor(
             Provider: "cloudflare-ai-gateway",
@@ -12245,7 +12245,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 384000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.0798m, Output: 0.1596m, CacheRead: 0.01596m))),
+            Cost: new ModelCost(Input: 0.077m, Output: 0.154m, CacheRead: 0.0154m))),
 
         new("openrouter", "deepseek/deepseek-v4-flash-0731", new ModelDescriptor(
             Provider: "openrouter",
@@ -14141,7 +14141,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m, CacheWrite: 3.125m))),
 
         new("openrouter", "openai/gpt-5.6-sol-pro", new ModelDescriptor(
             Provider: "openrouter",
@@ -14153,7 +14153,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m, CacheWrite: 3.125m))),
 
         new("openrouter", "openai/gpt-5.6-sol-pro:batch", new ModelDescriptor(
             Provider: "openrouter",
@@ -14165,7 +14165,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m))),
+            Cost: new ModelCost(Input: 1.25m, Output: 7.5m, CacheRead: 0.125m))),
 
         new("openrouter", "openai/gpt-5.6-sol:batch", new ModelDescriptor(
             Provider: "openrouter",
@@ -14177,7 +14177,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m))),
+            Cost: new ModelCost(Input: 1.25m, Output: 7.5m, CacheRead: 0.125m))),
 
         new("openrouter", "openai/gpt-5.6-terra", new ModelDescriptor(
             Provider: "openrouter",
@@ -15555,9 +15555,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 262144,
+            MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.19m, Output: 3.74m, CacheRead: 0.221m))),
+            Cost: new ModelCost(Input: 0.476m, Output: 1.496m, CacheRead: 0.0884m))),
 
         new("openrouter", "z-ai/glm-5.2:batch", new ModelDescriptor(
             Provider: "openrouter",
@@ -15639,9 +15639,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1310720,
-            MaxTokens: 384000,
+            MaxTokens: 262144,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.078596m, Output: 0.157192m, CacheRead: 0.0157192m))),
+            Cost: new ModelCost(Input: 0.0783m, Output: 0.1566m, CacheRead: 0.01566m))),
 
         new("openrouter", "~google/gemini-flash-latest", new ModelDescriptor(
             Provider: "openrouter",
@@ -15689,7 +15689,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 5m, Output: 30m, CacheRead: 0.5m, CacheWrite: 6.25m))),
+            Cost: new ModelCost(Input: 2.5m, Output: 15m, CacheRead: 0.25m, CacheWrite: 3.125m))),
 
         new("openrouter", "~openai/gpt-mini-latest", new ModelDescriptor(
             Provider: "openrouter",
