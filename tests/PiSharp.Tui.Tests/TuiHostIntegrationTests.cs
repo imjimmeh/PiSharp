@@ -1249,7 +1249,7 @@ public sealed class TuiHostIntegrationTests
         Assert.Equal("test-session", running.Context.GetState().SessionId);
         Assert.Equal("Test session", running.Context.GetState().SessionName);
 
-        await running.SubmitPromptAsync("/model");
+        await running.SubmitPromptAsync("/resume");
 
         await dispatchStartedTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 

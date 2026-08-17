@@ -91,7 +91,8 @@ public sealed class TuiCommandController(TuiCommandControllerOptions options, IL
                 options.DispatchCommandAsync!(options.CreateDispatchRequest!(commandText), cancellationToken));
             var dispatchResult = await dispatchTask.ConfigureAwait(false);
             _logger.LogDebug("TUI command dispatch completed text={CommandText} shouldExit={ShouldExit}", commandText, dispatchResult.ShouldExit);
-            if (options.RefreshAfterPossibleSessionChangeAsync is not null) await options.RefreshAfterPossibleSessionChangeAsync(cancellationToken).ConfigureAwait(false);
+            if (options.RefreshAfterPossibleSessionChangeAsync is not null && IsSessionChangingCommand(commandText))
+                await options.RefreshAfterPossibleSessionChangeAsync(cancellationToken).ConfigureAwait(false);
             if (dispatchResult.ShouldExit) options.RequestExit();
             return dispatchResult;
         }
@@ -138,11 +139,23 @@ public sealed class TuiCommandController(TuiCommandControllerOptions options, IL
         }
     }
 
-    private static bool IsResumeCommand(string command)
+    private static string? GetCommandName(string command)
     {
         var trimmed = command.Trim();
-        var name = trimmed[1..].Split([' '], 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        return string.Equals(name, "resume", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "session", StringComparison.OrdinalIgnoreCase);
+        return trimmed.Length > 1
+            ? trimmed[1..].Split([' '], 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()
+            : null;
     }
+
+    private static bool IsResumeCommand(string command)
+        => GetCommandName(command) is { } name
+            && (string.Equals(name, "resume", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "session", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsSessionChangingCommand(string command)
+        => IsResumeCommand(command)
+            || GetCommandName(command) is { } name
+                && (string.Equals(name, "fork", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(name, "clone", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(name, "new", StringComparison.OrdinalIgnoreCase));
 }

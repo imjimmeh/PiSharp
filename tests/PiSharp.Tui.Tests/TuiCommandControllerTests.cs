@@ -106,14 +106,59 @@ public sealed class TuiCommandControllerTests
         Assert.Equal("/session", secondDispatched);
 
         firstCompletion.SetResult(new TuiCommandDispatchResult(true));
-        await WaitUntilAsync(() => refreshes > 0);
-
         secondCompletion.SetResult(new TuiCommandDispatchResult(true));
         await WaitUntilAsync(() => !controller.IsCommandInProgress);
 
-        Assert.True(refreshes >= 1);
+        // Only the session-changing /session command refreshes the session snapshot.
+        Assert.Equal(1, refreshes);
         Assert.Equal("Idle", state.Status);
         Assert.False(state.IsBusy);
+    }
+
+    [Fact]
+    public async Task NonSessionChangingCommandDoesNotRefreshSession()
+    {
+        var state = Empty();
+        var refreshes = 0;
+        var dispatchCompletion = new TaskCompletionSource<TuiCommandDispatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var controller = new TuiCommandController(new TuiCommandControllerOptions(
+            () => state,
+            next => state = next,
+            () => { },
+            () => { },
+            () => "HOTKEYS",
+            command => new TuiCommandDispatchRequest(command, (_, _, _) => Task.FromResult<string?>(null), (_, _) => Task.FromResult<string?>(null), (_, _, _) => Task.CompletedTask),
+            (_, _) => dispatchCompletion.Task,
+            _ => { refreshes++; return Task.CompletedTask; }));
+
+        Assert.True(await controller.TryHandleCommandAsync("/model", CancellationToken.None));
+        dispatchCompletion.SetResult(new TuiCommandDispatchResult(true));
+        await WaitUntilAsync(() => !controller.IsCommandInProgress);
+
+        Assert.Equal(0, refreshes);
+    }
+
+    [Fact]
+    public async Task SessionChangingCommandRefreshesSession()
+    {
+        var state = Empty();
+        var refreshes = 0;
+        var dispatchCompletion = new TaskCompletionSource<TuiCommandDispatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var controller = new TuiCommandController(new TuiCommandControllerOptions(
+            () => state,
+            next => state = next,
+            () => { },
+            () => { },
+            () => "HOTKEYS",
+            command => new TuiCommandDispatchRequest(command, (_, _, _) => Task.FromResult<string?>(null), (_, _) => Task.FromResult<string?>(null), (_, _, _) => Task.CompletedTask),
+            (_, _) => dispatchCompletion.Task,
+            _ => { refreshes++; return Task.CompletedTask; }));
+
+        Assert.True(await controller.TryHandleCommandAsync("/resume abc", CancellationToken.None));
+        dispatchCompletion.SetResult(new TuiCommandDispatchResult(true));
+        await WaitUntilAsync(() => refreshes > 0);
+
+        Assert.Equal(1, refreshes);
     }
 
     [Fact]
