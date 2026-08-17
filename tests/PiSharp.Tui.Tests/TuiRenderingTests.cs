@@ -1137,6 +1137,22 @@ public sealed class TuiRenderingTests
     }
 
     [Fact]
+    public void HeaderStatusTokenIsEmberAccentWhenBusyAndDimWhenIdle()
+    {
+        var accent = TuiTheme.GetTokenAttribute(TuiThemeToken.Accent);
+
+        var busyHeader = new HeaderView();
+        busyHeader.Render(Empty() with { Status = "working", IsBusy = true }, false);
+        var busyAccentCount = busyHeader.StyledRuns.Count(r => r.Attribute == accent);
+        Assert.True(busyAccentCount > 0, "Busy header should render its status token with the ember accent.");
+
+        var idleHeader = new HeaderView();
+        idleHeader.Render(Empty() with { Status = "idle", IsBusy = false }, false);
+        var idleAccentCount = idleHeader.StyledRuns.Count(r => r.Attribute == accent);
+        Assert.True(idleAccentCount < busyAccentCount, "Idle header should render fewer accent runs than busy.");
+    }
+
+    [Fact]
     public void WrappedTextViewsStripAnsiFromExtensionControlledText()
     {
         var state = (Empty() with { IsBusy = true })
