@@ -6437,6 +6437,38 @@ public static class BuiltInModels
             Input: ["text"],
             Cost: new ModelCost(Input: 0.3m, Output: 2m))),
 
+        new("huggingface", "Qwen/Qwen3-VL-235B-A22B-Instruct", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3-VL-235B-A22B-Instruct",
+            Api: "openai-completions",
+            Name: "Qwen3 VL 235B A22B Instruct",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: false,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.3m, Output: 1.5m))),
+
+        new("huggingface", "Qwen/Qwen3-VL-235B-A22B-Thinking", new ModelDescriptor(
+            Provider: "huggingface",
+            Id: "Qwen/Qwen3-VL-235B-A22B-Thinking",
+            Api: "openai-completions",
+            Name: "Qwen3 VL 235B A22B Thinking",
+            BaseUrl: "https://router.huggingface.co/v1",
+            Reasoning: true,
+            ContextWindow: 131072,
+            MaxTokens: 32768,
+            ThinkingLevelMap: new Dictionary<string, int>
+            {
+                ["minimal"] = 1024,
+                ["low"] = 1024,
+                ["medium"] = 4096,
+                ["high"] = 16384,
+                ["xhigh"] = 32000,
+            },
+            Input: ["text", "image"],
+            Cost: new ModelCost(Input: 0.98m, Output: 3.95m))),
+
         new("huggingface", "Qwen/Qwen3.5-122B-A10B", new ModelDescriptor(
             Provider: "huggingface",
             Id: "Qwen/Qwen3.5-122B-A10B",
@@ -12245,7 +12277,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 384000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.077m, Output: 0.154m, CacheRead: 0.0154m))),
+            Cost: new ModelCost(Input: 0.0714m, Output: 0.1428m, CacheRead: 0.01428m))),
 
         new("openrouter", "deepseek/deepseek-v4-flash-0731", new ModelDescriptor(
             Provider: "openrouter",
@@ -15557,7 +15589,7 @@ public static class BuiltInModels
             ContextWindow: 1048576,
             MaxTokens: 131072,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.476m, Output: 1.496m, CacheRead: 0.0884m))),
+            Cost: new ModelCost(Input: 0.462m, Output: 1.452m, CacheRead: 0.0858m))),
 
         new("openrouter", "z-ai/glm-5.2:batch", new ModelDescriptor(
             Provider: "openrouter",
