@@ -7,6 +7,7 @@ public interface IExtensionRegistryChangeStream
 {
     IDisposable Subscribe(Func<ExtensionRegistryChange, CancellationToken, Task> handler);
     Task PublishAsync(ExtensionRegistryChange change, CancellationToken cancellationToken = default);
+    void Publish(ExtensionRegistryChange change);
 }
 
 public sealed record ExtensionRegistryChangeDeliveryFailure(ExtensionRegistryChange Change, Exception Exception);
@@ -55,6 +56,12 @@ public sealed class ExtensionRegistryChangeStream : IExtensionRegistryChangeStre
                 lock (_gate) _failures.Add(new ExtensionRegistryChangeDeliveryFailure(change, exception));
             }
         }
+    }
+
+    public void Publish(ExtensionRegistryChange change)
+    {
+        // Execute on thread pool to escape any UI SynchronizationContext and prevent deadlocks
+        Task.Run(() => PublishAsync(change, CancellationToken.None)).GetAwaiter().GetResult();
     }
 
     private IReadOnlyList<Subscription> Snapshot()

@@ -1,3 +1,5 @@
+using PiSharp.Compatibility.Settings;
+using PiSharp.Logging;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
@@ -223,6 +225,81 @@ public sealed class HostIntegrationTests
         id = "create",
         type = ServerCommandTypes.CreateSession,
         cwd = root,
+        sessionsRoot = Path.Combine(root, "sessions"),
+        noTools = true,
+        noBuiltinTools = true,
+        noExtensions = true,
+        noSkills = true,
+        noPromptTemplates = true,
+        noThemes = true,
+        noContextFiles = true,
+    };
+
+    [Fact]
+    public async Task PerSessionFileLogging_WritesDistinctDaemonSessionFilesPerCwd()
+    {
+        var root = NewTempDir();
+        var home = Path.Combine(root, "home");
+        var repo1 = Path.Combine(root, "repo1");
+        var repo2 = Path.Combine(root, "repo2");
+        Directory.CreateDirectory(repo1);
+        Directory.CreateDirectory(repo2);
+
+        using var daemonLogFactory = LoggerFactory.Create(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Debug).AddDebug();
+            var registration = CliFileLogging.CreateConfiguredFileLogging(root, homeDirectory: home, context: LogContext.Daemon);
+            if (registration is not null) builder.AddProvider(registration.Provider);
+        });
+        await using var host = await StartPerSessionLoggingHostAsync(home, daemonLogFactory);
+
+        await using var client = new RawClient();
+        await client.ConnectAsync(HostUri(host), ApiKey, CancellationToken.None);
+        AssertSuccess(await client.SendCommandAsync(SessionLoggingFrame(repo1, root)));
+        AssertSuccess(await client.SendCommandAsync(SessionLoggingFrame(repo2, root)));
+        var logsRoot = Path.Combine(home, ".pi", "PiSharp", "logs", "daemon");
+        var dir1 = Path.Combine(logsRoot, PiAgentPaths.EncodeCwd(repo1));
+        var dir2 = Path.Combine(logsRoot, PiAgentPaths.EncodeCwd(repo2));
+
+        Assert.True(Directory.Exists(dir1), $"expected daemon session log folder {dir1}");
+        Assert.True(Directory.Exists(dir2), $"expected daemon session log folder {dir2}");
+        Assert.NotEqual(dir1, dir2);
+
+        var content1 = string.Join("\n", Directory.GetFiles(dir1, "*.log").Select(ReadLogText));
+        var content2 = string.Join("\n", Directory.GetFiles(dir2, "*.log").Select(ReadLogText));
+        Assert.Contains("daemon session in folder", content1, StringComparison.Ordinal);
+        Assert.Contains("daemon session in folder", content2, StringComparison.Ordinal);
+        Assert.Contains("bootstrap: create-session start", content1, StringComparison.Ordinal);
+        Assert.Contains("bootstrap: create-session start", content2, StringComparison.Ordinal);
+    }
+
+    private static string ReadLogText(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static async Task<PiServerHost> StartPerSessionLoggingHostAsync(string home, ILoggerFactory daemonLogFactory)
+    {
+        var host = new PiServerHost(new PiServerHostOptions
+        {
+            ApiKey = ApiKey,
+            IdleTimeout = TimeSpan.FromHours(1),
+            LoggerFactory = daemonLogFactory,
+            LogHomeDirectory = home,
+            PerSessionFileLogging = true,
+            RunCommandAsync = (context, text, options, ct) => Task.FromResult(new ServerCommandResult(true, text)),
+        });
+        await host.StartAsync(0);
+        return host;
+    }
+
+    private static object SessionLoggingFrame(string cwd, string root) => new
+    {
+        id = "create",
+        type = ServerCommandTypes.CreateSession,
+        cwd,
         sessionsRoot = Path.Combine(root, "sessions"),
         noTools = true,
         noBuiltinTools = true,

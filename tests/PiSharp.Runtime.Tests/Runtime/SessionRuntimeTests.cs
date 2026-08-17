@@ -1304,7 +1304,6 @@ public sealed class SessionRuntimeTests
         public int GetEntriesCount { get; private set; }
         public JsonlSessionMetadata Metadata => inner.Metadata;
         public string Id => inner.Id;
-        public string? LeafId { get => inner.LeafId; set => inner.LeafId = value; }
         public ISessionStorage<JsonlSessionMetadata> Storage => inner.Storage;
         public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => inner.GetLeafIdAsync(cancellationToken);
         public Task<SessionTreeEntry?> GetEntryAsync(string id, CancellationToken cancellationToken = default) => inner.GetEntryAsync(id, cancellationToken);
@@ -1341,6 +1340,7 @@ public sealed class SessionRuntimeTests
 
         public void ReleaseAppend() => _releaseAppend.TrySetResult();
 
+        public TMetadata Metadata => _inner.Metadata;
         public Task<TMetadata> GetMetadataAsync(CancellationToken cancellationToken = default) => _inner.GetMetadataAsync(cancellationToken);
 
         public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => _inner.GetLeafIdAsync(cancellationToken);

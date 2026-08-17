@@ -6,24 +6,28 @@ namespace PiSharp.Logging.Tests;
 
 public sealed class CliFileLoggingTests
 {
-    [Fact]
-    public void GetDefaultLogFilePath_ReturnsCorrectPath()
+    [Theory]
+    [InlineData(LogContext.Client, "client")]
+    [InlineData(LogContext.Daemon, "daemon")]
+    public void GetDefaultLogFilePath_MatchesContextSubdirectory(LogContext context, string expected)
     {
-        var result = CliFileLogging.GetDefaultLogFilePath("/home/user");
+        var result = CliFileLogging.GetDefaultLogFilePath(context, "/home/user");
 
-        Assert.Equal(Path.Combine("/home/user", ".pi", "PiSharp", "logs", "pi.log"), result);
+        Assert.Equal(Path.Combine("/home/user", ".pi", "PiSharp", "logs", expected, "pi.log"), result);
     }
 
-    [Fact]
-    public void GetSessionLogFilePath_MirrorsSessionDirectoryAndFileStem()
+    [Theory]
+    [InlineData(LogContext.Client, "client")]
+    [InlineData(LogContext.Daemon, "daemon")]
+    public void GetSessionLogFilePath_MatchesContextAndMirrorsSessionDirectoryAndFileStem(LogContext context, string expected)
     {
         var home = Path.Combine(Path.GetTempPath(), "home");
         var encodedCwd = "--repo-project--";
         var sessionPath = Path.Combine(home, ".pi", "agent", "sessions", encodedCwd, "2026-06-04T10-20-30-000_session-1.jsonl");
 
-        var result = CliFileLogging.GetSessionLogFilePath(Path.Combine(home, ".pi", "PiSharp"), sessionPath);
+        var result = CliFileLogging.GetSessionLogFilePath(Path.Combine(home, ".pi", "PiSharp"), context, sessionPath);
 
-        Assert.Equal(Path.Combine(home, ".pi", "PiSharp", "logs", encodedCwd, "2026-06-04T10-20-30-000_session-1.log"), result);
+        Assert.Equal(Path.Combine(home, ".pi", "PiSharp", "logs", expected, encodedCwd, "2026-06-04T10-20-30-000_session-1.log"), result);
     }
 
     [Fact]
@@ -174,7 +178,24 @@ public sealed class CliFileLoggingTests
 
         Assert.NotNull(registration);
         registration.SetSessionPath(sessionPath);
-        Assert.Equal(Path.Combine(home, ".pi", "PiSharp", "logs", encodedCwd, "2026-06-04T10-20-30-000_session-1.log"), registration.CurrentFilePath);
+        Assert.Equal(Path.Combine(home, ".pi", "PiSharp", "logs", "client", encodedCwd, "2026-06-04T10-20-30-000_session-1.log"), registration.CurrentFilePath);
+        Assert.Equal(RollingFileMode.ExactFile, registration.Mode);
+    }
+    [Fact]
+    public void CreateConfiguredFileLogging_DaemonContextRetargetsToDaemonSessionLogPath()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "pisharp-cli-logging-daemon-" + Guid.NewGuid().ToString("N"));
+        var home = Path.Combine(root, "home");
+        var repo = Path.Combine(root, "repo");
+        var encodedCwd = "--repo--";
+        var sessionPath = Path.Combine(home, ".pi", "agent", "sessions", encodedCwd, "2026-06-04T10-20-30-000_session-1.jsonl");
+
+        var registration = CliFileLogging.CreateConfiguredFileLogging(repo, home, new CliFileLoggingOverrides(null, null, null), context: LogContext.Daemon);
+
+        Assert.NotNull(registration);
+        Assert.Equal(LogContext.Daemon, registration.Context);
+        registration.SetSessionPath(sessionPath);
+        Assert.Equal(Path.Combine(home, ".pi", "PiSharp", "logs", "daemon", encodedCwd, "2026-06-04T10-20-30-000_session-1.log"), registration.CurrentFilePath);
         Assert.Equal(RollingFileMode.ExactFile, registration.Mode);
     }
 

@@ -100,6 +100,7 @@ public sealed class JsonlSessionStorage : ISessionStorage<JsonlSessionMetadata>
             name);
     }
 
+    public JsonlSessionMetadata Metadata => _inner.Metadata;
     public Task<JsonlSessionMetadata> GetMetadataAsync(CancellationToken cancellationToken = default) => _inner.GetMetadataAsync(cancellationToken);
     public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => _inner.GetLeafIdAsync(cancellationToken);
     public Task<string> CreateEntryIdAsync(CancellationToken cancellationToken = default) => _inner.CreateEntryIdAsync(cancellationToken);

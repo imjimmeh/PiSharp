@@ -48,21 +48,8 @@ public sealed class SessionRuntime(
     TelemetryService? telemetry = null) : IAsyncDisposable
 {
     private Func<SessionRuntime, CancellationToken, Task>? _rebind;
-    private const int BridgeForwardingQueueCapacity = 2048;
-    private IDisposable? _bridgeForwardingSubscription;
-    private CancellationTokenSource? _bridgeForwardingCancellation;
-    private Channel<AgentHarnessEvent>? _bridgeForwardingQueue;
-    private Task? _bridgeForwardingWorker;
-    private IDisposable? _bridgeBeforeAgentStartSubscription;
-    private IDisposable? _bridgeBeforePromptRenderSubscription;
-    private IDisposable? _bridgeInputSubscription;
-    private IDisposable? _bridgeSessionBeforeSwitchSubscription;
-    private IDisposable? _bridgeSessionBeforeForkSubscription;
-    private IDisposable? _bridgeSettingsChangedSubscription;
-    private IDisposable? _bridgeSessionShutdownSubscription;
+    private readonly RuntimeEventBridge _eventBridge = new(loggerFactory);
     private IDisposable? _extensionDispatchSubscription;
-    private IDisposable? _telemetryInstrumentorSubscription;
-    private HarnessTelemetryInstrumentor? _harnessTelemetryInstrumentor;
     private readonly RuntimeSessionController _sessionController = new(repo, createOptions, harnessFactory, extensionManager);
     private readonly ExtensionSettingsService _settingsService = new(settingsStore, settingsSnapshot, extensionManager?.Registry, loggerFactory);
     private readonly ExtensionStateService _stateService = BuildStateService(settingsSnapshot, createOptions.Cwd, loggerFactory);
@@ -190,144 +177,13 @@ public sealed class SessionRuntime(
     public void SetRebindSession(Func<SessionRuntime, CancellationToken, Task> rebind) => _rebind = rebind;
 
     public void BindHarnessEventForwarding()
-    {
-        UnbindHarnessEventForwarding();
-        if (TsHost is null) return;
-        StartBridgeForwardingWorker(TsHost);
-        _bridgeForwardingSubscription = Harness.Subscribe((evt, token) =>
-            evt is AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.BeforeAgentStart or AgentHarnessOwnEvent.BeforePromptRender }
-                ? Task.CompletedTask
-                : evt is AgentHarnessEvent.Own { Event: AgentHarnessOwnEvent.SessionStart }
-                    ? TsHost.ForwardEventAsync(evt, token)
-                : QueueBridgeForwardingEvent(evt));
-        if (ExtensionManager is not null)
-        {
-            _bridgeBeforePromptRenderSubscription = ExtensionManager.Registry.RegisterHandler(
-                "extension:ts-bridge",
-                ExtensionEventNames.BeforePromptRender,
-                TsHost.ForwardExtensionEventAsync);
-            _bridgeBeforeAgentStartSubscription = ExtensionManager.Registry.RegisterHandler(
-                "extension:ts-bridge",
-                ExtensionEventNames.BeforeAgentStart,
-                TsHost.ForwardExtensionEventAsync);
-            _bridgeInputSubscription = ExtensionManager.Registry.RegisterHandler(
-                "extension:ts-bridge",
-                ExtensionEventNames.Input,
-                TsHost.ForwardExtensionEventAsync);
-            _bridgeSessionBeforeSwitchSubscription = ExtensionManager.Registry.RegisterHandler(
-                "extension:ts-bridge",
-                ExtensionEventNames.SessionBeforeSwitch,
-                TsHost.ForwardExtensionEventAsync);
-            _bridgeSessionBeforeForkSubscription = ExtensionManager.Registry.RegisterHandler(
-                "extension:ts-bridge",
-                ExtensionEventNames.SessionBeforeFork,
-                TsHost.ForwardExtensionEventAsync);
-            _bridgeSessionShutdownSubscription = ExtensionManager.Registry.RegisterHandler(
-                "extension:ts-bridge",
-                ExtensionEventNames.SessionShutdown,
-                TsHost.ForwardExtensionEventAsync);
-            _bridgeSettingsChangedSubscription = ExtensionManager.Registry.RegisterHandler(
-                "extension:ts-bridge",
-                ExtensionEventNames.SettingsChanged,
-                TsHost.ForwardExtensionEventAsync);
-        }
-    }
+        => _eventBridge.BindHarnessEventForwarding(Harness, TsHost, ExtensionManager);
 
     public void BindTelemetryInstrumentation()
-    {
-        _telemetryInstrumentorSubscription?.Dispose();
-        _telemetryInstrumentorSubscription = null;
-        if (Telemetry is null) return;
-        var instrumentor = new HarnessTelemetryInstrumentor(Telemetry);
-        _harnessTelemetryInstrumentor = instrumentor;
-        _telemetryInstrumentorSubscription = Harness.Subscribe(instrumentor.OnEventAsync);
-    }
+        => _eventBridge.BindTelemetryInstrumentation(Harness, Telemetry);
 
-    private void UnbindHarnessEventForwarding()
-    {
-        _bridgeForwardingSubscription?.Dispose();
-        _bridgeForwardingSubscription = null;
-        StopBridgeForwardingWorker();
-        _bridgeBeforeAgentStartSubscription?.Dispose();
-        _bridgeBeforeAgentStartSubscription = null;
-        _bridgeBeforePromptRenderSubscription?.Dispose();
-        _bridgeBeforePromptRenderSubscription = null;
-        _bridgeInputSubscription?.Dispose();
-        _bridgeInputSubscription = null;
-        _bridgeSessionBeforeSwitchSubscription?.Dispose();
-        _bridgeSessionBeforeSwitchSubscription = null;
-        _bridgeSessionBeforeForkSubscription?.Dispose();
-        _bridgeSessionBeforeForkSubscription = null;
-        _bridgeSessionShutdownSubscription?.Dispose();
-        _bridgeSettingsChangedSubscription?.Dispose();
-        _bridgeSettingsChangedSubscription = null;
-        _bridgeSessionShutdownSubscription = null;
-    }
-
-    private void StartBridgeForwardingWorker(TsExtensionHost tsHost)
-    {
-        var cancellation = new CancellationTokenSource();
-        var queue = Channel.CreateBounded<AgentHarnessEvent>(new BoundedChannelOptions(BridgeForwardingQueueCapacity)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = true,
-            SingleWriter = false
-        });
-        _bridgeForwardingCancellation = cancellation;
-        _bridgeForwardingQueue = queue;
-        _bridgeForwardingWorker = Task.Run(() => RunBridgeForwardingWorkerAsync(tsHost, queue.Reader, cancellation.Token), CancellationToken.None);
-    }
-
-    private Task QueueBridgeForwardingEvent(AgentHarnessEvent evt)
-    {
-        var queue = _bridgeForwardingQueue;
-        var cancellation = _bridgeForwardingCancellation;
-        if (queue is null || cancellation is null || cancellation.IsCancellationRequested) return Task.CompletedTask;
-        if (!queue.Writer.TryWrite(evt)) _ = WriteBridgeForwardingEventAsync(queue.Writer, evt, cancellation.Token);
-        return Task.CompletedTask;
-    }
-
-    private static async Task WriteBridgeForwardingEventAsync(ChannelWriter<AgentHarnessEvent> writer, AgentHarnessEvent evt, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await writer.WriteAsync(evt, cancellationToken);
-        }
-        catch (Exception exception) when (exception is OperationCanceledException or ChannelClosedException)
-        {
-        }
-    }
-
-    private async Task RunBridgeForwardingWorkerAsync(TsExtensionHost tsHost, ChannelReader<AgentHarnessEvent> reader, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await foreach (var evt in reader.ReadAllAsync(cancellationToken))
-            {
-                try
-                {
-                    await tsHost.ForwardEventAsync(evt, cancellationToken);
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-                {
-                    _logger.LogWarning(exception, "Ignoring TypeScript bridge event forwarding failure");
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-    }
-
-    private void StopBridgeForwardingWorker()
-    {
-        _bridgeForwardingQueue?.Writer.TryComplete();
-        _bridgeForwardingCancellation?.Cancel();
-        _bridgeForwardingCancellation?.Dispose();
-        _bridgeForwardingCancellation = null;
-        _bridgeForwardingQueue = null;
-        _bridgeForwardingWorker = null;
-    }
+    public void UnbindHarnessEventForwarding()
+        => _eventBridge.UnbindHarnessEventForwarding();
 
     public void BindExtensionRuntime() => _sessionController.ExtensionBinder.BindRuntimeActions(this);
 
@@ -727,10 +583,8 @@ public sealed class SessionRuntime(
                 _logger.LogWarning("Timed out waiting for extension session shutdown handlers during runtime disposal");
             }
         }
-        UnbindHarnessEventForwarding();
+        _eventBridge.Dispose();
         _extensionDispatchSubscription?.Dispose();
-        _telemetryInstrumentorSubscription?.Dispose();
-        _telemetryInstrumentorSubscription = null;
         Telemetry?.Flush();
         await _sessionController.ExtensionBinder.DisposeAsync();
         await Harness.WaitForIdleAsync();

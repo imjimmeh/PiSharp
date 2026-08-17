@@ -370,7 +370,7 @@ public sealed class ExtensionRegistry
         => source.Values.SelectMany(stack => stack.Items);
 
     private void Publish(ExtensionRegistryChange change)
-        => _changeStream.PublishAsync(change, CancellationToken.None).GetAwaiter().GetResult();
+        => _changeStream.Publish(change);
 
     private void Set<T>(Dictionary<string, OwnedExtensionRegistration<T>> target, string key, string sourceId, T value, string category)
     {

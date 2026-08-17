@@ -854,7 +854,6 @@ public sealed class SlashCommandRegistryTests
         public int GetBranchCount { get; private set; }
         public JsonlSessionMetadata Metadata => inner.Metadata;
         public string Id => inner.Id;
-        public string? LeafId { get => inner.LeafId; set => inner.LeafId = value; }
         public ISessionStorage<JsonlSessionMetadata> Storage => inner.Storage;
         public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => inner.GetLeafIdAsync(cancellationToken);
         public Task<SessionTreeEntry?> GetEntryAsync(string id, CancellationToken cancellationToken = default) => inner.GetEntryAsync(id, cancellationToken);

@@ -13,18 +13,13 @@ namespace PiSharp.Agent.Loops;
 
 public static class AgentLoop
 {
-    private static ILogger _logger = NullLogger.Instance;
-
-    public static void SetLogger(ILoggerFactory? loggerFactory)
-    {
-        _logger = loggerFactory?.CreateLogger("PiSharp.Agent.Loops.AgentLoop") ?? NullLogger.Instance;
-    }
     public static IEventStream<AgentEvent, IReadOnlyList<AgentMessage>> Run(
         IReadOnlyList<AgentMessage> prompts,
         AgentContext context,
         AgentLoopConfig config,
         CancellationToken cancellationToken = default)
     {
+        var logger = config.LoggerFactory?.CreateLogger("PiSharp.Agent.Loops.AgentLoop") ?? NullLogger.Instance;
         var stream = new EventStream<AgentEvent, IReadOnlyList<AgentMessage>>();
         _ = Task.Run(async () =>
         {
@@ -35,7 +30,7 @@ public static class AgentLoop
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Agent loop failed");
+                logger.LogWarning(exception, "Agent loop failed");
                 stream.Error(exception);
             }
         }, CancellationToken.None);
@@ -50,6 +45,7 @@ public static class AgentLoop
         if (context.Messages.Count == 0) throw new InvalidOperationException("Cannot continue: no messages in context");
         if (context.Messages[^1] is AssistantMessage) throw new InvalidOperationException("Cannot continue from message role: assistant");
 
+        var logger = config.LoggerFactory?.CreateLogger("PiSharp.Agent.Loops.AgentLoop") ?? NullLogger.Instance;
         var stream = new EventStream<AgentEvent, IReadOnlyList<AgentMessage>>();
         _ = Task.Run(async () =>
         {
@@ -60,7 +56,7 @@ public static class AgentLoop
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Agent loop failed");
+                logger.LogWarning(exception, "Agent loop failed");
                 stream.Error(exception);
             }
         }, CancellationToken.None);
@@ -348,7 +344,7 @@ public static class AgentLoop
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Agent loop failed");
+            (config.LoggerFactory?.CreateLogger("PiSharp.Agent.Loops.AgentLoop") ?? NullLogger.Instance).LogWarning(exception, "Agent loop failed");
             return await FinalizeAssistantAsync(context, ProviderErrorMessage(config.Model, exception), addedPartial: false, emitAsync, cancellationToken);
         }
     }

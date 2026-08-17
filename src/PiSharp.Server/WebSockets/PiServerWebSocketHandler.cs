@@ -336,6 +336,17 @@ public sealed class PiServerWebSocketHandler(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Prompt failed for {ServerSessionId}", live.Id);
+                try
+                {
+                    await live.Runtime.Harness.PublishOwnEventAsync(
+                        new AgentHarnessOwnEvent.SystemMessage($"Error: {ex.Message}", IsError: true),
+                        CancellationToken.None);
+                }
+                catch (Exception publishEx)
+                {
+                    logger.LogDebug(publishEx, "Failed to publish prompt error event for {ServerSessionId}", live.Id);
+                }
+
                 if (sendAsync is not null)
                 {
                     try { await sendAsync(ServerResponse.Fail(command.Id, command.Type, "prompt_failed", ex.Message, new { serverSessionId = live.Id }), CancellationToken.None); }
@@ -679,7 +690,9 @@ public sealed class PiServerWebSocketHandler(
             runtime.Session.Metadata.Id,
             runtime.Session.Metadata.Path,
             await runtime.Session.GetSessionNameAsync(token),
-            await runtime.Session.GetBranchAsync(cancellationToken: token)), cancellationToken);
+            await runtime.Session.GetBranchAsync(cancellationToken: token),
+            runtime.Harness.Model,
+            runtime.Harness.ThinkingLevel), cancellationToken);
         return ServerResponse.Ok(envelope.Id, envelope.Type, snapshot);
     }
 

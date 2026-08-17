@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using PiSharp.Agent.Core.Events;
@@ -20,15 +21,17 @@ public sealed class LiveServerSession : IAsyncDisposable
     private int _attachedClients;
     private long _lastActivityTicks = DateTimeOffset.UtcNow.UtcTicks;
     private long _sequence;
+    private readonly ILoggerFactory? _loggerFactory;
     private bool _disposed;
 
-    public LiveServerSession(string id, PiSharp.Runtime.SessionRuntime runtime, Func<LiveServerSession, string, string, CancellationToken, Task>? runtimeSessionChanged = null, int eventCapacity = 100_000)
+    public LiveServerSession(string id, PiSharp.Runtime.SessionRuntime runtime, Func<LiveServerSession, string, string, CancellationToken, Task>? runtimeSessionChanged = null, int eventCapacity = 100_000, ILoggerFactory? loggerFactory = null)
     {
         Id = id;
         Runtime = runtime;
         _runtimeSessionChanged = runtimeSessionChanged;
         _runtimeSessionId = runtime.Session.Metadata.Id;
         _eventCapacity = eventCapacity;
+        _loggerFactory = loggerFactory;
         EventLog = new RetainedEventLog(eventCapacity);
         BindCurrentHarness();
         BindAdvisorEventForwarding();
@@ -236,5 +239,6 @@ public sealed class LiveServerSession : IAsyncDisposable
         Gate.Dispose();
         _operationAbort.Dispose();
         _lifetime.Dispose();
+        _loggerFactory?.Dispose();
     }
 }

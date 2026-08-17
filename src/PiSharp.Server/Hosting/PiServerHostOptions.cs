@@ -10,6 +10,18 @@ public sealed record PiServerHostOptions
     public required string ApiKey { get; init; }
     public TimeSpan IdleTimeout { get; init; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// When true, each session runtime gets its own file logging writing to
+    /// <c>logs/daemon/&lt;cwd&gt;/&lt;session&gt;.log</c> (fanning out to <see cref="LoggerFactory"/>
+    /// as well). Requires <see cref="LoggerFactory"/> to be set. Default false — sessions share the
+    /// daemon-wide factory.
+    /// </summary>
+    public bool PerSessionFileLogging { get; init; } = false;
+
+    /// <summary>Home directory used to resolve per-session daemon log destinations (tests isolate
+    /// here); null uses the real user profile.</summary>
+    public string? LogHomeDirectory { get; init; }
+
     /// <summary>Logger factory used for host and runtime lifecycle diagnostics.</summary>
     public ILoggerFactory? LoggerFactory { get; init; }
 

@@ -452,6 +452,30 @@ public sealed class TuiHost(TuiHostOptions options)
                     {
                         stateStore.Update(s => s with { SessionName = sessionName });
                     }
+
+                    stateStore.Update(s =>
+                    {
+                        var model = runtime.Model;
+                        var modelDisplay = s.ModelDisplay;
+                        var contextWindow = s.ContextWindow;
+                        if (model is not null && (!string.IsNullOrWhiteSpace(model.Provider) || !string.IsNullOrWhiteSpace(model.Id) || !string.IsNullOrWhiteSpace(model.Name)))
+                        {
+                            modelDisplay = string.IsNullOrWhiteSpace(model.Name)
+                                ? (string.IsNullOrWhiteSpace(model.Provider) ? model.Id : $"{model.Provider}/{model.Id}")
+                                : model.Name;
+                            if (model.ContextWindow > 0)
+                            {
+                                contextWindow = model.ContextWindow;
+                            }
+                        }
+
+                        return s with
+                        {
+                            ModelDisplay = modelDisplay,
+                            ContextWindow = contextWindow,
+                            ThinkingLevel = runtime.ThinkingLevel
+                        };
+                    });
                     _logger.LogDebug(
                         "TUI startup state applied; placeholder session={PlaceholderSession}",
                         string.Equals(stateStore.Snapshot().SessionId, "connecting", StringComparison.Ordinal));

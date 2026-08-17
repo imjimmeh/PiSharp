@@ -12,9 +12,8 @@ public sealed class Session<TMetadata>(ISessionStorage<TMetadata> storage, ILogg
     private readonly ILogger _logger = loggerFactory?.CreateLogger<Session<TMetadata>>() ?? NullLogger<Session<TMetadata>>.Instance;
 
     public ISessionStorage<TMetadata> Storage { get; } = storage;
-    public TMetadata Metadata => Storage.GetMetadataAsync().GetAwaiter().GetResult();
-    public string Id => Metadata.Id;
-    public string? LeafId { get => GetLeafIdAsync().GetAwaiter().GetResult(); set => Storage.SetLeafIdAsync(value).GetAwaiter().GetResult(); }
+    public TMetadata Metadata => Storage.Metadata;
+    public string Id => Storage.Metadata.Id;
     public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => Storage.GetLeafIdAsync(cancellationToken);
     public Task<SessionTreeEntry?> GetEntryAsync(string id, CancellationToken cancellationToken = default) => Storage.GetEntryAsync(id, cancellationToken);
     public Task<IReadOnlyList<SessionTreeEntry>> GetEntriesAsync(CancellationToken cancellationToken = default) => Storage.GetEntriesAsync(cancellationToken);

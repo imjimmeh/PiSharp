@@ -158,10 +158,11 @@ internal sealed class RuntimeExtensionBinder(ExtensionManager? extensionManager)
             runtime.Harness.Skills.Select(ToExtensionSkillDefinition).ToArray());
         binding.GetSelectedSkillsAsync = _ => Task.FromResult<IReadOnlyList<string>>(runtime.Harness.SelectedSkillNames);
         binding.SetSelectedSkillsAsync = (names, _) => { runtime.Harness.SetSelectedSkills(names); return Task.CompletedTask; };
-        binding.RegisterSkillProviderAsync = (provider, ct) => Task.FromResult<IDisposable>(
+        binding.RegisterSkillProvider = provider =>
             extensionManager is null
                 ? new NoopDisposable()
-                : extensionManager.Registry.RegisterSkillProvider("runtime", provider));
+                : extensionManager.Registry.RegisterSkillProvider("runtime", provider);
+        binding.RegisterSkillProviderAsync = (provider, _) => Task.FromResult(binding.RegisterSkillProvider(provider));
         binding.GetSkillProviderPrioritiesAsync = _ => Task.FromResult<IReadOnlyDictionary<string, int>>(
             extensionManager is null
                 ? new Dictionary<string, int>()

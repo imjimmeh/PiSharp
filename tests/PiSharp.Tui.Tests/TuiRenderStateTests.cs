@@ -229,6 +229,22 @@ public sealed class TuiRenderStateTests
     }
 
     [Fact]
+    public void HydrateSession_UpdatesModelDisplayAndThinkingLevel_FromBranchEntries()
+    {
+        var branch = new SessionTreeEntry[]
+        {
+            new ModelChangeEntry { Id = "m1", ParentId = null, Timestamp = DateTimeOffset.UtcNow, Provider = "deepseek", ModelId = "deepseek-v4-flash" },
+            new ThinkingLevelChangeEntry { Id = "th1", ParentId = "m1", Timestamp = DateTimeOffset.UtcNow, ThinkingLevel = "high" },
+            new MessageEntry { Id = "u1", ParentId = "th1", Timestamp = DateTimeOffset.UtcNow, Message = AgentMessages.User("hello") },
+        };
+
+        var state = Empty().HydrateSession("sid", "session.jsonl", "Session", branch);
+
+        Assert.Equal("deepseek/deepseek-v4-flash", state.ModelDisplay);
+        Assert.Equal(ThinkingLevel.High, state.ThinkingLevel);
+    }
+
+    [Fact]
     public void PinnedSystemRowsRenderBeforeHydratedTranscript()
     {
         var branch = new SessionTreeEntry[]

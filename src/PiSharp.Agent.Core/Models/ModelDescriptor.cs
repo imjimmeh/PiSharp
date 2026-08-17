@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PiSharp.Agent.Core.Models;
 
 public sealed record ModelDescriptor(
@@ -23,6 +25,9 @@ public sealed record ModelCost(
     decimal CacheRead = 0,
     decimal CacheWrite = 0);
 
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(AnthropicCompat), "anthropic")]
+[JsonDerivedType(typeof(OpenAICompat), "openai")]
 public abstract record ModelCompat;
 
 public sealed record AnthropicCompat(

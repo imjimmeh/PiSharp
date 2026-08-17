@@ -91,4 +91,33 @@ public sealed class AgentEventJsonSerializerTests
         Assert.Contains("\"contentIndex\":0", json);
         Assert.Contains("\"delta\":\"lo\"", json);
     }
+
+    [Fact]
+    public void ModelDescriptor_WithModelCompat_SerializesAndDeserializesPolymorphically()
+    {
+        var modelWithOpenAi = new ModelDescriptor(
+            "openai", "gpt-4o", "openai-responses",
+            Compat: new OpenAICompat(Strict: true, MaxTokensField: "max_completion_tokens"));
+
+        var json = AgentJsonSerializer.Serialize(modelWithOpenAi);
+        Assert.Contains("\"compat\":{\"type\":\"openai\",\"strict\":true,\"maxTokensField\":\"max_completion_tokens\"}", json);
+
+        var roundTripped = AgentJsonSerializer.Deserialize<ModelDescriptor>(json);
+        Assert.NotNull(roundTripped);
+        var openAiCompat = Assert.IsType<OpenAICompat>(roundTripped.Compat);
+        Assert.True(openAiCompat.Strict);
+        Assert.Equal("max_completion_tokens", openAiCompat.MaxTokensField);
+
+        var modelWithAnthropic = new ModelDescriptor(
+            "anthropic", "claude-3-7-sonnet", "anthropic-messages",
+            Compat: new AnthropicCompat(CacheControl: "ephemeral"));
+
+        var jsonAnthropic = AgentJsonSerializer.Serialize(modelWithAnthropic);
+        Assert.Contains("\"compat\":{\"type\":\"anthropic\",\"cacheControl\":\"ephemeral\"}", jsonAnthropic);
+
+        var roundTrippedAnthropic = AgentJsonSerializer.Deserialize<ModelDescriptor>(jsonAnthropic);
+        Assert.NotNull(roundTrippedAnthropic);
+        var anthropicCompat = Assert.IsType<AnthropicCompat>(roundTrippedAnthropic.Compat);
+        Assert.Equal("ephemeral", anthropicCompat.CacheControl);
+    }
 }

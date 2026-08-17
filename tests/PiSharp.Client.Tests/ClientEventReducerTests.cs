@@ -104,6 +104,24 @@ public sealed class ClientEventReducerTests
     }
 
     [Fact]
+    public void Apply_ModelSelect_WithoutName_FormatsAsProviderAndId()
+    {
+        var model = new ModelDescriptor(
+            Provider: "deepseek",
+            Id: "deepseek-v4-flash",
+            Api: "deepseek",
+            Name: "",
+            Compat: new OpenAICompat(Strict: true));
+        var state = ClientSessionState.Empty;
+
+        var next = ClientEventReducer.Apply(
+            state,
+            EnvelopeOwn(1, new AgentHarnessOwnEvent.ModelSelect(model, null, "slash")));
+
+        Assert.Equal("deepseek/deepseek-v4-flash", next.ModelDisplay);
+    }
+
+    [Fact]
     public void Apply_Compaction_TogglesIsCompacting()
     {
         var compacting = ClientEventReducer.Apply(

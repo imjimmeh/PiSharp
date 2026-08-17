@@ -106,6 +106,7 @@ internal sealed class TuiPromptSubmissionCoordinator
                 : await _options.ProcessFileReferencesAsync(text, _options.WorkingDirectory ?? Environment.CurrentDirectory, token);
             var images = input.Images is { Count: > 0 } ? input.Images.Concat(processed.Images).ToArray() : processed.Images;
 
+            _logger.LogDebug("TUI prompt dispatch phase={Phase} textLength={TextLength}", _session.CurrentRuntime.Phase, text.Length);
             if (_session.CurrentRuntime.Phase == AgentHarnessPhase.Idle)
             {
                 _ = RunAgentTurnAsync(processed.Text, images, token);

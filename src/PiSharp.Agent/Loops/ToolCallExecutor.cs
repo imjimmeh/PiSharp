@@ -14,12 +14,6 @@ internal sealed record FinalizedToolCall(ToolCallContent ToolCall, AgentToolResu
 
 public static class ToolCallExecutor
 {
-    private static ILogger _logger = NullLogger.Instance;
-
-    public static void SetLogger(ILoggerFactory? loggerFactory)
-    {
-        _logger = loggerFactory?.CreateLogger("PiSharp.Agent.Loops.ToolCallExecutor") ?? NullLogger.Instance;
-    }
     public static Task<ExecutedToolCallBatch> ExecuteAsync(
         AgentContext context,
         AssistantMessage assistantMessage,
@@ -140,7 +134,7 @@ public static class ToolCallExecutor
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogWarning(exception, "Tool {ToolName} execution failed", toolCall.Name);
+                    (config.LoggerFactory?.CreateLogger("PiSharp.Agent.Loops.ToolCallExecutor") ?? NullLogger.Instance).LogWarning(exception, "Tool {ToolName} execution failed", toolCall.Name);
                     result = ErrorResult(exception.Message);
                     isError = true;
                 }
@@ -150,7 +144,7 @@ public static class ToolCallExecutor
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Tool call executor failed");
+            (config.LoggerFactory?.CreateLogger("PiSharp.Agent.Loops.ToolCallExecutor") ?? NullLogger.Instance).LogWarning(exception, "Tool call executor failed");
             return new FinalizedToolCall(toolCall, ErrorResult(exception.Message), true);
         }
     }

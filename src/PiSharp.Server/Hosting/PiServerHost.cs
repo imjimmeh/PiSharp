@@ -1,3 +1,4 @@
+using PiSharp.Logging;
 using PiSharp.Extensions;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.UiBridge;
@@ -83,26 +84,62 @@ public sealed class PiServerHost(PiServerHostOptions options) : IAsyncDisposable
     /// Runtime factory used by the host's registry. With telemetry disabled the default
     /// telemetry-free factory is used; with telemetry enabled each runtime receives its own
     /// <see cref="PiSharp.Runtime.Telemetry.TelemetryService"/> feeding the shared aggregator
-    /// (plus any host-configured sinks), and its harness instrumentor is bound.
+    /// (plus any host-configured sinks), and its harness instrumentor is bound. When
+    /// <see cref="PiServerHostOptions.PerSessionFileLogging"/> is set, the runtime's
+    /// <see cref="ILoggerFactory"/> is a session-scoped fan-out that also writes to
+    /// <c>logs/daemon/&lt;cwd&gt;/&lt;session&gt;.log</c>; the owned session factory travels with the
+    /// returned <see cref="SessionRuntimeResult"/> so the hosting <see cref="LiveServerSession"/>
+    /// disposes it at session teardown.
     /// </summary>
-    private static Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> CreateRuntimeFactory(PiServerHostOptions options, TelemetryMetricsAggregator metrics)
+    private static Func<CreateServerSessionRequest, CancellationToken, Task<SessionRuntimeResult>> CreateRuntimeFactory(PiServerHostOptions options, TelemetryMetricsAggregator metrics)
         => async (request, cancellationToken) =>
         {
-            if (!options.TelemetryEnabled)
-                return await ServerSessionRegistry.CreateRuntimeAsync(
-                    request,
-                    telemetry: null,
-                    cancellationToken: cancellationToken,
-                    loggerFactory: options.LoggerFactory);
+            PiSharp.Runtime.Telemetry.TelemetryService? telemetry = null;
+            if (options.TelemetryEnabled)
+            {
+                var sinks = new List<ITelemetrySink> { metrics };
+                if (options.TelemetrySinks is not null) sinks.AddRange(options.TelemetrySinks);
+                telemetry = new PiSharp.Runtime.Telemetry.TelemetryService(enabled: true, sinks: sinks);
+            }
 
-            var sinks = new List<ITelemetrySink> { metrics };
-            if (options.TelemetrySinks is not null) sinks.AddRange(options.TelemetrySinks);
-            var telemetry = new PiSharp.Runtime.Telemetry.TelemetryService(enabled: true, sinks: sinks);
-            return await ServerSessionRegistry.CreateRuntimeAsync(
+            if (!options.PerSessionFileLogging || options.LoggerFactory is null)
+            {
+                var plainRuntime = await ServerSessionRegistry.CreateRuntimeAsync(
+                    request,
+                    telemetry,
+                    cancellationToken,
+                    loggerFactory: options.LoggerFactory);
+                return new SessionRuntimeResult(plainRuntime, LoggerFactory: null);
+            }
+
+            var sessionLogging = CliFileLogging.CreateConfiguredFileLogging(request.Cwd, homeDirectory: options.LogHomeDirectory, context: LogContext.Daemon);
+            ILoggerFactory? sessionFileFactory = null;
+            if (sessionLogging is not null)
+            {
+                sessionFileFactory = LoggerFactory.Create(builder =>
+                {
+                    builder.SetMinimumLevel(LogLevel.Debug);
+                    builder.AddDebug();
+                    builder.AddProvider(sessionLogging.Provider);
+                });
+            }
+
+            sessionLogging?.SetLogFolderPath(request.Cwd);
+            var sessionFactory = new SessionLoggerFactory(options.LoggerFactory, sessionFileFactory);
+            var runtime = await ServerSessionRegistry.CreateRuntimeAsync(
                 request,
                 telemetry,
                 cancellationToken,
-                loggerFactory: options.LoggerFactory);
+                loggerFactory: sessionFactory);
+            sessionLogging?.SetSessionPath(runtime.Session.Metadata.Path);
+            if (sessionFactory is not null)
+            {
+                sessionFactory.CreateLogger("PiSharp.Daemon.Session").LogInformation(
+                    "daemon session in folder cwd={Cwd} sessionPath={SessionPath}",
+                    runtime.Session.Metadata.Cwd,
+                    runtime.Session.Metadata.Path);
+            }
+            return new SessionRuntimeResult(runtime, sessionFileFactory is null ? null : sessionFactory);
         };
 
     /// <summary>Stops the Kestrel host when the shutdown token fires, so cancellation alone triggers graceful teardown.</summary>

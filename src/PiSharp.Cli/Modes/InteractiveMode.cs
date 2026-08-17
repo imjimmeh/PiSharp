@@ -110,7 +110,7 @@ public static class InteractiveMode
         {
             try
             {
-                var sessionEntries = state.SessionBranchEntries ?? runtime.Session.GetBranchAsync().GetAwaiter().GetResult();
+                var sessionEntries = state.SessionBranchEntries;
                 return footerSnapshotProvider.CreateSnapshotFromSessionEntries(state, runtime.Session.Metadata.Cwd, sessionEntries);
             }
             catch (Exception ex)
@@ -281,7 +281,8 @@ public static class InteractiveMode
         CliArgs runtimeArgs,
         IConsoleIO console,
         ILoggerFactory? loggerFactory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CliFileLoggingRegistration? fileLogging = null)
     {
         var activeLoggerFactory = loggerFactory ?? LoggerFactory.Create(builder =>
         {
@@ -290,6 +291,7 @@ public static class InteractiveMode
                 .AddDebug();
             _ = CliFileLogging.AddConfiguredFileLogging(builder, Directory.GetCurrentDirectory());
         });
+
         await using var transport = new ClientWebSocketTransport(
             activeLoggerFactory.CreateLogger<ClientWebSocketTransport>(),
             TimeSpan.FromSeconds(30));
@@ -307,6 +309,13 @@ public static class InteractiveMode
         var attachId = runtimeArgs.Attach;
         string? runtimeSessionId = null;
         var remoteReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void RetargetClientLogging(string? sessionPath)
+        {
+            if (string.IsNullOrWhiteSpace(sessionPath)) return;
+            fileLogging?.SetSessionPath(sessionPath);
+            if (fileLogging is not null) logger?.LogInformation("Session log file retargeted path={LogFilePath}", fileLogging.CurrentFilePath);
+        }
 
         async Task<TuiHostStartupResult> StartRemoteAsync(CancellationToken token)
         {
@@ -359,6 +368,18 @@ public static class InteractiveMode
                 }
 
                 backend.ServerSessionId = (attachedServerSessionId ?? created!.ServerSessionId)!;
+                if (created is not null)
+                {
+                    backend.AdoptInitialState(created.State);
+                    RetargetClientLogging(created.State.RuntimeSessionPath);
+                }
+                else
+                {
+                    var state = await backend.GetStateAsync(token);
+                    backend.AdoptInitialState(state);
+                    RetargetClientLogging(state.RuntimeSessionPath);
+                }
+
                 runtimeSessionId = attachedServerSessionId is null ? created!.State.RuntimeSessionId : attachId!;
 
                 var startupMessages = await backend.GetStartupMessagesAsync(token);

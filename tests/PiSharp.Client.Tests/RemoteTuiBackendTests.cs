@@ -224,6 +224,35 @@ public sealed class RemoteTuiBackendTests
     }
 
     [Fact]
+    public async Task AdoptInitialState_PopulatesModelAndThinkingLevelAndPhase()
+    {
+        var transport = new BackendFakeTransport();
+        var connection = new ClientSessionConnection(transport, NullLogger.Instance);
+        await using var backend = new RemoteTuiBackend(connection, NullLogger.Instance) { ServerSessionId = SessionId };
+
+        var initialState = new ServerSessionState(
+            SessionId,
+            "rt-session-1",
+            "/tmp/session.jsonl",
+            "Test Session",
+            "/tmp",
+            TestModel,
+            ThinkingLevel.High,
+            IsBusy: false,
+            IsCompacting: false,
+            MessageCount: 5,
+            HighWatermark: 42);
+
+        backend.AdoptInitialState(initialState);
+
+        Assert.Equal(TestModel.Id, backend.Model.Id);
+        Assert.Equal(TestModel.Name, backend.Model.Name);
+        Assert.Equal(ThinkingLevel.High, backend.ThinkingLevel);
+        Assert.Equal(AgentHarnessPhase.Idle, backend.Phase);
+        Assert.Equal("Test Session", await backend.GetSessionNameAsync());
+    }
+
+    [Fact]
     public async Task UiRequest_AutoCancelled_WhenNoHandler()
     {
         var transport = new BackendFakeTransport();

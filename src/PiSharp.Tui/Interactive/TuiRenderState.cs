@@ -181,14 +181,52 @@ public sealed record TuiRenderState(
         return this with { ExtensionStatuses = copy };
     }
 
-    public TuiRenderState HydrateSession(string sessionId, string? sessionFile, string? sessionName, IReadOnlyList<SessionTreeEntry> branchEntries)
+    public TuiRenderState HydrateSession(
+        string sessionId,
+        string? sessionFile,
+        string? sessionName,
+        IReadOnlyList<SessionTreeEntry> branchEntries,
+        ModelDescriptor? model = null,
+        ThinkingLevel? thinkingLevelOverride = null)
     {
+        var modelDisplay = ModelDisplay;
+        var contextWindow = ContextWindow;
+        var thinkingLevel = thinkingLevelOverride ?? ThinkingLevel;
+
+        if (model is not null && (!string.IsNullOrWhiteSpace(model.Provider) || !string.IsNullOrWhiteSpace(model.Id) || !string.IsNullOrWhiteSpace(model.Name)))
+        {
+            modelDisplay = string.IsNullOrWhiteSpace(model.Name)
+                ? (string.IsNullOrWhiteSpace(model.Provider) ? model.Id : $"{model.Provider}/{model.Id}")
+                : model.Name;
+            if (model.ContextWindow > 0)
+            {
+                contextWindow = model.ContextWindow;
+            }
+        }
+
+        var lastModelChange = branchEntries.OfType<ModelChangeEntry>().LastOrDefault();
+        if (lastModelChange is not null && (!string.IsNullOrWhiteSpace(lastModelChange.Provider) || !string.IsNullOrWhiteSpace(lastModelChange.ModelId)))
+        {
+            modelDisplay = string.IsNullOrWhiteSpace(lastModelChange.Provider)
+                ? lastModelChange.ModelId
+                : $"{lastModelChange.Provider}/{lastModelChange.ModelId}";
+        }
+
+        var lastThinkingChange = branchEntries.OfType<ThinkingLevelChangeEntry>().LastOrDefault();
+        if (lastThinkingChange is not null && Enum.TryParse<ThinkingLevel>(lastThinkingChange.ThinkingLevel, ignoreCase: true, out var parsedThinking))
+        {
+            thinkingLevel = parsedThinking;
+        }
+
         var hydrated = this with
         {
             SessionId = sessionId,
             SessionFile = sessionFile,
             SessionName = sessionName,
             SessionBranchEntries = branchEntries,
+            ModelDisplay = modelDisplay,
+            ContextWindow = contextWindow,
+            ThinkingLevel = thinkingLevel,
             Transcript = []
         };
 

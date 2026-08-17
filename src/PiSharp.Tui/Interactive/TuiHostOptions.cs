@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Messages;
+using PiSharp.Abstractions.Options;
 using PiSharp.Abstractions.Sessions;
+using PiSharp.Agent.Core.Models;
 using PiSharp.Agent.Core.Tools;
 using PiSharp.Agent.Resources.Theme;
 using PiSharp.Extensions;
@@ -23,7 +25,9 @@ public sealed record TuiSessionSnapshot(
     string SessionId,
     string? SessionFile,
     string? SessionName,
-    IReadOnlyList<SessionTreeEntry> BranchEntries);
+    IReadOnlyList<SessionTreeEntry> BranchEntries,
+    ModelDescriptor? Model = null,
+    ThinkingLevel? ThinkingLevel = null);
 
 public sealed record TuiHostStartupResult(
     TuiThemeDocument? Theme,

@@ -9,7 +9,7 @@ public static class TuiSessionSwitch
         var localSystemRows = preserveLocalSystemRows
             ? state.Transcript.Where(item => item.EntryId is null && string.Equals(item.Role, "system", StringComparison.Ordinal) && item.ExpiresAt is null).ToArray()
             : [];
-        var hydrated = state.HydrateSession(snapshot.SessionId, snapshot.SessionFile, snapshot.SessionName, snapshot.BranchEntries);
+        var hydrated = state.HydrateSession(snapshot.SessionId, snapshot.SessionFile, snapshot.SessionName, snapshot.BranchEntries, snapshot.Model, snapshot.ThinkingLevel);
         return localSystemRows.Length == 0 ? hydrated : hydrated.RestoreLocalSystemRows(localSystemRows);
     }
 

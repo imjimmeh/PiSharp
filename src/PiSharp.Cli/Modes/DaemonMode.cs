@@ -97,7 +97,7 @@ public static class DaemonMode
             builder
                 .SetMinimumLevel(LogLevel.Debug)
                 .AddDebug();
-            _ = CliFileLogging.AddConfiguredFileLogging(builder, Directory.GetCurrentDirectory());
+            _ = CliFileLogging.AddConfiguredFileLogging(builder, Directory.GetCurrentDirectory(), context: LogContext.Daemon);
         });
         PiServerHost? host = null;
         var hostOptions = DaemonCommandHost.CreateHostOptions(

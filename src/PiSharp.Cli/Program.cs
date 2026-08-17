@@ -145,7 +145,7 @@ public static class Program
             if (lease is not null)
             {
                 appLogger.LogInformation("Using daemon lease pid={Pid} port={Port}", lease.Pid, lease.Port);
-                return await InteractiveMode.RunRemoteAsync(lease, runtimeArgs, console, loggerFactory, cancellationToken);
+                return await InteractiveMode.RunRemoteAsync(lease, runtimeArgs, console, loggerFactory, cancellationToken, fileLogging);
             }
 
             appLogger.LogInformation("Daemon unavailable; falling back to in-process mode");
@@ -165,6 +165,7 @@ public static class Program
             };
         }
 
+        fileLogging?.SetLogFolderPath(cwd);
         await using var runtime = await PiRuntimeBootstrap.CreateRuntimeAsync(
             runtimeOptions,
             loggerFactory: loggerFactory,

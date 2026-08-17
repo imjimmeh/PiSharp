@@ -3,7 +3,9 @@ namespace PiSharp.Abstractions.Sessions;
 public interface ISessionStorage<TMetadata>
     where TMetadata : ISessionMetadata
 {
-    Task<TMetadata> GetMetadataAsync(CancellationToken cancellationToken = default);
+    TMetadata Metadata { get; }
+
+    Task<TMetadata> GetMetadataAsync(CancellationToken cancellationToken = default) => Task.FromResult(Metadata);
 
     Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default);
 

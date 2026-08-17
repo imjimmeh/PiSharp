@@ -95,7 +95,11 @@ public static class ClientToTuiAdapter
             : null;
 
     private static string DisplayModel(ModelDescriptor model)
-        => !string.IsNullOrWhiteSpace(model.Name) ? model.Name : model.Id;
+        => !string.IsNullOrWhiteSpace(model.Name)
+            ? model.Name
+            : string.IsNullOrWhiteSpace(model.Provider)
+                ? model.Id
+                : $"{model.Provider}/{model.Id}";
 
     /// <summary>
     /// Maps the server's <see cref="ServerSessionSnapshot"/> to the TUI's
@@ -110,7 +114,13 @@ public static class ClientToTuiAdapter
             if (FromPayload<SessionTreeEntry>(entry) is { } parsed) entries.Add(parsed);
         }
 
-        return new TuiSessionSnapshot(snapshot.SessionId, snapshot.SessionFile, snapshot.SessionName, entries);
+        return new TuiSessionSnapshot(
+            snapshot.SessionId,
+            snapshot.SessionFile,
+            snapshot.SessionName,
+            entries,
+            snapshot.Model,
+            snapshot.ThinkingLevel);
     }
 
     public static ThinkingLevel? TryParseThinkingLevel(string? value)

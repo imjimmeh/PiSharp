@@ -116,7 +116,7 @@ public sealed class McpStatusCommandTests
 
     private static PiServerWebSocketHandler CreateHandler(PiServerCommandDelegates? delegates = null)
         => new(
-            new ServerSessionRegistry((request, _) => throw new InvalidOperationException("No session should be created for mcp_status tests.")),
+            new ServerSessionRegistry((request, _) => Task.FromException<PiSharp.Server.Runtime.SessionRuntimeResult>(new InvalidOperationException("No session should be created for mcp_status tests."))),
             new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }),
             NullLogger<PiServerWebSocketHandler>.Instance,
             uiBridge: null,

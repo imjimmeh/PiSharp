@@ -24,7 +24,8 @@ public sealed record AgentLoopConfig(
     ThinkingLevel ThinkingLevel = ThinkingLevel.Off,
     Func<StreamDeltaContext, CancellationToken, Task<StreamDeltaDecision?>>? OnStreamDelta = null,
     Func<IReadOnlyList<AgentMessage>, AgentContext, CancellationToken, Task<IReadOnlyList<AgentMessage>>>? PrepareStreamMessages = null,
-    int MaxStreamRetries = 3);
+    int MaxStreamRetries = 3,
+    Microsoft.Extensions.Logging.ILoggerFactory? LoggerFactory = null);
 
 public sealed record AgentLoopTurnUpdate(
     AgentContext? Context = null,

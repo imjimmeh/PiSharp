@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Abstractions.Options;
+using PiSharp.Abstractions.Tasks;
 using PiSharp.Agent.Core;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Agent.Core.Tools;
@@ -73,14 +74,16 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     /// id; a <c>ui_cancelled</c> envelope cancels the matching entry so the handler
     /// (e.g. <c>SelectInlineAsync</c>) ends and releases the UI.</summary>
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _pendingUiRequests = new(StringComparer.Ordinal);
+    private readonly BackgroundTaskTracker _taskTracker;
 
     public RemoteTuiBackend(ClientSessionConnection connection, ILogger logger)
     {
         _connection = connection;
         _logger = logger;
+        _taskTracker = new BackgroundTaskTracker(logger);
         connection.EventReceived += OnEnvelope;
-        _ = Task.Run(() => ProcessInboxAsync(_cts.Token), CancellationToken.None);
-        _ = Task.Run(() => DrainLateResponsesAsync(_cts.Token), CancellationToken.None);
+        _taskTracker.Run("ProcessInbox", ProcessInboxAsync, _cts.Token);
+        _taskTracker.Run("DrainLateResponses", DrainLateResponsesAsync, _cts.Token);
     }
 
     private async Task DrainLateResponsesAsync(CancellationToken token)
@@ -228,7 +231,14 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         {
         }
 
+        await _taskTracker.DisposeAsync().ConfigureAwait(false);
         await _connection.DisposeAsync();
+        _cts.Dispose();
+    }
+
+    public void Dispose()
+    {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -279,6 +289,25 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     }
 
 
+
+    /// <summary>
+    /// Adopts the initial session state returned by the daemon upon creation or attach,
+    /// ensuring Model, ThinkingLevel, and Phase are populated immediately before TUI launch.
+    /// </summary>
+    public void AdoptInitialState(ServerSessionState state)
+    {
+        lock (_sync)
+        {
+            _state = ClientToTuiAdapter.ToClientState(_state, state);
+            _model = state.Model;
+            _thinkingLevel = state.ThinkingLevel;
+            _turnActive = state.IsBusy;
+            if (state.HighWatermark > _maxSequence)
+            {
+                _maxSequence = state.HighWatermark;
+            }
+        }
+    }
 
     // --- TuiHostOptions-shaped surface (Task3.4 wraps these into its delegates) ---
 
@@ -802,7 +831,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
                 JsonSerializer.Serialize(data, ServerJsonSerializer.Options),
                 ServerJsonSerializer.Options);
 
-    private async Task<ServerSessionState> GetStateAsync(CancellationToken token)
+    public async Task<ServerSessionState> GetStateAsync(CancellationToken token = default)
     {
         var sessionId = RequireSessionId();
         var response = await SendAsync(

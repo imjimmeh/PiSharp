@@ -23,15 +23,10 @@ public sealed record SkillDiagnostic(string Type, string Code, string Message, s
 public static class SkillManager
 {
     private static readonly string[] IgnoreNames = [".gitignore", ".ignore", ".fdignore"];
-    private static ILogger _logger = NullLogger.Instance;
 
-    public static void SetLogger(ILoggerFactory? loggerFactory)
+    public static async Task<(IReadOnlyList<Skill> Skills, IReadOnlyList<SkillDiagnostic> Diagnostics)> LoadAsync(IExecutionEnv env, string path, bool includeDirectMarkdownFiles = true, CancellationToken cancellationToken = default, ILoggerFactory? loggerFactory = null)
     {
-        _logger = loggerFactory?.CreateLogger("PiSharp.Agent.Resources.SkillManager") ?? NullLogger.Instance;
-    }
-
-    public static async Task<(IReadOnlyList<Skill> Skills, IReadOnlyList<SkillDiagnostic> Diagnostics)> LoadAsync(IExecutionEnv env, string path, bool includeDirectMarkdownFiles = true, CancellationToken cancellationToken = default)
-    {
+        var logger = loggerFactory?.CreateLogger("PiSharp.Agent.Resources.SkillManager") ?? NullLogger.Instance;
         var skills = new List<Skill>();
         var diagnostics = new List<SkillDiagnostic>();
         var info = await env.GetFileInfoAsync(path, cancellationToken);
@@ -43,13 +38,13 @@ public static class SkillManager
 
         if (info.Value.Kind == FileKind.File)
         {
-            var (skill, diagnostic) = await LoadSkillFileAsync(env, path, cancellationToken);
+            var (skill, diagnostic) = await LoadSkillFileAsync(env, path, cancellationToken, logger);
             if (diagnostic is not null) diagnostics.Add(diagnostic);
             if (skill is not null) skills.Add(skill);
             return (skills, diagnostics);
         }
 
-        await WalkDirectoryAsync(env, path, path, includeDirectMarkdownFiles, [], skills, diagnostics, cancellationToken);
+        await WalkDirectoryAsync(env, path, path, includeDirectMarkdownFiles, [], skills, diagnostics, cancellationToken, logger);
         return (skills, diagnostics);
     }
 
@@ -60,7 +55,7 @@ public static class SkillManager
         return additionalInstructions is null ? block : $"{block}\n\n{additionalInstructions}";
     }
 
-    private static async Task WalkDirectoryAsync(IExecutionEnv env, string dir, string rootDir, bool includeDirectMarkdownFiles, HashSet<string> ignoreMatcher, List<Skill> skills, List<SkillDiagnostic> diagnostics, CancellationToken cancellationToken)
+    private static async Task WalkDirectoryAsync(IExecutionEnv env, string dir, string rootDir, bool includeDirectMarkdownFiles, HashSet<string> ignoreMatcher, List<Skill> skills, List<SkillDiagnostic> diagnostics, CancellationToken cancellationToken, ILogger? logger = null)
     {
         await LoadIgnoreRulesAsync(env, ignoreMatcher, dir, rootDir, diagnostics, cancellationToken);
         var list = await env.ListDirectoryAsync(dir, cancellationToken);
@@ -69,7 +64,7 @@ public static class SkillManager
         var directSkillFile = entries.FirstOrDefault(entry => entry.Kind == FileKind.File && string.Equals(entry.Name, "SKILL.md", StringComparison.OrdinalIgnoreCase));
         if (directSkillFile is not null)
         {
-            var (result, diagnostic) = await LoadSkillFileAsync(env, directSkillFile.Path, cancellationToken);
+            var (result, diagnostic) = await LoadSkillFileAsync(env, directSkillFile.Path, cancellationToken, logger);
             if (diagnostic is not null) diagnostics.Add(diagnostic);
             if (result is not null) skills.Add(result);
             return;
@@ -84,11 +79,11 @@ public static class SkillManager
             if (entry.Kind == FileKind.File)
             {
                 if (!includeDirectMarkdownFiles || !entry.Name.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) continue;
-                fileLoadTasks.Add(LoadSkillFileAsync(env, entry.Path, cancellationToken));
+                fileLoadTasks.Add(LoadSkillFileAsync(env, entry.Path, cancellationToken, logger));
                 continue;
             }
 
-            if (entry.Kind == FileKind.Directory) await WalkDirectoryAsync(env, entry.Path, rootDir, false, ignoreMatcher, skills, diagnostics, cancellationToken);
+            if (entry.Kind == FileKind.Directory) await WalkDirectoryAsync(env, entry.Path, rootDir, false, ignoreMatcher, skills, diagnostics, cancellationToken, logger);
         }
 
         var fileResults = await Task.WhenAll(fileLoadTasks);
@@ -99,11 +94,11 @@ public static class SkillManager
         }
     }
 
-    private static async Task<(Skill? Skill, SkillDiagnostic? Diagnostic)> LoadSkillFileAsync(IExecutionEnv env, string path, CancellationToken cancellationToken)
+    private static async Task<(Skill? Skill, SkillDiagnostic? Diagnostic)> LoadSkillFileAsync(IExecutionEnv env, string path, CancellationToken cancellationToken, ILogger? logger = null)
     {
         var read = await env.ReadTextFileAsync(path, cancellationToken);
         if (read.IsErr) return (null, new("warning", "read_failed", read.Error.Message, path));
-        var (frontmatter, body) = ParseFrontmatter(read.Value);
+        var (frontmatter, body) = ParseFrontmatter(read.Value, logger);
         var desc = frontmatter.TryGetValue("description", out var d) ? d?.ToString() : null;
         var name = frontmatter.TryGetValue("name", out var n) ? n?.ToString() : null;
         var fileName = Path.GetFileName(path);
@@ -123,7 +118,7 @@ public static class SkillManager
             _ => false
         };
 
-    private static (Dictionary<string, object?> Frontmatter, string Body) ParseFrontmatter(string content)
+    private static (Dictionary<string, object?> Frontmatter, string Body) ParseFrontmatter(string content, ILogger? logger = null)
     {
         var normalized = content.Replace("\r\n", "\n").Replace("\r", "\n");
         if (!normalized.StartsWith("---")) return ([], normalized);
@@ -134,7 +129,7 @@ public static class SkillManager
             var d = new DeserializerBuilder().WithNamingConvention(UnderscoredNamingConvention.Instance).Build();
             return (d.Deserialize<Dictionary<string, object?>>(normalized[4..endIndex]) ?? [], normalized[(endIndex + 4)..].TrimStart());
         }
-        catch { _logger.LogDebug("Skill frontmatter parse failed"); return ([], normalized[(endIndex + 4)..].TrimStart()); }
+        catch (Exception ex) { logger?.LogDebug(ex, "Skill frontmatter parse failed"); return ([], normalized[(endIndex + 4)..].TrimStart()); }
     }
 
     private static async Task LoadIgnoreRulesAsync(IExecutionEnv env, HashSet<string> matcher, string dir, string rootDir, List<SkillDiagnostic> diagnostics, CancellationToken cancellationToken)

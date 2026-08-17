@@ -14,24 +14,39 @@ public sealed partial class ServerSessionRegistry : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, LiveServerSession> _sessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _liveRuntimeSessionIds = new(StringComparer.Ordinal);
-    private readonly Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> _runtimeFactory;
+    private readonly Func<CreateServerSessionRequest, CancellationToken, Task<SessionRuntimeResult>> _runtimeFactory;
     private readonly TimeSpan _idleTimeout;
     private readonly CancellationTokenSource _sweepCts = new();
     private readonly Task _sweepTask;
 
     public ServerSessionRegistry()
-        : this(CreateRuntimeAsync)
+        : this(async (request, ct) => new SessionRuntimeResult(await CreateRuntimeAsync(request, ct), null))
     {
     }
 
-    public ServerSessionRegistry(TimeSpan? idleTimeout) : this(CreateRuntimeAsync, idleTimeout) { }
+    public ServerSessionRegistry(TimeSpan? idleTimeout)
+        : this(async (request, ct) => new SessionRuntimeResult(await CreateRuntimeAsync(request, ct), null), idleTimeout)
+    {
+    }
 
-    public ServerSessionRegistry(Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> runtimeFactory, TimeSpan? idleTimeout = null)
+    public ServerSessionRegistry(Func<CreateServerSessionRequest, CancellationToken, Task<SessionRuntimeResult>> runtimeFactory, TimeSpan? idleTimeout = null)
     {
         _runtimeFactory = runtimeFactory;
         _idleTimeout = idleTimeout ?? TimeSpan.FromMinutes(5);
         _sweepTask = Task.Run(SweepLoopAsync);
     }
+
+    /// <summary>
+    /// Compatibility overload: a factory that only produces the <see cref="SessionRuntime"/> (no
+    /// per-session logger factory) is adapted with a null owned factory, preserving prior behavior.
+    /// </summary>
+    public ServerSessionRegistry(Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> runtimeFactory, TimeSpan? idleTimeout = null)
+        : this(Wrap(runtimeFactory), idleTimeout)
+    {
+    }
+
+    private static Func<CreateServerSessionRequest, CancellationToken, Task<SessionRuntimeResult>> Wrap(Func<CreateServerSessionRequest, CancellationToken, Task<PiSharp.Runtime.SessionRuntime>> runtimeFactory)
+        => async (request, ct) => new SessionRuntimeResult(await runtimeFactory(request, ct), null);
 
     public IReadOnlyCollection<LiveServerSession> Sessions => _sessions.Values.ToArray();
 
@@ -42,13 +57,15 @@ public sealed partial class ServerSessionRegistry : IAsyncDisposable
         var serverSessionId = NewServerSessionId();
         var reservedRuntimeSessionIds = new HashSet<string>(StringComparer.Ordinal);
         PiSharp.Runtime.SessionRuntime? runtime = null;
+        SessionRuntimeResult? runtimeResult = null;
         LiveServerSession? live = null;
         try
         {
             ReserveLiveRuntimeSessionId(request.SessionId, serverSessionId, reservedRuntimeSessionIds);
-            runtime = await _runtimeFactory(request, cancellationToken);
+            runtimeResult = await _runtimeFactory(request, cancellationToken);
+            runtime = runtimeResult.Runtime;
             if (!string.Equals(request.SessionId, runtime.Session.Metadata.Id, StringComparison.Ordinal)) ReserveLiveRuntimeSessionId(runtime.Session.Metadata.Id, serverSessionId, reservedRuntimeSessionIds);
-            live = new LiveServerSession(serverSessionId, runtime, OnRuntimeSessionChangedAsync);
+            live = new LiveServerSession(serverSessionId, runtime, OnRuntimeSessionChangedAsync, loggerFactory: runtimeResult.LoggerFactory);
             var snapshot = await live.SnapshotAsync(cancellationToken);
             if (!_sessions.TryAdd(live.Id, live))
                 throw new InvalidOperationException($"Server session id collision for '{live.Id}'.");
@@ -59,7 +76,11 @@ public sealed partial class ServerSessionRegistry : IAsyncDisposable
         {
             foreach (var reservedRuntimeSessionId in reservedRuntimeSessionIds) ReleaseLiveRuntimeSessionId(reservedRuntimeSessionId);
             if (live is not null) await live.DisposeAsync();
-            else if (runtime is not null) await runtime.DisposeAsync();
+            else
+            {
+                if (runtime is not null) await runtime.DisposeAsync();
+                runtimeResult?.LoggerFactory?.Dispose();
+            }
             throw;
         }
     }

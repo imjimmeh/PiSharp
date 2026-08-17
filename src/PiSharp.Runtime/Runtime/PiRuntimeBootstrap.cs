@@ -301,7 +301,7 @@ public static class PiRuntimeBootstrap
             ReadmePath: Path.GetFullPath("README.md", options.Env.Cwd),
             DocsPath: Path.GetFullPath("docs", options.Env.Cwd),
             ExamplesPath: Path.GetFullPath("examples", options.Env.Cwd));
-        var loadedSkills = await startupContext.MeasureAsync("skills.load", () => LoadSkillsAsync(options.Env, resources.SkillPaths, cancellationToken));
+        var loadedSkills = await startupContext.MeasureAsync("skills.load", () => LoadSkillsAsync(options.Env, resources.SkillPaths, loggerFactory, cancellationToken));
         var promptOptionsWithSkills = systemPromptOptions with { Skills = loadedSkills };
 
         var systemPromptContext = SystemPromptBuildOptionsMapper.ToContext(promptOptionsWithSkills);
@@ -422,13 +422,13 @@ public static class PiRuntimeBootstrap
     private static IReadOnlyList<SystemPromptContextFile> ToSystemPromptContextFiles(IReadOnlyList<PiResourceContextFile>? contextFiles)
         => contextFiles?.Select(file => new SystemPromptContextFile(file.Path, file.Content)).ToArray() ?? [];
 
-    private static async Task<IReadOnlyList<Skill>> LoadSkillsAsync(IExecutionEnv env, IReadOnlyList<string> skillPaths, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<Skill>> LoadSkillsAsync(IExecutionEnv env, IReadOnlyList<string> skillPaths, ILoggerFactory? loggerFactory, CancellationToken cancellationToken)
     {
         var loaded = new List<Skill>();
         foreach (var skillPath in skillPaths)
         {
             var includeDirectMarkdownFiles = !skillPath.Replace('\\', '/').Contains("/.agents/skills", StringComparison.OrdinalIgnoreCase);
-            var (skills, _) = await SkillManager.LoadAsync(env, skillPath, includeDirectMarkdownFiles, cancellationToken);
+            var (skills, _) = await SkillManager.LoadAsync(env, skillPath, includeDirectMarkdownFiles, cancellationToken, loggerFactory);
             loaded.AddRange(skills);
         }
         return loaded;

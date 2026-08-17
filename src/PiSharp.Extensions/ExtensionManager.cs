@@ -213,7 +213,7 @@ public sealed class ExtensionManager(ExtensionRegistry? registry = null)
             => binding.GetAllRulesAsync(cancellationToken);
 
         public IReadOnlyList<string> GetProviderNames()
-            => binding.GetRuleProviderNamesAsync(CancellationToken.None).GetAwaiter().GetResult();
+            => registry.GetRuleProviderNames();
     }
 
     private sealed class StreamDeltaApi(ExtensionDescriptor descriptor, ExtensionRegistry registry) : IStreamDeltaInterceptorApi

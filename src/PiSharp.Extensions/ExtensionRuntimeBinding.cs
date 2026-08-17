@@ -80,8 +80,9 @@ public sealed class ExtensionRuntimeBinding
         = (_, _, _, _, _, _, _) => EmptyCompletionStream();
     public Func<IReadOnlyList<string>?, CancellationToken, Task> SetActiveToolsAsync { get; set; } = (_, _) => Task.CompletedTask;
     public Func<CancellationToken, Task<IReadOnlyList<ExtensionSkillDefinition>>> GetAllSkillsAsync { get; set; } = _ => Task.FromResult<IReadOnlyList<ExtensionSkillDefinition>>([]);
+    public Func<ISkillProvider, IDisposable> RegisterSkillProvider { get; set; } = _ => new DisposableAction(() => { });
     public Func<ISkillProvider, CancellationToken, Task<IDisposable>> RegisterSkillProviderAsync { get; set; }
-        = (_, _) => Task.FromResult<IDisposable>(new DisposableAction(() => { }));
+        = (provider, _) => Task.FromResult<IDisposable>(new DisposableAction(() => { }));
     public Func<CancellationToken, Task<IReadOnlyDictionary<string, int>>> GetSkillProviderPrioritiesAsync { get; set; }
         = _ => Task.FromResult<IReadOnlyDictionary<string, int>>(new Dictionary<string, int>());
     public Func<string, bool, bool, bool, CancellationToken, Task<ExtensionPackageResult>> InstallExtensionAsync { get; set; }
@@ -270,7 +271,7 @@ public sealed class ExtensionRuntimeBinding
     {
         public IDisposable RegisterSkill(ExtensionSkillDefinition registration) => new DisposableAction(() => { });
         public IDisposable RegisterSkillProvider(ISkillProvider provider)
-            => binding.RegisterSkillProviderAsync(provider, CancellationToken.None).GetAwaiter().GetResult();
+            => binding.RegisterSkillProvider(provider);
         public Task<IReadOnlyList<ExtensionSkillDefinition>> GetAllSkillsAsync(CancellationToken cancellationToken = default) => binding.GetAllSkillsAsync(cancellationToken);
         public Task<IReadOnlyList<string>> GetSelectedSkillsAsync(CancellationToken cancellationToken = default) => binding.GetSelectedSkillsAsync(cancellationToken);
         public Task SetSelectedSkillsAsync(IReadOnlyList<string> skillNames, CancellationToken cancellationToken = default) => binding.SetSelectedSkillsAsync(skillNames, cancellationToken);

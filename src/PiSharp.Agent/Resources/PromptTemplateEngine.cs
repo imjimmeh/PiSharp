@@ -12,14 +12,9 @@ public sealed record PromptTemplateDiagnostic(string Type, string Code, string M
 
 public static class PromptTemplateEngine
 {
-    private static ILogger _logger = NullLogger.Instance;
-
-    public static void SetLogger(ILoggerFactory? loggerFactory)
+    public static async Task<(IReadOnlyList<PromptTemplate> Templates, IReadOnlyList<PromptTemplateDiagnostic> Diagnostics)> LoadAsync(IExecutionEnv env, string path, CancellationToken cancellationToken = default, ILoggerFactory? loggerFactory = null)
     {
-        _logger = loggerFactory?.CreateLogger("PiSharp.Agent.Resources.PromptTemplateEngine") ?? NullLogger.Instance;
-    }
-    public static async Task<(IReadOnlyList<PromptTemplate> Templates, IReadOnlyList<PromptTemplateDiagnostic> Diagnostics)> LoadAsync(IExecutionEnv env, string path, CancellationToken cancellationToken = default)
-    {
+        var logger = loggerFactory?.CreateLogger("PiSharp.Agent.Resources.PromptTemplateEngine") ?? NullLogger.Instance;
         var templates = new List<PromptTemplate>();
         var diagnostics = new List<PromptTemplateDiagnostic>();
         var list = await env.ListDirectoryAsync(path, cancellationToken);
@@ -29,7 +24,7 @@ public static class PromptTemplateEngine
             if (entry.Kind != FileKind.File || !entry.Name.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) continue;
             var read = await env.ReadTextFileAsync(entry.Path, cancellationToken);
             if (read.IsErr) { diagnostics.Add(new("warning", "read_failed", read.Error.Message, entry.Path)); continue; }
-            var (frontmatter, body) = ParseFrontmatter(read.Value);
+            var (frontmatter, body) = ParseFrontmatter(read.Value, logger);
             var desc = frontmatter.TryGetValue("description", out var d) ? d?.ToString() : null;
             var name = Path.GetFileNameWithoutExtension(entry.Name);
             templates.Add(new PromptTemplate(name, desc, body));
@@ -52,7 +47,7 @@ public static class PromptTemplateEngine
 
     public static string FormatInvocation(PromptTemplate template, IReadOnlyList<string>? args = null) => SubstituteArgs(template.Content, args ?? []);
 
-    private static (Dictionary<string, object?> Frontmatter, string Body) ParseFrontmatter(string content)
+    private static (Dictionary<string, object?> Frontmatter, string Body) ParseFrontmatter(string content, ILogger? logger = null)
     {
         var normalized = content.Replace("\r\n", "\n").Replace("\r", "\n");
         if (!normalized.StartsWith("---")) return ([], normalized);
@@ -63,6 +58,6 @@ public static class PromptTemplateEngine
             var d = new DeserializerBuilder().WithNamingConvention(UnderscoredNamingConvention.Instance).Build();
             return (d.Deserialize<Dictionary<string, object?>>(normalized[4..end]) ?? [], normalized[(end + 4)..].TrimStart());
         }
-        catch (Exception ex) { _logger.LogDebug(ex, "Template frontmatter parse failed"); return ([], normalized[(end + 4)..].TrimStart()); }
+        catch (Exception ex) { logger?.LogDebug(ex, "Template frontmatter parse failed"); return ([], normalized[(end + 4)..].TrimStart()); }
     }
 }

@@ -25,6 +25,7 @@ public sealed class MemorySessionStorage<TMetadata> : ISessionStorage<TMetadata>
         if (initialLeafId is not null) _leafId = initialLeafId;
     }
 
+    public TMetadata Metadata => _metadata;
     public Task<TMetadata> GetMetadataAsync(CancellationToken cancellationToken = default) => Task.FromResult(_metadata);
     public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => Task.FromResult(_leafId is null || _byId.ContainsKey(_leafId) ? _leafId : throw new InvalidOperationException($"Entry {_leafId} not found"));
     public Task<string> CreateEntryIdAsync(CancellationToken cancellationToken = default) => Task.FromResult(SessionRepoUtils.CreateEntryId(_byId.ContainsKey));

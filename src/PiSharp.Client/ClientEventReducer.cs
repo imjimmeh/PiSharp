@@ -122,7 +122,11 @@ public static class ClientEventReducer
         if (payload?.Model is null) return state with { LastAppliedSequence = seq };
 
         var model = payload.Model;
-        var display = !string.IsNullOrWhiteSpace(model.Name) ? model.Name : model.Id;
+        var display = !string.IsNullOrWhiteSpace(model.Name)
+            ? model.Name
+            : string.IsNullOrWhiteSpace(model.Provider)
+                ? model.Id
+                : $"{model.Provider}/{model.Id}";
         return state with
         {
             ModelDisplay = display,

@@ -40,6 +40,7 @@ public static class DaemonCommandHost
         {
             ApiKey = apiKey,
             LoggerFactory = loggerFactory,
+            PerSessionFileLogging = true,
             RunCommandAsync = async (context, text, options, ct) =>
             {
                 if (string.IsNullOrWhiteSpace(text)) return new ServerCommandResult(false);

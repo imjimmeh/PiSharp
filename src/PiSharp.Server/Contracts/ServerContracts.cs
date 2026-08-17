@@ -325,7 +325,13 @@ public sealed record ServerUiResponse(string RequestId, object? Value = null, bo
 
 public sealed record ServerStartupMessages(IReadOnlyList<string> Messages);
 
-public sealed record ServerSessionSnapshot(string SessionId, string? SessionFile, string? SessionName, IReadOnlyList<object> BranchEntries);
+public sealed record ServerSessionSnapshot(
+    string SessionId,
+    string? SessionFile,
+    string? SessionName,
+    IReadOnlyList<object> BranchEntries,
+    ModelDescriptor? Model = null,
+    ThinkingLevel? ThinkingLevel = null);
 
 /// <summary>Carries the live session and UI bridge into host-provided command delegates.</summary>
 public sealed record PiServerHostContext(LiveServerSession Session, IServerUiBridge UiBridge);

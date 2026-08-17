@@ -284,6 +284,7 @@ public sealed class AgentHarnessEventTests
 
         public void ReleaseAppend() => _releaseAppend.TrySetResult();
 
+        public TMetadata Metadata => _inner.Metadata;
         public Task<TMetadata> GetMetadataAsync(CancellationToken cancellationToken = default) => _inner.GetMetadataAsync(cancellationToken);
 
         public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => _inner.GetLeafIdAsync(cancellationToken);
@@ -319,6 +320,7 @@ public sealed class AgentHarnessEventTests
         public int AppendEntriesCallCount { get; private set; }
         public IReadOnlyList<int> BatchSizes => _batchSizes.ToArray();
 
+        public TMetadata Metadata => _inner.Metadata;
         public Task<TMetadata> GetMetadataAsync(CancellationToken cancellationToken = default) => _inner.GetMetadataAsync(cancellationToken);
 
         public Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default) => _inner.GetLeafIdAsync(cancellationToken);

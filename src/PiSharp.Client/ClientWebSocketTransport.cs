@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
+using PiSharp.Abstractions.Tasks;
 using PiSharp.Agent.Core.Events;
 using PiSharp.Server.Contracts;
 using PiSharp.Server.Serialization;
@@ -54,12 +55,14 @@ public sealed class ClientWebSocketTransport : IClientTransport
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly TimeSpan _commandTimeout;
     private readonly ILogger _logger;
+    private readonly BackgroundTaskTracker _taskTracker;
     private int _disposed;
 
     public ClientWebSocketTransport(ILogger logger, TimeSpan? commandTimeout = null)
     {
         _commandTimeout = commandTimeout ?? DefaultCommandTimeout;
         _logger = logger;
+        _taskTracker = new BackgroundTaskTracker(logger);
     }
 
     public ChannelReader<ServerEventEnvelope> Events => _events.Reader;
@@ -87,7 +90,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         }
 
         _logger.LogInformation("Connected to daemon at {Endpoint}", endpoint);
-        _ = Task.Run(() => ReadLoopAsync(_readerCts.Token), CancellationToken.None);
+        _taskTracker.Run("ReadLoop", ReadLoopAsync, _readerCts.Token);
     }
 
     public Task<ServerResponse> SendCommandAsync(ServerCommandEnvelope envelope, CancellationToken ct, TimeSpan? timeoutOverride = null)
@@ -181,6 +184,7 @@ public sealed class ClientWebSocketTransport : IClientTransport
         }
         finally
         {
+            await _taskTracker.DisposeAsync().ConfigureAwait(false);
             _socket.Dispose();
             _readerCts.Dispose();
             _sendLock.Dispose();

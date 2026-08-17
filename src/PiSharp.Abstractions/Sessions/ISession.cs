@@ -7,7 +7,6 @@ public interface ISession<TMetadata>
 {
     TMetadata Metadata { get; }
     string Id { get; }
-    string? LeafId { get; set; }
     ISessionStorage<TMetadata> Storage { get; }
     Task<string?> GetLeafIdAsync(CancellationToken cancellationToken = default);
     Task<SessionTreeEntry?> GetEntryAsync(string id, CancellationToken cancellationToken = default);

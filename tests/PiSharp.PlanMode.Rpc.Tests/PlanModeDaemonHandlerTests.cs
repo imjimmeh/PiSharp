@@ -121,7 +121,7 @@ public sealed class PlanModeDaemonHandlerTests
     public async Task SetPlanMode_WithoutExtensionLoaded_ReturnsPlanModeUnavailable()
     {
         // Runtime has no extension manager / no plan-mode extension loaded.
-        var registry = new ServerSessionRegistry((request, _) => CreatePlainRuntimeAsync(request.Cwd), TimeSpan.FromHours(1));
+        var registry = new ServerSessionRegistry(async (request, _) => new SessionRuntimeResult(await CreatePlainRuntimeAsync(request.Cwd), null), TimeSpan.FromHours(1));
         var handler = new PiServerWebSocketHandler(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance);
         var created = await CreateSessionAsync(handler);
 
@@ -180,7 +180,7 @@ public sealed class PlanModeDaemonHandlerTests
             new PiSharp.Extensions.ExtensionDescriptor("plan-mode", "PiSharp Plan Mode", "0.1.0", SourceId: "pi:extension:plan-mode"),
             surface,
             new PiSharp.Extensions.ExtensionRuntimeBinding(TempRoot(), false, PiSharp.Extensions.NoExtensionUi.Instance));
-        var registry = new ServerSessionRegistry((request, ct) => CreateRuntimeAsync(request.Cwd, manager), TimeSpan.FromHours(1));
+        var registry = new ServerSessionRegistry(async (request, ct) => new SessionRuntimeResult(await CreateRuntimeAsync(request.Cwd, manager), null), TimeSpan.FromHours(1));
         var handler = new PiServerWebSocketHandler(registry, new ApiKeyValidator(new ApiKeyOptions { ApiKey = "secret" }), NullLogger<PiServerWebSocketHandler>.Instance);
         var created = await CreateSessionAsync(handler);
         return (handler, created.ServerSessionId);
