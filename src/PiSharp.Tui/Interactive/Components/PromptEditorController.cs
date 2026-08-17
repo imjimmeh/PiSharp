@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 namespace PiSharp.Tui.Interactive.Components;
 
 internal interface IPromptEditorSurface
@@ -11,8 +14,9 @@ internal interface IPromptEditorSurface
     bool MoveCursorVertical(int delta);
 }
 
-internal sealed class PromptEditorController(IPromptEditorSurface surface)
+internal sealed class PromptEditorController(IPromptEditorSurface surface, ILoggerFactory? loggerFactory = null)
 {
+    private readonly ILogger<PromptEditorController> _logger = loggerFactory?.CreateLogger<PromptEditorController>() ?? NullLogger<PromptEditorController>.Instance;
     private const int MaxPromptHistory = 200;
     private readonly PromptHistory _history = new(MaxPromptHistory);
     private readonly PromptSuggestionState _suggestions = new();
@@ -92,9 +96,14 @@ internal sealed class PromptEditorController(IPromptEditorSurface surface)
 
     public async Task SubmitAsync(CancellationToken cancellationToken = default)
     {
-        if (IsSubmitting) return;
+        if (IsSubmitting)
+        {
+            _logger.LogDebug("PromptEditorController.SubmitAsync ignored (already submitting)");
+            return;
+        }
 
         var text = surface.PromptText.Trim();
+        _logger.LogDebug("PromptEditorController.SubmitAsync entry textLength={TextLength}", text.Length);
         if (_mode.ShouldSubmitSelectedSuggestion(text, SelectedCompletion) && !HasExactSuggestion(text))
         {
             text = SelectedCompletion!.Value;
@@ -111,7 +120,9 @@ internal sealed class PromptEditorController(IPromptEditorSurface surface)
         IsSubmitting = false;
         try
         {
+            _logger.LogDebug("PromptEditorController.SubmitAsync raising Submitted event");
             await Submitted(text, cancellationToken).ConfigureAwait(false);
+            _logger.LogDebug("PromptEditorController.SubmitAsync Submitted event completed");
         }
         catch
         {

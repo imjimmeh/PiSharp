@@ -184,17 +184,20 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
     public async Task PromptAsync(string text, IReadOnlyList<ImageContent> images, CancellationToken token)
     {
+        _logger.LogDebug("RemoteTuiBackend.PromptAsync entry textLength={TextLength}", text.Length);
         var sessionId = RequireSessionId();
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.Prompt, ServerSessionId: sessionId),
             new { message = text, images },
-            token);
+            token).ConfigureAwait(false);
+        _logger.LogDebug("RemoteTuiBackend.PromptAsync exit success={Success}", response.Success);
         ThrowOnFailure(response, "prompt");
     }
 
     /// <summary>Steers the daemon with the message's text via the <c>steer</c> command; fire-and-forget.</summary>
     public void Steer(AgentMessage message)
     {
+        _logger.LogDebug("RemoteTuiBackend.Steer entry");
         var sessionId = ServerSessionId;
         if (sessionId is null)
         {
@@ -263,7 +266,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
                 sinceSequence = _maxSequence;
             }
 
-            var state = await GetStateAsync(token);
+            var state = await GetStateAsync(token).ConfigureAwait(false);
             lock (_sync)
             {
                 _state = ClientToTuiAdapter.ToClientState(_state, state);
@@ -275,7 +278,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             await SendAsync(
                 new ServerCommandEnvelope(ServerCommandTypes.Attach, ServerSessionId: sessionId),
                 new { sinceSequence },
-                token);
+                token).ConfigureAwait(false);
             Resynced?.Invoke();
             _logger.LogInformation("Daemon event stream resynchronized from sequence {SinceSequence}", sinceSequence);
         }
@@ -318,7 +321,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
             if (_state.SessionName is { } name) return name;
         }
 
-        return (await GetStateAsync(token)).SessionName;
+        return (await GetStateAsync(token).ConfigureAwait(false)).SessionName;
     }
 
     public async Task<TuiCommandDispatchResult> DispatchCommandAsync(TuiCommandDispatchRequest request, CancellationToken token = default)
@@ -326,7 +329,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.RunCommand, ServerSessionId: RequireSessionId()),
             new { text = request.Text, options = (object?)null },
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success)
         {
             throw new InvalidOperationException($"run_command failed: {response.Error?.Code}: {response.Error?.Message}");
@@ -343,7 +346,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.CompleteCommand, ServerSessionId: RequireSessionId()),
             new { text },
-            token);
+            token).ConfigureAwait(false);
         return response.Success
             ? FromServerPayload<IReadOnlyList<string>>(response.Data) ?? []
             : [];
@@ -369,7 +372,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.ResolveTool, ServerSessionId: RequireSessionId()),
             new { name },
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success) return null;
         var wire = FromServerPayload<ExtensionToolWire>(response.Data);
         return wire is null ? null : new RemoteRegisteredTool(wire, this);
@@ -385,7 +388,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.RenderToolCall, ServerSessionId: RequireSessionId()),
             new RenderToolRequest(ServerCommandTypes.RenderToolCall, null, RequireSessionId(), name, request.ToolCallId, request.Arguments ?? EmptyArguments, IsCall: true, IsError: false, IsExpanded: request.Expanded, Width: request.Width),
-            token);
+            token).ConfigureAwait(false);
         return ReadRenderLines(response);
     }
 
@@ -399,7 +402,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.RenderToolResult, ServerSessionId: RequireSessionId()),
             new RenderToolRequest(ServerCommandTypes.RenderToolResult, null, RequireSessionId(), name, request.ToolCallId, request.Arguments ?? EmptyArguments, IsCall: false, IsError: request.IsError, IsExpanded: request.Expanded, Width: request.Width),
-            token);
+            token).ConfigureAwait(false);
         return ReadRenderLines(response);
     }
 
@@ -412,26 +415,30 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
 
     public async Task<TuiInputHookResult> ProcessInputAsync(string text, IReadOnlyList<ImageContent>? images, string source, CancellationToken token = default)
     {
+        _logger.LogDebug("RemoteTuiBackend.ProcessInputAsync entry textLength={TextLength} source={Source}", text.Length, source);
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.ProcessInput, ServerSessionId: RequireSessionId()),
             new { text, images, source },
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success)
         {
+            _logger.LogDebug("RemoteTuiBackend.ProcessInputAsync failed code={Code} message={Message}", response.Error?.Code, response.Error?.Message);
             throw new InvalidOperationException($"process_input failed: {response.Error?.Code}: {response.Error?.Message}");
         }
 
         var result = FromServerPayload<ProcessInputResult>(response.Data);
-        return result is null
+        var hookResult = result is null
             ? new TuiInputHookResult(false, text, images)
             : new TuiInputHookResult(result.Handled, result.Text, result.Images);
+        _logger.LogDebug("RemoteTuiBackend.ProcessInputAsync exit handled={Handled} textLength={TextLength}", hookResult.Handled, hookResult.Text?.Length ?? 0);
+        return hookResult;
     }
 
     public async Task<TuiThemeDocument?> GetThemeAsync(CancellationToken token = default)
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetTheme, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         return response.Success ? FromServerPayload<TuiThemeDocument>(response.Data) : null;
     }
 
@@ -439,7 +446,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetSessionSnapshot, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success)
         {
             throw new InvalidOperationException($"get_session_snapshot failed: {response.Error?.Code}: {response.Error?.Message}");
@@ -455,7 +462,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.Fork, ServerSessionId: RequireSessionId()),
             new { entryId, newSessionId = (string?)null },
-            token);
+            token).ConfigureAwait(false);
         ThrowOnFailure(response, "fork");
 
         // The daemon switched to a new live session: adopt it, then let the TUI refresh its snapshot.
@@ -482,7 +489,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetExtensionShortcuts, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success) return [];
 
         var items = FromServerPayload<IReadOnlyList<ExtensionShortcutWire>>(response.Data) ?? [];
@@ -503,7 +510,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetExtensionRegistry, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success) return null;
 
         var wire = FromServerPayload<ExtensionRegistryWire>(response.Data);
@@ -531,7 +538,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.InvokeExtensionShortcut, ServerSessionId: RequireSessionId()),
-            new { keys = shortcut.Keys, args }, ct);
+            new { keys = shortcut.Keys, args }, ct).ConfigureAwait(false);
         if (!response.Success)
             throw new InvalidOperationException($"Extension shortcut '{shortcut.Keys}' failed: {response.Error?.Code}: {response.Error?.Message}");
     }
@@ -540,7 +547,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetExtensionLoadStatus, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success) return new TuiExtensionLoadStatus(0, 0, 0, 0, 0);
 
         var summary = FromServerPayload<ExtensionLoadSummary>(response.Data);
@@ -556,7 +563,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetStartupMessages, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success) return [];
 
         return FromServerPayload<ServerStartupMessages>(response.Data)?.Messages ?? [];
@@ -566,7 +573,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.PostStartupChecks, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success)
         {
             // Older or delegate-less daemons answer not_available; startup-check lines then arrive
@@ -580,7 +587,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.CycleThinkingLevel, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         ThrowOnFailure(response, "cycle_thinking_level");
         var payload = FromServerPayload<ThinkingLevelWire>(response.Data);
         if (payload is { Level: { } level } && ClientToTuiAdapter.TryParseThinkingLevel(level) is { } parsed)
@@ -596,7 +603,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetAvailableModels, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success) return [];
 
         return FromServerPayload<IReadOnlyList<ModelDescriptor>>(response.Data) ?? [];
@@ -606,7 +613,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetCommands, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         return response.Success
             ? FromServerPayload<IReadOnlyList<string>>(response.Data) ?? []
             : [];
@@ -616,7 +623,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     {
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetLastAssistantText, ServerSessionId: RequireSessionId()),
-            token);
+            token).ConfigureAwait(false);
         if (!response.Success) return string.Empty;
 
         return FromServerPayload<TextWire>(response.Data)?.Text ?? string.Empty;
@@ -796,7 +803,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.UiResponse, ServerSessionId: envelope.ServerSessionId),
             new { requestId = response.RequestId, value = response.Value, cancelled = response.Cancelled },
-            CancellationToken.None);
+            CancellationToken.None).ConfigureAwait(false);
     }
 
     /// <summary>Ends a pending UI request on the daemon's behalf (it auto-cancelled): cancels the
@@ -819,10 +826,20 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
     // --- command plumbing ---
 
     private Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, CancellationToken token)
-        => _connection.SendAsync(envelope, token);
+        => SendAsyncCore(envelope, token);
 
     private Task<ServerResponse> SendAsync(ServerCommandEnvelope envelope, object payload, CancellationToken token)
-        => _connection.SendAsync(envelope, payload, token);
+        => SendAsyncCore(envelope, token, payload);
+
+    private async Task<ServerResponse> SendAsyncCore(ServerCommandEnvelope envelope, CancellationToken token, object? payload = null)
+    {
+        _logger.LogDebug("RemoteTuiBackend.SendAsync entry type={Type} id={Id}", envelope.Type, envelope.Id);
+        var response = payload is null
+            ? await _connection.SendAsync(envelope, token).ConfigureAwait(false)
+            : await _connection.SendAsync(envelope, payload, token).ConfigureAwait(false);
+        _logger.LogDebug("RemoteTuiBackend.SendAsync exit type={Type} id={Id} success={Success}", envelope.Type, envelope.Id, response.Success);
+        return response;
+    }
 
     private static T? FromServerPayload<T>(object? data)
         => data is null
@@ -836,7 +853,7 @@ public sealed class RemoteTuiBackend : ITuiRuntimeFacade, IAsyncDisposable
         var sessionId = RequireSessionId();
         var response = await SendAsync(
             new ServerCommandEnvelope(ServerCommandTypes.GetState, ServerSessionId: sessionId),
-            token);
+            token).ConfigureAwait(false);
         ThrowOnFailure(response, "get_state");
         return FromServerPayload<ServerSessionState>(response.Data)
             ?? throw new InvalidOperationException("get_state returned no state.");

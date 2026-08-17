@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Abstractions.Messages;
 using PiSharp.Tools.Shared;
 
@@ -9,10 +11,17 @@ public sealed record ProcessedFileReferences(string Text, IReadOnlyList<ImageCon
 
 public static class FileReferenceProcessor
 {
-    public static async Task<ProcessedFileReferences> ProcessInlineReferencesAsync(string text, string workingDirectory, CancellationToken cancellationToken = default)
+    public static async Task<ProcessedFileReferences> ProcessInlineReferencesAsync(string text, string workingDirectory, CancellationToken cancellationToken = default, ILogger? logger = null)
     {
+        logger ??= NullLogger.Instance;
+        logger.LogDebug("FileReferenceProcessor.ProcessInlineReferencesAsync entry textLength={TextLength}", text.Length);
         var references = ExtractReferences(text).ToArray();
-        if (references.Length == 0) return new ProcessedFileReferences(text, []);
+        if (references.Length == 0)
+        {
+            logger.LogDebug("FileReferenceProcessor.ProcessInlineReferencesAsync exit (no references)");
+            return new ProcessedFileReferences(text, []);
+        }
+        logger.LogDebug("FileReferenceProcessor.ProcessInlineReferencesAsync found {ReferenceCount} references", references.Length);
 
         var context = new StringBuilder();
         var images = new List<ImageContent>();
@@ -25,8 +34,13 @@ public static class FileReferenceProcessor
             await AppendFileContextAsync(context, images, fullPath, cancellationToken).ConfigureAwait(false);
         }
 
-        if (context.Length == 0) return new ProcessedFileReferences(text, []);
+        if (context.Length == 0)
+        {
+            logger.LogDebug("FileReferenceProcessor.ProcessInlineReferencesAsync exit (no usable references)");
+            return new ProcessedFileReferences(text, []);
+        }
         context.Append(text);
+        logger.LogDebug("FileReferenceProcessor.ProcessInlineReferencesAsync exit with {ImageCount} images", images.Count);
         return new ProcessedFileReferences(context.ToString(), images);
     }
 

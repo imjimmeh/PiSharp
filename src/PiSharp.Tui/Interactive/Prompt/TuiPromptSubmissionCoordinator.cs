@@ -88,6 +88,8 @@ internal sealed class TuiPromptSubmissionCoordinator
             var input = _options.ProcessInputAsync is null
                 ? new TuiInputHookResult(false, text, null)
                 : await _options.ProcessInputAsync(text, null, "interactive", token).ConfigureAwait(false);
+            _logger.LogDebug("TUI submit process_input result handled={Handled} textLength={TextLength}",
+                input.Handled, input.Text?.Length ?? 0);
             if (input.Handled)
             {
                 _logger.LogInformation("TUI prompt handled by input hook textLength={TextLength}", text.Length);
@@ -100,10 +102,14 @@ internal sealed class TuiPromptSubmissionCoordinator
                 _logger.LogDebug("TUI submit handled as command text={Text}", text);
                 return;
             }
+            _logger.LogDebug("TUI submit before RecordSubmittedPrompt marshal");
             await _gateway.RunOnTuiAsync(() => _shell.Prompt.RecordSubmittedPrompt(text)).ConfigureAwait(false);
+            _logger.LogDebug("TUI submit after RecordSubmittedPrompt marshal");
             var processed = _options.ProcessFileReferencesAsync is null
                 ? (Text: text, Images: (IReadOnlyList<ImageContent>)[])
                 : await _options.ProcessFileReferencesAsync(text, _options.WorkingDirectory ?? Environment.CurrentDirectory, token);
+            _logger.LogDebug("TUI submit file refs processed textLength={TextLength} imageCount={ImageCount}",
+                processed.Text.Length, processed.Images.Count);
             var images = input.Images is { Count: > 0 } ? input.Images.Concat(processed.Images).ToArray() : processed.Images;
 
             _logger.LogDebug("TUI prompt dispatch phase={Phase} textLength={TextLength}", _session.CurrentRuntime.Phase, text.Length);

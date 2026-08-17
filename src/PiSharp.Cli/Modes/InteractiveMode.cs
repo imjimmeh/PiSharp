@@ -205,7 +205,8 @@ public static class InteractiveMode
             CycleThinkingLevelAsync: CycleThinkingLevelAsync,
             ProcessFileReferencesAsync: async (text, cwd, token) =>
             {
-                var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, cwd, token);
+                var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, cwd, token,
+                    runtime.LoggerFactory?.CreateLogger(nameof(FileReferenceProcessor)));
                 return (processed.Text, processed.Images);
             },
             ProcessInputAsync: async (text, images, source, token) =>
@@ -556,7 +557,8 @@ public static class InteractiveMode
             CycleThinkingLevelAsync: backend.CycleThinkingLevelAsync,
             ProcessFileReferencesAsync: async (text, workingDirectory, token) =>
             {
-                var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, workingDirectory, token);
+                var processed = await FileReferenceProcessor.ProcessInlineReferencesAsync(text, workingDirectory, token,
+                    activeLoggerFactory.CreateLogger(nameof(FileReferenceProcessor)));
                 return (processed.Text, processed.Images);
             },
             ProcessInputAsync: backend.ProcessInputAsync,

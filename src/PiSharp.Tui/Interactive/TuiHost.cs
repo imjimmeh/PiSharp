@@ -264,7 +264,7 @@ public sealed class TuiHost(TuiHostOptions options)
             => await ConfirmDialog.ConfirmAsync(title, message, ct, dispatcher: appContext) ? "allow" : "deny";
 
         var sessionContext = new TuiSessionContext { CurrentRuntime = runtime, HeaderExpanded = headerExpanded };
-        var stateGateway = new TuiStateGateway(() => stateStore.Snapshot(), s => stateStore.Replace(s), renderCoordinator, appContext, cancellationToken, updateState: stateStore.Update);
+        var stateGateway = new TuiStateGateway(() => stateStore.Snapshot(), s => stateStore.Replace(s), renderCoordinator, appContext, cancellationToken, updateState: stateStore.Update, loggerFactory);
         var harnessLifecycle = new TuiHarnessLifecycleCoordinator(
             sessionContext, options, appContext, renderCoordinator,
             stateStore, LoadSessionSnapshotAsync, ApplySessionSnapshot, loggerFactory);
@@ -365,7 +365,11 @@ public sealed class TuiHost(TuiHostOptions options)
             shell.Prompt.FocusAtEnd();
             renderCoordinator.RequestRender();
         };
-        shell.Prompt.Submitted += submissionCoordinator.HandleSubmitAsync;
+        shell.Prompt.Submitted += (text, token) =>
+        {
+            _logger.LogDebug("TuiHost Submitted event fired textLength={TextLength}", text.Length);
+            return submissionCoordinator.HandleSubmitAsync(text, token);
+        };
 
         using var suggestionSubscription = TuiRenderRequestRouter.ConnectPromptSuggestions(shell.Prompt, () => renderCoordinator.RequestRender());
 

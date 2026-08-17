@@ -20,7 +20,7 @@ public sealed class PromptEditor : TextView, IPromptEditorSurface
     public PromptEditor(PromptEditorKeyMap? keyMap = null, ILoggerFactory? loggerFactory = null)
     {
         _logger = loggerFactory?.CreateLogger<PromptEditor>() ?? NullLogger<PromptEditor>.Instance;
-        _controller = new PromptEditorController(this);
+        _controller = new PromptEditorController(this, loggerFactory);
         _keyMap = keyMap ?? PromptEditorKeyMap.CreateDefault();
         WordWrap = true;
         Multiline = true;

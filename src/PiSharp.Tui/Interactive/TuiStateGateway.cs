@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PiSharp.Tui.Interactive.Shell;
 
 namespace PiSharp.Tui.Interactive;
@@ -12,8 +14,10 @@ internal sealed class TuiStateGateway(
     TuiRenderCoordinator renderCoordinator,
     ITuiApplicationContext appContext,
     CancellationToken cancellationToken,
-    Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState>? updateState = null)
+    Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState>? updateState = null,
+    ILoggerFactory? loggerFactory = null)
 {
+    private readonly ILogger _logger = loggerFactory?.CreateLogger("TuiStateGateway") ?? NullLogger.Instance;
     private readonly Func<Func<TuiRenderState, TuiRenderState>, TuiRenderState> _updateState =
         updateState ?? (update =>
         {
@@ -38,12 +42,20 @@ internal sealed class TuiStateGateway(
 
     internal async Task RunOnTuiAsync(Action action)
     {
+        _logger.LogDebug("TuiStateGateway.RunOnTuiAsync entry");
         try
         {
-            await appContext.InvokeAsync(action, cancellationToken).ConfigureAwait(false);
+            await appContext.InvokeAsync(() =>
+            {
+                _logger.LogDebug("TuiStateGateway.RunOnTuiAsync action executing");
+                action();
+                _logger.LogDebug("TuiStateGateway.RunOnTuiAsync action completed");
+            }, cancellationToken).ConfigureAwait(false);
+            _logger.LogDebug("TuiStateGateway.RunOnTuiAsync exit");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            _logger.LogDebug("TuiStateGateway.RunOnTuiAsync cancelled");
         }
     }
 }

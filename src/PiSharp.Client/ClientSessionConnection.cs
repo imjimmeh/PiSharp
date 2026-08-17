@@ -56,7 +56,18 @@ public sealed class ClientSessionConnection : IAsyncDisposable
         {
             envelope = envelope with { Id = Guid.NewGuid().ToString("N") };
         }
-        return await _transport.SendCommandAsync(envelope, payload, ct, timeoutOverride);
+        _logger.LogDebug("ClientSessionConnection.SendAsync entry type={Type} id={Id}", envelope.Type, envelope.Id);
+        try
+        {
+            var response = await _transport.SendCommandAsync(envelope, payload, ct, timeoutOverride).ConfigureAwait(false);
+            _logger.LogDebug("ClientSessionConnection.SendAsync completed type={Type} id={Id} success={Success}", envelope.Type, envelope.Id, response.Success);
+            return response;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "ClientSessionConnection.SendAsync faulted type={Type} id={Id}", envelope.Type, envelope.Id);
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -68,7 +79,7 @@ public sealed class ClientSessionConnection : IAsyncDisposable
         _pumpCts.Cancel();
         try
         {
-            await _pumpTask;
+            await _pumpTask.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -76,7 +87,7 @@ public sealed class ClientSessionConnection : IAsyncDisposable
         finally
         {
             _pumpCts.Dispose();
-            await _transport.DisposeAsync();
+            await _transport.DisposeAsync().ConfigureAwait(false);
         }
     }
 

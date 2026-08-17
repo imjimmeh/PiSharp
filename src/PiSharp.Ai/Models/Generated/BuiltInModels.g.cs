@@ -12287,9 +12287,9 @@ public static class BuiltInModels
             BaseUrl: "https://openrouter.ai/api/v1",
             Reasoning: true,
             ContextWindow: 1048576,
-            MaxTokens: 393216,
+            MaxTokens: 384000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1.44m, Output: 2.88m, CacheRead: 0.1215m))),
+            Cost: new ModelCost(Input: 0.66m, Output: 1.98m, CacheRead: 0.022m))),
 
         new("openrouter", "deepseek/deepseek-v4-pro-0813", new ModelDescriptor(
             Provider: "openrouter",
@@ -14113,7 +14113,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.6m, CacheRead: 0.01m, CacheWrite: 0.125m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 1.2m, CacheRead: 0.02m, CacheWrite: 0.25m))),
 
         new("openrouter", "openai/gpt-5.6-luna-pro", new ModelDescriptor(
             Provider: "openrouter",
@@ -14125,7 +14125,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 0.1m, Output: 0.6m, CacheRead: 0.01m, CacheWrite: 0.125m))),
+            Cost: new ModelCost(Input: 0.2m, Output: 1.2m, CacheRead: 0.02m, CacheWrite: 0.25m))),
 
         new("openrouter", "openai/gpt-5.6-luna-pro:batch", new ModelDescriptor(
             Provider: "openrouter",
@@ -14209,7 +14209,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1m, Output: 6m, CacheRead: 0.1m, CacheWrite: 1.25m))),
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("openrouter", "openai/gpt-5.6-terra-pro", new ModelDescriptor(
             Provider: "openrouter",
@@ -14221,7 +14221,7 @@ public static class BuiltInModels
             ContextWindow: 1050000,
             MaxTokens: 128000,
             Input: ["text"],
-            Cost: new ModelCost(Input: 1m, Output: 6m, CacheRead: 0.1m, CacheWrite: 1.25m))),
+            Cost: new ModelCost(Input: 2m, Output: 12m, CacheRead: 0.2m, CacheWrite: 2.5m))),
 
         new("openrouter", "openai/gpt-5.6-terra-pro:batch", new ModelDescriptor(
             Provider: "openrouter",
