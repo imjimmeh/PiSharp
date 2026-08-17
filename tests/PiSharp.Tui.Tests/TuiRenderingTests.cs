@@ -938,9 +938,9 @@ public sealed class TuiRenderingTests
         };
         chat.Render(Empty() with { Transcript = [new TuiTranscriptItem("system", "alpha beta")] });
 
-        SendMouse(chat, MouseFlags.Button1Pressed, 9, 0);
-        SendMouse(chat, MouseFlags.Button1Pressed, 13, 0);
-        var release = SendMouse(chat, MouseFlags.Button1Released, 13, 0);
+        SendMouse(chat, MouseFlags.Button1Pressed, 9, 1);
+        SendMouse(chat, MouseFlags.Button1Pressed, 13, 1);
+        var release = SendMouse(chat, MouseFlags.Button1Released, 13, 1);
 
         Assert.True(chat.WantContinuousButtonPressed);
         Assert.True(release.Handled);
@@ -961,9 +961,9 @@ public sealed class TuiRenderingTests
         };
         chat.SelectionCopied += (text, copiedToClipboard) => copiedEvent = (text, copiedToClipboard);
         chat.Render(Empty() with { Transcript = [new TuiTranscriptItem("system", "alpha beta")] });
-        SendMouse(chat, MouseFlags.Button1Pressed, 9, 0);
-        SendMouse(chat, MouseFlags.Button1Pressed, 13, 0);
-        SendMouse(chat, MouseFlags.Button1Released, 13, 0);
+        SendMouse(chat, MouseFlags.Button1Pressed, 9, 1);
+        SendMouse(chat, MouseFlags.Button1Pressed, 13, 1);
+        SendMouse(chat, MouseFlags.Button1Released, 13, 1);
 
         Assert.True(chat.CopySelectionToClipboard());
         Assert.Equal("alpha", copied);
@@ -979,9 +979,9 @@ public sealed class TuiRenderingTests
         chat.ClipboardWriter = _ => false;
         chat.SelectionCopied += (text, copiedToClipboard) => copiedEvent = (text, copiedToClipboard);
         chat.Render(Empty() with { Transcript = [new TuiTranscriptItem("system", "alpha beta")] });
-        SendMouse(chat, MouseFlags.Button1Pressed, 9, 0);
-        SendMouse(chat, MouseFlags.Button1Pressed, 13, 0);
-        SendMouse(chat, MouseFlags.Button1Released, 13, 0);
+        SendMouse(chat, MouseFlags.Button1Pressed, 9, 1);
+        SendMouse(chat, MouseFlags.Button1Pressed, 13, 1);
+        SendMouse(chat, MouseFlags.Button1Released, 13, 1);
 
         Assert.False(chat.CopySelectionToClipboard());
         Assert.Equal(("alpha", false), copiedEvent);
@@ -999,9 +999,9 @@ public sealed class TuiRenderingTests
         ];
         chat.Render(Empty() with { Transcript = [new TuiTranscriptItem("system", "ignored")] });
 
-        SendMouse(chat, MouseFlags.Button1Pressed, 0, 0);
-        SendMouse(chat, MouseFlags.Button1Pressed, 5, 1);
-        SendMouse(chat, MouseFlags.Button1Released, 5, 1);
+        SendMouse(chat, MouseFlags.Button1Pressed, 0, 1);
+        SendMouse(chat, MouseFlags.Button1Pressed, 5, 2);
+        SendMouse(chat, MouseFlags.Button1Released, 5, 2);
 
         Assert.True(chat.HasSelection);
         Assert.Equal($"first line{Environment.NewLine}second", chat.SelectedText);
@@ -1018,11 +1018,11 @@ public sealed class TuiRenderingTests
         };
         chat.Render(Empty() with { Transcript = transcript });
 
-        SendMouse(chat, MouseFlags.Button1Pressed, 9, 0);
-        SendMouse(chat, MouseFlags.Button1Pressed, 13, 0);
+        SendMouse(chat, MouseFlags.Button1Pressed, 9, 1);
+        SendMouse(chat, MouseFlags.Button1Pressed, 13, 1);
         transcript.Add(new TuiTranscriptItem("assistant", "new streamed output"));
         chat.Render(Empty() with { Transcript = transcript });
-        SendMouse(chat, MouseFlags.Button1Pressed, 13, 0);
+        SendMouse(chat, MouseFlags.Button1Pressed, 13, 1);
 
         Assert.Equal("alpha", chat.SelectedText);
     }
@@ -1033,9 +1033,9 @@ public sealed class TuiRenderingTests
         var chat = new ChatView { Width = 80, Height = 3 };
         chat.Render(Empty() with { Transcript = [new TuiTranscriptItem("system", "界 alpha")] });
 
-        SendMouse(chat, MouseFlags.Button1Pressed, 12, 0);
-        SendMouse(chat, MouseFlags.Button1Pressed, 16, 0);
-        SendMouse(chat, MouseFlags.Button1Released, 16, 0);
+        SendMouse(chat, MouseFlags.Button1Pressed, 12, 1);
+        SendMouse(chat, MouseFlags.Button1Pressed, 16, 1);
+        SendMouse(chat, MouseFlags.Button1Released, 16, 1);
 
         Assert.Equal("alpha", chat.SelectedText);
     }
@@ -1655,6 +1655,32 @@ public sealed class TuiRenderingTests
         Assert.StartsWith("  [system] hello", contentRow.Text, StringComparison.Ordinal);
         Assert.Equal(40, contentRow.Text.Length);
         Assert.Equal(string.Empty.PadRight(40), chat.Rows[^1].Text);
+    }
+
+    [Fact]
+    public void PlannerInsertsBlankSeparatorBetweenTranscriptItems()
+    {
+        var planner = new ChatTranscriptRowPlanner();
+        var state = Empty() with
+        {
+            Transcript =
+            [
+                new TuiTranscriptItem("user", "first"),
+                new TuiTranscriptItem("assistant", "second")
+            ]
+        };
+        var rows = planner.BuildRows(state, 40, new ChatRowCache(TuiMessageRenderer.Render));
+        Assert.Contains(rows, r => string.IsNullOrWhiteSpace(r.Text));
+    }
+
+    [Fact]
+    public void PlannerEmitsDimMetadataHeaderBeforeEachRoleGroup()
+    {
+        var planner = new ChatTranscriptRowPlanner();
+        var state = Empty() with { Transcript = [new TuiTranscriptItem("user", "hello")] };
+        var rows = planner.BuildRows(state, 40, new ChatRowCache(TuiMessageRenderer.Render));
+        var metadata = rows.FirstOrDefault(r => r.Kind == TuiChatRowKind.System && r.Text.Contains("user", StringComparison.Ordinal));
+        Assert.NotNull(metadata);
     }
 
     [Fact]

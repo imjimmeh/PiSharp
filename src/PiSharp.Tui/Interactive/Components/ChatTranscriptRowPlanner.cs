@@ -31,6 +31,7 @@ internal sealed class ChatTranscriptRowPlanner
         }
 
         var nextTranscriptRowGroups = new List<PlannedTranscriptRowGroup>(state.Transcript.Count);
+        var stamp = DateTimeOffset.Now.ToString("HH:mm:ss");
         for (var index = 0; index < state.Transcript.Count; index++)
         {
             var item = state.Transcript[index];
@@ -47,6 +48,7 @@ internal sealed class ChatTranscriptRowPlanner
 
             profilingCounters?.Increment(TuiProfilingCounterNames.ChatRowGroupPlan);
             var groupRows = new List<TuiChatRow>();
+            groupRows.Add(ChatRowCache.ApplyHorizontalPadding(ClipMetadataLabel(MetadataRow(item, stamp), width), width));
             cache.AddPaddedRowGroup(groupRows, cache.GetOrRenderTranscriptItem(item, state, width, activeCacheKeys), width);
             var plannedGroup = new PlannedTranscriptRowGroup(item, groupRows.ToArray());
             rows.AddRange(plannedGroup.Rows);
@@ -65,5 +67,23 @@ internal sealed class ChatTranscriptRowPlanner
         _hasPlan = true;
         cache.Prune(activeCacheKeys);
         return rows;
+    }
+    private static TuiChatRow MetadataRow(TuiTranscriptItem item, string stamp)
+    {
+        var label = item.Role switch
+        {
+            "user" => $"user · {stamp}",
+            "assistant" => $"assistant · {stamp}",
+            "tool" or "toolResult" => $"tool · {item.ToolName ?? "tool"} · {stamp}",
+            "system" => $"system · {stamp}",
+            _ => $"{item.Role} · {stamp}"
+        };
+        return new TuiChatRow(label, TuiChatRowKind.System);
+    }
+    private static TuiChatRow ClipMetadataLabel(TuiChatRow row, int width)
+    {
+        var max = ChatRowCache.ContentWidth(width);
+        if (row.Text.Length <= max) return row;
+        return row with { Text = row.Text[..max] };
     }
 }
